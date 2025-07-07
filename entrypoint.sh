@@ -19,4 +19,5 @@ if not User.objects.filter(username='admin').exists():
 " | python manage.py shell
 
 # Start Gunicorn server
-exec gunicorn Putevka.wsgi:application --bind 0.0.0.0:8000
+#exec gunicorn Putevka.wsgi:application --bind 0.0.0.0:8000
+exec python manage.py runserver 0.0.0.0:8000
