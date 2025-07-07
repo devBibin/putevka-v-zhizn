@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.sqlite3
+*.log
+*.pot
+*.pyc
+*.pyo
+*.pyd
+*.env
+*.DS_Store
+.env
+
+# Virtual environments
+venv/
+env/
+
+# Django static and media files
+staticfiles/
+media/
+
+# Docker
+*.pid
+*.swp
+docker-compose.override.yml
+
+# VSCode
+.vscode/
+
+# PyCharm
+.idea/
+
+# Migrations (optional: keep if you want to version DB structure)
+**/migrations/*.py
+**/migrations/*.pyc
+!**/migrations/__init__.py
