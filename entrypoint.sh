@@ -18,6 +18,8 @@ if not User.objects.filter(username='admin').exists():
     User.objects.create_superuser('admin', 'admin@example.com', 'adminpass')
 " | python manage.py shell
 
+python telegram_bot_polling.py &
+
 # Start Gunicorn server
 #exec gunicorn Putevka.wsgi:application --bind 0.0.0.0:8000
 exec python manage.py runserver 0.0.0.0:8000

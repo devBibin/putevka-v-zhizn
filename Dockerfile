@@ -14,6 +14,9 @@ RUN pip install --no-cache-dir \
     --default-timeout=30 \
     -r requirements.txt
 
+COPY .env .
+COPY telegram_bot_polling.py .
+
 COPY . .
 
 COPY entrypoint.sh /entrypoint.sh
