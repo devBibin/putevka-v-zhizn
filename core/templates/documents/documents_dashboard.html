@@ -1,0 +1,73 @@
+{% extends "core/base.html" %}
+{% load static %}
+{% load widget_tweaks %}
+
+{% block title %}Мои Документы и Загрузка{% endblock %}
+
+{% block content %}
+    <h1 class="mb-4">Мои Документы</h1>
+
+    <div class="row">
+        <div class="col-md-5">
+            <div class="card mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h2 class="card-title mb-0">Загрузить новый документ</h2>
+                </div>
+                <div class="card-body">
+                    <form method="post" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        {% for field in form %}
+                            <div class="mb-3">
+                                {{ field.label_tag }}
+                                {{ field|add_class:"form-control" }}
+                                {% if field.help_text %}
+                                    <div class="form-text text-muted">{{ field.help_text }}</div>
+                                {% endif %}
+                                {% for error in field.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                        {% endfor %}
+                        {% if form.non_field_errors %}
+                            <div class="alert alert-danger">
+                                {% for error in form.non_field_errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                        <button type="submit" class="btn btn-primary mt-3">Загрузить</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-7">
+            <div class="card">
+                <div class="card-header bg-secondary text-white">
+                    <h2 class="card-title mb-0">Список моих документов</h2>
+                </div>
+                <div class="card-body">
+                    {% if documents %}
+                        <ul class="list-group">
+                            {% for doc in documents %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <a href="{{ doc.file.url }}" target="_blank">{{ doc.caption|default:doc.file.name }}</a>
+                                        {% if doc.caption %}
+                                            <small class="text-muted d-block">{{ doc.file.name }}</small>
+                                        {% endif %}
+                                    </div>
+                                    <span class="badge bg-info text-dark">{{ doc.uploaded_at|date:"d.m.Y H:i" }}</span>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <div class="alert alert-info" role="alert">
+                            У вас пока нет загруженных документов.
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

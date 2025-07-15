@@ -22,5 +22,9 @@ from django.conf.urls.static import static
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('core.urls')),
+    path('documents/', include('documents.urls')),
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT) \
 + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+if settings.DEBUG: #для дева, чтобы хранить и выбрасывать картинки, вопрос: что будем юзать на проде?
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
