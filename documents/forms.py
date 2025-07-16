@@ -1,5 +1,6 @@
 from django import forms
 from .models import Document
+import magic
 
 class DocumentUploadForm(forms.ModelForm):
     class Meta:
@@ -42,6 +43,14 @@ class DocumentUploadForm(forms.ModelForm):
         uploaded_file = self.cleaned_data.get('file')
         if not uploaded_file:
             raise forms.ValidationError("Выберите файл для загрузки.")
+        else:
+            initial_bytes = uploaded_file.read(1024)
+            uploaded_file.seek(0)
+
+            try:
+                file_mime_type = magic.from_buffer(initial_bytes, mime=True)
+            except Exception as e:
+                raise forms.ValidationError(f"Не удалось определить тип файла: {e}")
 
         allowed_types_map = {
             'PASSPORT': ['application/pdf', 'image/jpeg', 'image/png'],
@@ -60,7 +69,7 @@ class DocumentUploadForm(forms.ModelForm):
 
         allowed_types = allowed_types_map.get(doc_type_for_validation, allowed_types_map['GENERAL'])
 
-        if uploaded_file.content_type not in allowed_types:
+        if file_mime_type not in allowed_types:
             type_names = ", ".join([t.split('/')[-1] for t in allowed_types])
             raise forms.ValidationError(
                 f"Недопустимый формат файла. Разрешены: {type_names.upper().replace('JPEG', 'JPG')}."
