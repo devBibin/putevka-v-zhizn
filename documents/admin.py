@@ -20,8 +20,8 @@ class DocumentAdmin(admin.ModelAdmin):
 class DocumentInline(admin.TabularInline):
     model = Document
     extra = 0
-    fields = ('caption', 'file', 'uploaded_at')
-    readonly_fields = ('uploaded_at',)
+    fields = ('caption', 'document_type', 'file', 'uploaded_at')
+    readonly_fields = ('uploaded_at', 'caption', 'document_type', 'file')
 
     def get_formset(self, request, obj=None, **kwargs):
         formset = super().get_formset(request, obj, **kwargs)
