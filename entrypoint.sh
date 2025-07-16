@@ -1,7 +1,7 @@
 #!/bin/sh
 
 echo "Waiting for PostgreSQL..."
-until pg_isready -h db -U vukish; do sleep 0.1; done
+until pg_isready -h db -U "$POSTGRES_USER"; do sleep 0.1; done
 echo "PostgreSQL started."
 
 # Apply migrations
@@ -14,8 +14,13 @@ python manage.py collectstatic --noinput
 echo "
 from django.contrib.auth import get_user_model
 User = get_user_model()
+
+username = os.environ.get('DJANGO_SUPERUSER_USERNAME', 'admin')
+email = os.environ.get('DJANGO_SUPERUSER_EMAIL', '')
+password = os.environ.get('DJANGO_SUPERUSER_PASSWORD', '0000')
+
 if not User.objects.filter(username='admin').exists():
-    User.objects.create_superuser('admin', 'admin@example.com', 'adminpass')
+    User.objects.create_superuser(username, email, password)
 " | python manage.py shell
 
 python telegram_bot_polling.py &
