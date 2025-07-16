@@ -16,6 +16,10 @@ RUN pip install --no-cache-dir \
 
 COPY . .
 
+RUN mkdir -p /media/documents && \
+    chmod 755 /media && \
+    chmod 755 /media/documents
+
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
