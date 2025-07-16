@@ -1,7 +1,9 @@
 from django.contrib import admin
-from .models import Document
 from django.contrib.auth.admin import UserAdmin
 from django.contrib.auth.models import User
+
+from .models import Document
+
 
 @admin.register(Document)
 class DocumentAdmin(admin.ModelAdmin):
@@ -12,8 +14,10 @@ class DocumentAdmin(admin.ModelAdmin):
 
     def get_file_url(self, obj):
         if obj.file:
-            return admin.display(description="Файл", ordering="file")(lambda x: f'<a href="{x.file.url}" target="_blank">{x.file.name.split("/")[-1]}</a>')(obj)
+            return admin.display(description="Файл", ordering="file")(
+                lambda x: f'<a href="{x.file.url}" target="_blank">{x.file.name.split("/")[-1]}</a>')(obj)
         return "Нет файла"
+
     get_file_url.allow_tags = True
 
 
@@ -34,8 +38,10 @@ class DocumentInline(admin.TabularInline):
     def has_delete_permission(self, request, obj=None):
         return True
 
+
 class CustomUserAdmin(UserAdmin):
-    inlines = [DocumentInline,]
+    inlines = [DocumentInline, ]
+
 
 admin.site.unregister(User)
 admin.site.register(User, CustomUserAdmin)

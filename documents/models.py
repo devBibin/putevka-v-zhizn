@@ -1,12 +1,15 @@
-from django.db import models
-from django.contrib.auth.models import User
 import os
 import uuid
+
+from django.contrib.auth.models import User
+from django.db import models
+
 
 def upload_to_path(instance, filename):
     ext = filename.split('.')[-1]
     new_filename = f'{filename.split(".")[0]}-{uuid.uuid4().hex}.{ext}'
     return os.path.join('documents', instance.user.username, new_filename)
+
 
 class Document(models.Model):
     DOCUMENT_TYPE_CHOICES = [

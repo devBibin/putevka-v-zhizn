@@ -1,13 +1,15 @@
-from django.http import Http404, FileResponse
-from django.shortcuts import render, redirect
-from django.contrib.auth.decorators import login_required
+import mimetypes
+import os
+
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.http import Http404, FileResponse
+from django.shortcuts import get_object_or_404
+from django.shortcuts import render, redirect
+
+from .decorators import rate_limit_uploads
 from .forms import DocumentUploadForm
 from .models import Document
-from django.shortcuts import get_object_or_404
-from .decorators import rate_limit_uploads
-import os
-import mimetypes
 
 
 @login_required
@@ -38,6 +40,7 @@ def serve_document(request, document_id):
             raise Http404("Произошла ошибка при попытке открыть документ.")
     else:
         raise Http404("У вас нет доступа к этому документу.")
+
 
 @login_required
 @rate_limit_uploads(rate_limit_seconds=1, max_uploads=1)
@@ -127,4 +130,3 @@ def delete_document(request, document_id):
     document.delete()
     messages.success(request, 'Документ успешно удален.')
     return redirect('documents_dashboard')
-
