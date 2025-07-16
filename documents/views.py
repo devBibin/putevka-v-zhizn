@@ -4,9 +4,11 @@ from django.contrib import messages
 from .forms import DocumentUploadForm
 from .models import Document
 from django.shortcuts import get_object_or_404
+from .decorators import rate_limit_uploads
 
 
 @login_required
+@rate_limit_uploads(rate_limit_seconds=1, max_uploads=1)
 def documents_dashboard(request):
     user_documents = Document.objects.filter(user=request.user).order_by('-uploaded_at')
 
