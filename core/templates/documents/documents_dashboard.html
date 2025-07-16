@@ -19,7 +19,11 @@
                         {% for field in form %}
                             <div class="mb-3">
                                 {{ field.label_tag }}
-                                {{ field|add_class:"form-control" }}
+                                {% if field.name == 'file' %}
+                                    {{ field|add_class:"form-control"|attr:"accept:application/pdf,application/msword,text/plain,image/jpeg,image/png" }}
+                                {% else %}
+                                    {{ field|add_class:"form-control" }}
+                                {% endif %}
                                 {% if field.help_text %}
                                     <div class="form-text text-muted">{{ field.help_text }}</div>
                                 {% endif %}
