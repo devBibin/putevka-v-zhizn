@@ -1,3 +1,4 @@
+from django.http import Http404, FileResponse
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
@@ -5,7 +6,38 @@ from .forms import DocumentUploadForm
 from .models import Document
 from django.shortcuts import get_object_or_404
 from .decorators import rate_limit_uploads
+import os
+import mimetypes
 
+
+@login_required
+def serve_document(request, document_id):
+    document = get_object_or_404(Document, pk=document_id)
+    if request.user == document.user or request.user.is_staff:
+        file_path = document.file.path
+
+        if not os.path.exists(file_path):
+            raise Http404("Документ не найден на сервере.")
+
+        try:
+            content_type, encoding = mimetypes.guess_type(file_path)
+
+            if content_type is None:
+                content_type = 'application/octet-stream'
+
+            response = FileResponse(open(file_path, 'rb'),
+                                    content_type=content_type)
+
+            response['Content-Disposition'] = f'inline; filename="{document.file.name.split("/")[-1]}"'
+
+            return response
+        except FileNotFoundError:
+            raise Http404("Файл документа не найден.")
+        except Exception as e:
+            print(f"Ошибка при отдаче файла: {e}")
+            raise Http404("Произошла ошибка при попытке открыть документ.")
+    else:
+        raise Http404("У вас нет доступа к этому документу.")
 
 @login_required
 @rate_limit_uploads(rate_limit_seconds=1, max_uploads=1)
