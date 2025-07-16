@@ -4,28 +4,75 @@ from .models import Document
 class DocumentUploadForm(forms.ModelForm):
     class Meta:
         model = Document
-        fields = ['file', 'caption']
+        fields = ['file', 'caption', 'document_type']
+
+        labels = {
+            'caption': 'Описание документа',
+            'file': 'Выберите файл',
+            'document_type': 'Тип документа',
+        }
+        widgets = {
+            'document_type': forms.HiddenInput(),
+        }
+
+    def __init__(self, *args, **kwargs):
+        self.specific_document_type = kwargs.pop('specific_document_type', None)
+        self.specific_caption = kwargs.pop('specific_caption', None)
+
+        super().__init__(*args, **kwargs)
+
+        if self.specific_document_type:
+            self.initial['document_type'] = self.specific_document_type
+            self.fields['document_type'].required = True
+            self.fields['document_type'].widget = forms.HiddenInput()
+
+            if self.specific_caption:
+                self.initial['caption'] = self.specific_caption
+                self.fields['caption'].widget = forms.TextInput(attrs={'readonly': 'readonly'})
+                self.fields['caption'].required = False
+            else:
+                self.fields['caption'].required = True
+        else:
+            self.fields['document_type'].initial = 'GENERAL'
+            self.fields['document_type'].widget = forms.HiddenInput()
+            self.fields['caption'].required = False
+            self.fields['caption'].widget = forms.TextInput(attrs={'placeholder': 'Введите описание (необязательно)'})
 
     def clean_file(self):
         uploaded_file = self.cleaned_data.get('file')
-        if uploaded_file:
-            allowed_types = [
+        if not uploaded_file:
+            raise forms.ValidationError("Выберите файл для загрузки.")
+
+        allowed_types_map = {
+            'PASSPORT': ['application/pdf', 'image/jpeg', 'image/png'],
+            'INN': ['application/pdf', 'image/jpeg', 'image/png'],
+            'SNILS': ['application/pdf', 'image/jpeg', 'image/png'],
+            'GENERAL': [
                 'application/pdf',
-                'application/msword',  # .doc
-                'application/vnd.openxmlformats-officedocument.wordprocessingml.document',  # .docx
-                'text/plain',  # .txt
-                'image/jpeg',  # .jpg, .jpeg
-                'image/png',  # .png
+                'application/msword',
+                'text/plain',
+                'image/jpeg',
+                'image/png',
             ]
+        }
 
-            if uploaded_file.content_type not in allowed_types:
-                raise forms.ValidationError(
-                    f"Недопустимый формат файла. Разрешены: PDF, Word (doc/docx), TXT, JPG, PNG."
-                )
+        doc_type_for_validation = self.specific_document_type or self.initial.get('document_type', 'GENERAL')
 
-            max_upload_size = 20 * 1024 * 1024  # 20 MB
-            if uploaded_file.size > max_upload_size:
-                raise forms.ValidationError(
-                    f"Размер файла не должен превышать {max_upload_size / (1024 * 1024):.0f} MB.")
+        allowed_types = allowed_types_map.get(doc_type_for_validation, allowed_types_map['GENERAL'])
+
+        if uploaded_file.content_type not in allowed_types:
+            type_names = ", ".join([t.split('/')[-1] for t in allowed_types])
+            raise forms.ValidationError(
+                f"Недопустимый формат файла. Разрешены: {type_names.upper().replace('JPEG', 'JPG')}."
+            )
+
+        max_upload_size = 20 * 1024 * 1024  # 20 MB
+        if uploaded_file.size > max_upload_size:
+            raise forms.ValidationError(f"Размер файла не должен превышать {max_upload_size / (1024 * 1024):.0f} MB.")
 
         return uploaded_file
+
+    def clean_document_type(self):
+        if self.specific_document_type and self.cleaned_data.get('document_type') != self.specific_document_type:
+            raise forms.ValidationError("Тип документа не может быть изменен.")
+        return self.cleaned_data.get('document_type')
