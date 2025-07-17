@@ -45,7 +45,7 @@ def serve_document(request, document_id):
 @login_required
 @rate_limit_uploads(rate_limit_seconds=1, max_uploads=1)
 def documents_dashboard(request):
-    user_documents = Document.objects.filter(user=request.user).order_by('-uploaded_at')
+    user_documents = Document.objects.filter(user=request.user).filter(is_deleted=False).order_by('-uploaded_at')
 
     specific_doc_types = {
         'PASSPORT': 'Паспорт',
@@ -75,7 +75,7 @@ def documents_dashboard(request):
                 specific_caption=specific_doc_types[form_submitted_type]
             )
             if form.is_valid():
-                if Document.objects.filter(user=request.user, document_type=form_submitted_type).exists():
+                if Document.objects.filter(user=request.user, document_type=form_submitted_type).filter(is_deleted=False).exists():
                     messages.error(request,
                                    f'{specific_doc_types[form_submitted_type]} уже загружен. Удалите старый, чтобы загрузить новый.')
                 else:
@@ -127,6 +127,7 @@ def documents_dashboard(request):
 def delete_document(request, document_id):
     document = get_object_or_404(Document, pk=document_id, user=request.user)
 
-    document.delete()
+    document.is_deleted = True
+    document.save()
     messages.success(request, 'Документ успешно удален.')
     return redirect('documents_dashboard')

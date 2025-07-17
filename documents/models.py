@@ -23,6 +23,7 @@ class Document(models.Model):
     file = models.FileField(upload_to=upload_to_path)
     caption = models.CharField(max_length=255, blank=True)
     uploaded_at = models.DateTimeField(auto_now_add=True)
+    is_deleted = models.BooleanField(default=False)
 
     document_type = models.CharField(
         max_length=20,
