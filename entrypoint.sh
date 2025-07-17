@@ -4,6 +4,9 @@ echo "Waiting for PostgreSQL..."
 until pg_isready -h db -U vukish; do sleep 0.1; done
 echo "PostgreSQL started."
 
+# Create migrations
+python manage.py makemigrations
+
 # Apply migrations
 python manage.py migrate
 
