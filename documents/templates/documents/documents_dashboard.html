@@ -36,8 +36,6 @@
                                 <i class="bi bi-exclamation-circle-fill text-warning me-2"></i>{{ data.display_name }} не загружен.
                             </p>
                             <form method="post" enctype="multipart/form-data" class="mt-auto">
-                                {% csrf_token %}
-                                <input type="hidden" name="document_type" value="{{ type_key }}">
 
                                 {% for field in data.form %}
                                     {% if field.name == 'file' or field.name == 'caption' %}
@@ -95,24 +93,20 @@
                         {% csrf_token %}
                         <input type="hidden" name="form_type" value="general_document_form">
                         {% for field in general_document_form %}
-                            {% if field.name != 'document_type' %}
-                                <div class="mb-3">
-                                    {{ field.label_tag }}
-                                    {% if field.name == 'file' %}
-                                        {{ field|add_class:"form-control"|attr:"accept:application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/plain,image/jpeg,image/png" }}
-                                    {% else %}
-                                        {{ field|add_class:"form-control" }}
-                                    {% endif %}
-                                    {% if field.help_text %}
-                                        <div class="form-text text-muted">{{ field.help_text }}</div>
-                                    {% endif %}
-                                    {% for error in field.errors %}
-                                        <div class="text-danger small">{{ error }}</div>
-                                    {% endfor %}
-                                </div>
-                            {% else %}
-                                {{ field }}
-                            {% endif %}
+                            <div class="mb-3">
+                                {{ field.label_tag }}
+                                {% if field.name == 'file' %}
+                                    {{ field|add_class:"form-control"|attr:"accept:application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/plain,image/jpeg,image/png" }}
+                                {% else %}
+                                    {{ field|add_class:"form-control" }}
+                                {% endif %}
+                                {% if field.help_text %}
+                                    <div class="form-text text-muted">{{ field.help_text }}</div>
+                                {% endif %}
+                                {% for error in field.errors %}
+                                    <div class="text-danger small">{{ error }}</div>
+                                {% endfor %}
+                            </div>
                         {% endfor %}
                         {% if general_document_form.non_field_errors %}
                             <div class="alert alert-danger">
@@ -151,12 +145,10 @@
                                         {% endif %}
                                     </div>
                                     <span class="badge bg-info text-dark">{{ doc.uploaded_at|date:"d.m.Y H:i" }}</span>
-                                    {% if doc.document_type == 'GENERAL' %}
-                                        <form action="{% url 'delete_document' doc.pk %}" method="post" class="ms-3" onsubmit="return confirm('Вы уверены, что хотите удалить этот документ?');">
-                                            {% csrf_token %}
-                                            <button type="submit" class="btn btn-danger btn-sm">X</button>
-                                        </form>
-                                    {% endif %}
+                                    <form action="{% url 'delete_document' doc.pk %}" method="post" class="ms-3" onsubmit="return confirm('Вы уверены, что хотите удалить этот документ?');">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-danger btn-sm">X</button>
+                                    </form>
                                 </li>
                             {% endfor %}
                         </ul>

@@ -7,18 +7,11 @@ from django.db import models
 
 def upload_to_path(instance, filename):
     ext = filename.split('.')[-1]
-    new_filename = f'{filename.split(".")[0]}-{uuid.uuid4().hex}.{ext}'
+    new_filename = f'{filename.split(".")[0]}_{uuid.uuid4().hex}.{ext}'
     return os.path.join('documents', instance.user.username, new_filename)
 
 
 class Document(models.Model):
-    DOCUMENT_TYPE_CHOICES = [
-        ('PASSPORT', 'Паспорт'),
-        ('INN', 'ИНН'),
-        ('SNILS', 'СНИЛС'),
-        ('GENERAL', 'Общий документ'),
-    ]
-
     STATUSES = [
         ('PENDING', 'На проверке'),
         ('APPROVED', 'Подтверждено'),
@@ -32,15 +25,5 @@ class Document(models.Model):
     is_deleted = models.BooleanField(default=False)
     status = models.CharField(max_length=12, choices=STATUSES, default='PENDING')
 
-    document_type = models.CharField(
-        max_length=20,
-        choices=DOCUMENT_TYPE_CHOICES,
-        default='GENERAL',
-        verbose_name="Тип документа",
-        unique=False
-    )
-
     def __str__(self):
-        if self.document_type != 'GENERAL':
-            return f"{self.get_document_type_display()} ({self.user.username})"
         return self.caption if self.caption else self.file.name
