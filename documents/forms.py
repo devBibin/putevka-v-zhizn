@@ -78,7 +78,17 @@ class DocumentUploadForm(forms.ModelForm):
             )
 
         max_upload_size = 20 * 1024 * 1024  # 20 MB
-        if uploaded_file.size > max_upload_size:
+        if hasattr(uploaded_file, 'size'):
+            file_size = uploaded_file.size
+        else:
+            try:
+                full_content = uploaded_file.read()
+                file_size = len(full_content)
+                uploaded_file.seek(0)
+            except Exception as e:
+                raise forms.ValidationError(f"Не удалось определить размер файла: {e}")
+
+        if file_size > max_upload_size:
             raise forms.ValidationError(f"Размер файла не должен превышать {max_upload_size / (1024 * 1024):.0f} MB.")
 
         return uploaded_file
