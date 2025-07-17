@@ -19,11 +19,18 @@ class Document(models.Model):
         ('GENERAL', 'Общий документ'),
     ]
 
+    STATUSES = [
+        ('PENDING', 'На проверке'),
+        ('APPROVED', 'Подтверждено'),
+        ('QUESTION', 'Уточнить'),
+    ]
+
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='documents')
     file = models.FileField(upload_to=upload_to_path)
     caption = models.CharField(max_length=255, blank=True)
     uploaded_at = models.DateTimeField(auto_now_add=True)
     is_deleted = models.BooleanField(default=False)
+    status = models.CharField(max_length=12, choices=STATUSES, default='PENDING')
 
     document_type = models.CharField(
         max_length=20,

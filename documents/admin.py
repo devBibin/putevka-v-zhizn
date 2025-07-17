@@ -7,24 +7,16 @@ from .models import Document
 
 @admin.register(Document)
 class DocumentAdmin(admin.ModelAdmin):
-    list_display = ('caption', 'user', 'uploaded_at', 'get_file_url')
-    list_filter = ('uploaded_at', 'user')
-    search_fields = ('caption', 'user__username')
+    list_display = ('caption', 'user', 'uploaded_at', 'status', 'is_deleted')
+    list_filter = ('uploaded_at', 'user', 'status')
+    search_fields = ('caption', 'user__username', 'status')
     date_hierarchy = 'uploaded_at'
-
-    def get_file_url(self, obj):
-        if obj.file:
-            return admin.display(description="Файл", ordering="file")(
-                lambda x: f'<a href="{x.file.url}" target="_blank">{x.file.name.split("/")[-1]}</a>')(obj)
-        return "Нет файла"
-
-    get_file_url.allow_tags = True
 
 
 class DocumentInline(admin.TabularInline):
     model = Document
     extra = 0
-    fields = ('caption', 'document_type', 'file', 'uploaded_at')
+    fields = ('caption', 'document_type', 'file', 'uploaded_at', 'status')
     readonly_fields = ('uploaded_at', 'caption', 'document_type', 'file')
 
     def get_formset(self, request, obj=None, **kwargs):

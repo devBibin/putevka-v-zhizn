@@ -139,9 +139,13 @@
                                 <li class="list-group-item d-flex justify-content-between align-items-center">
                                     <div>
                                         <a href="{% url 'serve_document' doc.pk %}" target="_blank">{{ doc.caption|default:doc.file.name }}</a>
-                                        {% if doc.document_type != 'GENERAL' %}
-                                            <span class="badge bg-success ms-2">{{ doc.get_document_type_display }}</span>
-                                        {% endif %}
+                                        <span class="badge
+                                            {% if doc.status == 'APPROVED' %}bg-success
+                                            {% elif doc.status == 'PENDING' %}bg-warning text-dark
+                                            {% elif doc.status == 'QUESTION' %}bg-danger
+                                            {% else %}bg-secondary{% endif %} ms-2">
+                                            {{ doc.status }}
+                                        </span>
                                         {% if doc.caption %}
                                             <small class="text-muted d-block">{{ doc.file.name }}</small>
                                         {% endif %}
