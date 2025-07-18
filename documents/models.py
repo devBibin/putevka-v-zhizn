@@ -26,6 +26,8 @@ class Document(models.Model):
     is_deleted = models.BooleanField(default=False)
     status = models.CharField(max_length=12, choices=STATUSES, default='PENDING')
 
+    only_staff_comment = models.CharField(max_length=1024, blank=True)
+
     def save(self, *args, **kwargs):
         if self.pk is None and self.file:
             if not self.user_file_name:
