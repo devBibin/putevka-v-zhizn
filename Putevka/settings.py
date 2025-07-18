@@ -244,3 +244,4 @@ if not os.path.exists(LOG_DIR):
     os.makedirs(LOG_DIR)
 
 TG_TOKEN = os.getenv("TG_TOKEN")
+CHAT_ID = os.getenv("CHAT_ID")

@@ -35,4 +35,4 @@ class Document(models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return self.caption if self.caption else self.file.name
+        return self.file.name
