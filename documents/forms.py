@@ -1,7 +1,11 @@
+import logging
+
 import magic
 from django import forms
 
 from .models import Document
+
+logger = logging.getLogger(__name__)
 
 
 class DocumentUploadForm(forms.ModelForm):
@@ -33,6 +37,7 @@ class DocumentUploadForm(forms.ModelForm):
             try:
                 file_mime_type = magic.from_buffer(initial_bytes, mime=True)
             except Exception as e:
+                logger.info(f'При определении типа файла произошла ошибка: {e}')
                 raise forms.ValidationError(f"Не удалось определить тип файла: {e}")
 
         allowed_types = [

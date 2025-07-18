@@ -1,5 +1,6 @@
 import mimetypes
 import os
+import logging
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -11,6 +12,7 @@ from .decorators import rate_limit_uploads
 from .forms import DocumentUploadForm
 from .models import Document
 
+logger = logging.getLogger(__name__)
 
 @login_required
 def serve_document(request, document_id):
@@ -19,6 +21,7 @@ def serve_document(request, document_id):
         file_path = document.file.path
 
         if not os.path.exists(file_path):
+            logger.info('Документ не найден на сервере.')
             raise Http404("Документ не найден на сервере.")
 
         try:
@@ -34,11 +37,13 @@ def serve_document(request, document_id):
 
             return response
         except FileNotFoundError:
+            logger.info('Файл документа не найден на сервере.')
             raise Http404("Файл документа не найден.")
         except Exception as e:
-            print(f"Ошибка при отдаче файла: {e}")
+            logger.error(f"Ошибка при отдаче файла: {e}")
             raise Http404("Произошла ошибка при попытке открыть документ.")
     else:
+        logger.info(f'Пользователь {request.user.username} пытается получить доступ к документам {document.user.username}')
         raise Http404("У вас нет доступа к этому документу.")
 
 
@@ -57,11 +62,14 @@ def documents_dashboard(request):
                 document.user = request.user
                 document.save()
                 messages.success(request, 'Общий документ успешно загружен!')
+                logger.info(f'{request.user.username} загрузил файл {document.file.name}')
                 return redirect('documents_dashboard')
             else:
+                logger.error(f'{request.user.username} ошибка при загрузке файла')
                 messages.error(request, 'Ошибка при загрузке общего документа. Пожалуйста, проверьте форму.')
                 document_upload_form = form
         else:
+            logger.error(f'{request.user.username} неизвестный тип формы')
             messages.error(request, 'Неизвестный тип формы.')
 
     context = {
@@ -78,4 +86,5 @@ def delete_document(request, document_id):
     document.is_deleted = True
     document.save()
     messages.success(request, 'Документ успешно удален.')
+    logger.info(f'Файл {document.file.name} помечен как удалённый')
     return redirect('documents_dashboard')

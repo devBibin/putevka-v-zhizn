@@ -1,9 +1,12 @@
+import logging
 import time
 from functools import wraps
 
 from django.contrib import messages
 from django.core.cache import cache
 from django.shortcuts import redirect
+
+logger = logging.getLogger(__name__)
 
 
 def rate_limit_uploads(rate_limit_seconds=60, max_uploads=5):
@@ -20,6 +23,7 @@ def rate_limit_uploads(rate_limit_seconds=60, max_uploads=5):
                 timestamps = [t for t in timestamps if current_time - t < rate_limit_seconds]
 
                 if len(timestamps) >= max_uploads:
+                    logger.info(f'{request.user.username} пытается загрузить {max_uploads} документов каждые {rate_limit_seconds} секунд.')
                     messages.error(request,
                                    f'Вы можете загружать не более {max_uploads} документов каждые {rate_limit_seconds} секунд.')
                     return redirect('documents_dashboard')
