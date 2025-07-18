@@ -47,7 +47,7 @@ def serve_document(request, document_id):
 def documents_dashboard(request):
     user_documents = Document.objects.filter(user=request.user).filter(is_deleted=False).order_by('-uploaded_at')
 
-    forms_by_type = {}
+    document_upload_form = DocumentUploadForm()
 
     if request.method == 'POST':
         if request.POST.get('form_type') == 'general_document_form':
@@ -60,15 +60,12 @@ def documents_dashboard(request):
                 return redirect('documents_dashboard')
             else:
                 messages.error(request, 'Ошибка при загрузке общего документа. Пожалуйста, проверьте форму.')
-                forms_by_type['general_document_form'] = form
+                document_upload_form = form
         else:
             messages.error(request, 'Неизвестный тип формы.')
 
-    if 'general_document_form' not in forms_by_type:
-        forms_by_type['general_document_form'] = DocumentUploadForm()
-
     context = {
-        'general_document_form': forms_by_type['general_document_form'],
+        'general_document_form': document_upload_form,
         'user_documents': user_documents,
     }
     return render(request, 'documents/documents_dashboard.html', context)

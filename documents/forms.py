@@ -15,19 +15,9 @@ class DocumentUploadForm(forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
-        # self.specific_document_type = kwargs.pop('specific_document_type', None)
         self.specific_caption = kwargs.pop('specific_caption', None)
 
         super().__init__(*args, **kwargs)
-
-        # if self.specific_document_type:
-        #     if self.specific_caption:
-        #         self.initial['caption'] = self.specific_caption
-        #         self.fields['caption'].widget = forms.TextInput(attrs={'readonly': 'readonly'})
-        #         self.fields['caption'].required = False
-        #     else:
-        #         self.fields['caption'].required = True
-        # else:
 
         self.fields['caption'].required = False
         self.fields['caption'].widget = forms.TextInput(attrs={'placeholder': 'Введите описание (необязательно)'})
