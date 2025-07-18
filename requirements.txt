@@ -4,3 +4,4 @@ python-dotenv
 gunicorn
 django-widget-tweaks
 python-magic
+pyTelegramBotAPI
