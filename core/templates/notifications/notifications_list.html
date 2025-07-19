@@ -1,0 +1,39 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Ваши оповещения{% endblock %}
+
+{% block content %}
+    <h1 class="mb-4">Ваши оповещения</h1>
+
+    {% if notifications %}
+        <div class="list-group">
+            {% for notification in notifications %}
+                <div class="list-group-item list-group-item-action {% if not notification.is_seen %}list-group-item-info{% endif %} mb-2 rounded">
+                    <div class="d-flex w-100 justify-content-between">
+                        <h5 class="mb-1">Сообщение:</h5>
+                        <small class="text-muted">{{ notification.created_at|date:"d M Y H:i" }}</small>
+                    </div>
+                    <p class="mb-1">{{ notification.message }}</p>
+                    {% if notification.sender %}
+                        <p class="text-muted small"><strong>Отправитель:</strong> {{ notification.sender.username }}</p>
+                    {% endif %}
+                    
+                    <div class="d-flex justify-content-end mt-2">
+                        {% if not notification.is_seen %}
+                            <form action="{% url 'mark_as_seen' notification.id %}" method="post" class="ms-auto">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-primary">Прочитать</button>
+                            </form>
+                        {% else %}
+                            <span class="badge bg-success">Просмотрено</span>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="alert alert-info" role="alert">
+            У вас пока нет оповещений.
+        </div>
+    {% endif %}
+{% endblock %}
