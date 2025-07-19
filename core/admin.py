@@ -1,33 +1,65 @@
 import logging
 
 from django.contrib import admin
+from django.contrib.auth import get_user_model
+from django.http import HttpResponseRedirect
 
-from core.models import Notification
+from core.models import Notification, UserNotification
+from django.urls import reverse
+
+User = get_user_model()
 
 logger = logging.getLogger(__name__)
 
 @admin.register(Notification)
 class NotificationAdmin(admin.ModelAdmin):
-    list_display = ('recipient', 'message', 'created_at', 'is_seen')
-    list_filter = ('is_seen', 'created_at')
-    search_fields = ('recipient__username', 'message', 'sender__username')
+    list_display = ('message', 'display_recipients', 'created_at')
+    list_filter = ('created_at',)
+    search_fields = ('recipients__username', 'message', 'sender__username')
 
-    raw_id_fields = ('recipient', 'sender')
+    raw_id_fields = ('recipients', 'sender')
 
     actions = ['mark_seen', 'mark_unseen']
 
-    def mark_seen(self, request, queryset):
-        notification_ids = list(queryset.values_list('id', flat=True))
+    class UserNotificationInline(admin.TabularInline):
+        model = UserNotification
+        extra = 1
+        raw_id_fields = ('recipient',)
+        list_display = ('recipient', 'is_seen')
+        readonly_fields = ('seen_at',)
 
-        queryset.update(is_seen=True)
-        self.message_user(request, 'Оповещения помечены как просмотренные.')
-        logger.info(f'Оповещения {notification_ids} помечены как прочитанные пользователем {request.user.username}')
-    mark_seen.short_description = 'Пометить как просмотренные'
+    inlines = [UserNotificationInline]
 
-    def mark_unseen(self, request, queryset):
-        notification_ids = list(queryset.values_list('id', flat=True))
+    def display_recipients(self, obj):
+        return ", ".join([user.username for user in obj.recipients.all()[:5]]) + (
+            "..." if obj.recipients.count() > 10 else "")
 
-        queryset.update(is_seen=False)
-        self.message_user(request, 'Оповещения помечены как непросмотренные.')
-        logger.info(f'Оповещения {notification_ids} помечены как непрочитанные пользователем {request.user.username}')
-    mark_unseen.short_description = 'Пометить как непросмотренные'
+    display_recipients.short_description = "Получатели"
+
+@admin.register(UserNotification)
+class UserNotificationAdmin(admin.ModelAdmin):
+    list_display = ('notification', 'recipient', 'is_seen', 'seen_at')
+    list_filter = ('is_seen', 'seen_at')
+    search_fields = ('notification__message', 'recipient__username')
+    raw_id_fields = ('notification', 'recipient')
+
+try:
+    admin.site.unregister(User)
+except admin.sites.NotRegistered:
+    pass
+
+@admin.register(User)
+class MyUserAdmin(admin.ModelAdmin):
+    list_display = ('username', 'email', 'first_name', 'last_name', 'is_staff')
+    search_fields = ('username', 'first_name', 'last_name', 'email')
+    list_filter = ('is_staff', 'is_active', 'groups')
+    actions = ['send_notification_to_selected_users']
+
+    def send_notification_to_selected_users(self, request, queryset):
+        selected_ids = queryset.values_list('id', flat=True)
+        request.session['selected_users_for_notification'] = list(selected_ids)
+
+        url = reverse('send_notification_to_users')
+        return HttpResponseRedirect(url)
+
+    send_notification_to_selected_users.short_description = "Отправить оповещение выбранным пользователям"

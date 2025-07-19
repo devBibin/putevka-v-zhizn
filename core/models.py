@@ -1,18 +1,18 @@
 from django.conf import settings
 from django.db import models
 
+
 class Notification(models.Model):
     message = models.TextField(verbose_name='Сообщение')
 
-    recipient = models.ForeignKey(
+    recipients = models.ManyToManyField(
         settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name='notifications',
-        verbose_name="Получатель"
+        through='UserNotification',
+        related_name='received_notifications',
+        verbose_name="Получатели"
     )
 
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата создания")
-    is_seen = models.BooleanField(default=False, verbose_name="Просмотрено")
 
     sender = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -29,4 +29,32 @@ class Notification(models.Model):
         verbose_name_plural = "Оповещения"
 
     def __str__(self):
-        return f"Оповещение для {self.recipient.username} от {self.created_at.strftime('%Y-%m-%d %H:%M')}"
+        return f"Оповещение {self.message[:50] + '...' if len(self.message) > 50 else self.message} от {self.created_at.strftime('%Y-%m-%d %H:%M')}"
+
+
+class UserNotification(models.Model):
+    notification = models.ForeignKey(
+        Notification,
+        on_delete=models.CASCADE,
+        verbose_name="Оповещение"
+    )
+
+    recipient = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        verbose_name="Пользователь"
+    )
+
+    is_seen = models.BooleanField(default=False, verbose_name="Просмотрено")
+
+    seen_at = models.DateTimeField(null=True, blank=True, verbose_name="Время просмотра")
+
+    class Meta:
+        unique_together = ('notification', 'recipient')
+        verbose_name = "Статус оповещения пользователя"
+        verbose_name_plural = "Статусы оповещений пользователей"
+        ordering = ['-notification__created_at']
+
+    def __str__(self):
+        status = "Просмотрено" if self.is_seen else "Не просмотрено"
+        return f"Оповещение '{self.notification.message[:20]}...' для {self.recipient.username} - {status}"
