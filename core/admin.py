@@ -3,13 +3,14 @@ import logging
 from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.http import HttpResponseRedirect
+from django.urls import reverse
 
 from core.models import Notification, UserNotification
-from django.urls import reverse
 
 User = get_user_model()
 
 logger = logging.getLogger(__name__)
+
 
 @admin.register(Notification)
 class NotificationAdmin(admin.ModelAdmin):
@@ -17,7 +18,7 @@ class NotificationAdmin(admin.ModelAdmin):
     list_filter = ('created_at',)
     search_fields = ('recipients__username', 'message', 'sender__username')
 
-    raw_id_fields = ('recipients', 'sender')
+    raw_id_fields = ('recipients',)
 
     actions = ['mark_seen', 'mark_unseen']
 
@@ -36,6 +37,7 @@ class NotificationAdmin(admin.ModelAdmin):
 
     display_recipients.short_description = "Получатели"
 
+
 @admin.register(UserNotification)
 class UserNotificationAdmin(admin.ModelAdmin):
     list_display = ('notification', 'recipient', 'is_seen', 'seen_at')
@@ -43,10 +45,12 @@ class UserNotificationAdmin(admin.ModelAdmin):
     search_fields = ('notification__message', 'recipient__username')
     raw_id_fields = ('notification', 'recipient')
 
+
 try:
     admin.site.unregister(User)
 except admin.sites.NotRegistered:
     pass
+
 
 @admin.register(User)
 class MyUserAdmin(admin.ModelAdmin):

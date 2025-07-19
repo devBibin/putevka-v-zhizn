@@ -1,3 +1,5 @@
+import logging
+
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth import authenticate, login, get_user_model
@@ -13,7 +15,7 @@ from .models import UserNotification, Notification
 
 from .bot import webhook
 
-User = get_user_model()
+logger = logging.getLogger(__name__)
 
 def index(request):
     return render(request, 'core/index.html')
@@ -69,6 +71,7 @@ def mark_notification_as_seen(request, user_notification_id):
         notification.is_seen = True
         notification.seen_at = timezone.now()
         notification.save()
+        logger.info(f'Оповещение {notification.pk} прочитано')
 
     return redirect('notifications')
 
@@ -97,6 +100,7 @@ def send_notification_to_users(request):
                 ]
                 UserNotification.objects.bulk_create(user_notification_objects)
 
+            logger.info(f'Массовое оповещение {new_notification.pk} зарегистрировано')
             messages.success(request, f"Оповещение '{message_text[:30]}...' успешно отправлено {len(selected_user_ids)} пользователям.")
             del request.session['selected_users_for_notification']
             return redirect('admin:auth_user_changelist')
@@ -110,4 +114,4 @@ def send_notification_to_users(request):
         'opts': User._meta,
         'app_label': 'auth',
     }
-    return render(request, 'notifications/toManyNotifications.html', context)
+    return render(request, 'admin/toManyNotifications.html', context)

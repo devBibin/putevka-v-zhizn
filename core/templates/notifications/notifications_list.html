@@ -3,7 +3,14 @@
 {% block title %}Ваши оповещения{% endblock %}
 
 {% block content %}
-    <h1 class="mb-4">Ваши оповещения</h1>
+    <h1 class="mb-4">
+        Ваши оповещения
+        {% if unread_notifications_count > 0 %}
+            {# Иконка колокольчика, если есть непрочитанные уведомления #}
+            <i class="fas fa-bell text-danger ms-2"></i> {# Красный колокольчик #}
+            <span class="badge bg-danger rounded-pill ms-1">{{ unread_notifications_count }}</span> {# Счетчик #}
+        {% endif %}
+    </h1>
 
     {% if notifications %}
         <div class="list-group">

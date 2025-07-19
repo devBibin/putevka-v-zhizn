@@ -28,6 +28,11 @@ class Notification(models.Model):
         verbose_name = "Оповещение"
         verbose_name_plural = "Оповещения"
 
+    def save_model(self, request, obj, form, change):
+        if not obj.pk and not obj.sender:
+            obj.sender = request.user
+        super().save_model(request, obj, form, change)
+
     def __str__(self):
         return f"Оповещение {self.message[:50] + '...' if len(self.message) > 50 else self.message} от {self.created_at.strftime('%Y-%m-%d %H:%M')}"
 
