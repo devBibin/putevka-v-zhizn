@@ -56,8 +56,8 @@ class UserNotification(models.Model):
 
     class Meta:
         unique_together = ('notification', 'recipient')
-        verbose_name = "Статус оповещения пользователя"
-        verbose_name_plural = "Статусы оповещений пользователей"
+        verbose_name = "Получатель оповещения"
+        verbose_name_plural = "Получатели оповещения"
         ordering = ['-notification__created_at']
 
     def __str__(self):

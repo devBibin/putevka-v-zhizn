@@ -14,13 +14,12 @@ logger = logging.getLogger(__name__)
 
 @admin.register(Notification)
 class NotificationAdmin(admin.ModelAdmin):
-    list_display = ('message', 'display_recipients', 'created_at')
+    list_display = ('message', 'display_recipients', 'created_at', 'sender__username')
     list_filter = ('created_at',)
     search_fields = ('recipients__username', 'message', 'sender__username')
+    exclude = ('sender',)
 
     raw_id_fields = ('recipients',)
-
-    actions = ['mark_seen', 'mark_unseen']
 
     class UserNotificationInline(admin.TabularInline):
         model = UserNotification
@@ -28,6 +27,11 @@ class NotificationAdmin(admin.ModelAdmin):
         raw_id_fields = ('recipient',)
         list_display = ('recipient', 'is_seen')
         readonly_fields = ('seen_at',)
+
+    def save_model(self, request, obj, form, change):
+        if not change:
+            obj.sender = request.user
+        super().save_model(request, obj, form, change)
 
     inlines = [UserNotificationInline]
 
