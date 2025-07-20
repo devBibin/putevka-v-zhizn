@@ -15,6 +15,8 @@ bot = TeleBot(TG_TOKEN)
 
 TELEGRAM_CHAT_IDS = app_config.TELEGRAM_STAFF_CHAT_IDS
 
+BASE_URL = os.getenv('BASE_URL')
+
 logger = logging.getLogger(__name__)
 
 @receiver(post_save, sender=Document)
@@ -26,7 +28,7 @@ def notify_telegram_on_document_upload(sender, instance, created, **kwargs):
             f"Новый документ загружен пользователем {instance.user.username}:\n"
             f"Название: {os.path.basename(instance.file.name)}\n"
             f"Описание: {instance.caption}\n"
-            f"Доступен по ссылке: http://localhost:8000{document_url}"
+            f"Доступен по ссылке: {BASE_URL}{document_url}"
         )
 
         for username, chat_id in TELEGRAM_CHAT_IDS.items():

@@ -65,7 +65,7 @@ def documents_dashboard(request):
                 logger.info(f'{request.user.username} загрузил файл {document.file.name}')
                 return redirect('documents_dashboard')
             else:
-                logger.error(f'{request.user.username} ошибка при загрузке файла')
+                logger.info(f'Неверное заполнение формы загрузки документа')
                 messages.error(request, 'Ошибка при загрузке общего документа. Пожалуйста, проверьте форму.')
                 document_upload_form = form
         else:
