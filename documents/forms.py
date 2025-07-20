@@ -24,7 +24,7 @@ class DocumentUploadForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
 
         self.fields['caption'].required = False
-        self.fields['caption'].widget = forms.TextInput(attrs={'placeholder': 'Введите описание (необязательно)'})
+        self.fields['caption'].widget = forms.TextInput(attrs={'placeholder': 'Введите описание'})
 
     def clean_file(self):
         uploaded_file = self.cleaned_data.get('file')

@@ -2,6 +2,7 @@ import os
 import uuid
 
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 from django.db import models
 
 
@@ -21,12 +22,17 @@ class Document(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='documents')
     file = models.FileField(upload_to=upload_to_path)
     user_file_name = models.CharField(max_length=100, null=True, blank=True)
-    caption = models.CharField(max_length=255, blank=True)
+    caption = models.CharField(max_length=255, blank=False)
     uploaded_at = models.DateTimeField(auto_now_add=True)
     is_deleted = models.BooleanField(default=False)
     status = models.CharField(max_length=12, choices=STATUSES, default='PENDING')
 
-    only_staff_comment = models.CharField(max_length=1024, blank=True)
+    only_staff_comment = models.CharField(max_length=1024, blank=True, null=True)
+
+    def clean(self):
+        super().clean()
+        if not self.caption:
+            raise ValidationError({'caption': 'Это поле не может быть пустым.'})
 
     def save(self, *args, **kwargs):
         if self.pk is None and self.file:

@@ -7,17 +7,19 @@ from telebot import TeleBot
 from django.conf import settings
 import os
 
-from telegram_bot_polling import bot
+import config as app_config
 
 CHAT_ID = os.getenv('CHAT_ID')
+TG_TOKEN = os.getenv("TG_TOKEN")
+bot = TeleBot(TG_TOKEN)
+
+TELEGRAM_CHAT_IDS = app_config.TELEGRAM_STAFF_CHAT_IDS
 
 logger = logging.getLogger(__name__)
 
 @receiver(post_save, sender=Document)
 def notify_telegram_on_document_upload(sender, instance, created, **kwargs):
     if created and bot:
-        # telegram_users_to_notify = TelegramUser.objects.filter(user__is_staff=True)
-
         document_url = f"/documents/view/{instance.pk}/"
 
         message_text = (
@@ -27,10 +29,10 @@ def notify_telegram_on_document_upload(sender, instance, created, **kwargs):
             f"Доступен по ссылке: http://localhost:8000{document_url}"
         )
 
-        # for tg_user in telegram_users_to_notify:
-        try:
-            bot.send_message(CHAT_ID, message_text)
-            # logger.info(f"Уведомление отправлено пользователю {tg_user.user.username} ({tg_user.chat_id})")
-        except Exception as e:
-            logger.error("Ошибка при отправке уведомления о новом документе пользователю")
-            # logger.error(f"Ошибка при отправке уведомления Telegram пользователю {tg_user.user.username}: {e}")
+        for username, chat_id in TELEGRAM_CHAT_IDS.items():
+            try:
+                bot.send_message(chat_id, message_text)
+                logger.info(f"Уведомление отправлено пользователю {username} ({chat_id})")
+            except Exception as e:
+                logger.error("Ошибка при отправке уведомления о новом документе пользователю")
+                logger.error(f"Ошибка при отправке уведомления Telegram пользователю {username}: {e}")
