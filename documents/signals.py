@@ -32,7 +32,6 @@ def notify_telegram_on_document_upload(sender, instance, created, **kwargs):
         for username, chat_id in TELEGRAM_CHAT_IDS.items():
             try:
                 bot.send_message(chat_id, message_text)
-                logger.info(f"Уведомление отправлено пользователю {username} ({chat_id})")
+                logger.info(f"Уведомление отправлено пользователю {username} (staff) ({chat_id})")
             except Exception as e:
-                logger.error("Ошибка при отправке уведомления о новом документе пользователю")
-                logger.error(f"Ошибка при отправке уведомления Telegram пользователю {username}: {e}")
+                logger.error(f"Ошибка при отправке уведомления Telegram пользователю (staff) {username}: {e}")

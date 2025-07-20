@@ -52,6 +52,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'Putevka.utils.middlewares.RequestMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -170,7 +171,7 @@ LOGGING = {
             'style': '{',
         },
         'standard': {
-            'format': '[{levelname}] {asctime} {pathname}:{lineno} {funcName} - {message}',
+            'format': '[{levelname}] {asctime} {pathname}:{lineno} {funcName} [user:{user_id} {username}] - {message}',
             'style': '{',
         },
     },
@@ -182,12 +183,15 @@ LOGGING = {
         'require_debug_false': {
             '()': 'django.utils.log.RequireDebugFalse',
         },
+        'user_info_filter': {
+            '()': 'Putevka.utils.log_filters.UserInfoFilter',
+        },
     },
 
     'handlers': {
         'console': {
             'level': 'INFO',
-            'filters': ['require_debug_true'],
+            'filters': ['require_debug_true', 'user_info_filter'],
             'class': 'logging.StreamHandler',
             'formatter': 'simple',
         },
@@ -198,6 +202,7 @@ LOGGING = {
             'maxBytes': 1024*1024*5,
             'backupCount': 5,
             'formatter': 'standard',
+            'filters': ['user_info_filter'],
         },
         'file_error': {
             'level': 'ERROR',
@@ -206,6 +211,7 @@ LOGGING = {
             'maxBytes': 1024*1024*10,
             'backupCount': 10,
             'formatter': 'standard',
+            'filters': ['user_info_filter'],
         },
         'telegram_errors': {
             'level': 'ERROR',
@@ -213,6 +219,7 @@ LOGGING = {
             'token': TG_TOKEN,
             'chat_id': app_config.TELEGRAM_LOG_CHAT_ID,
             'formatter': 'standard',
+            'filters': ['user_info_filter'],
         },
     },
 

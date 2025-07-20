@@ -21,7 +21,7 @@ def serve_document(request, document_id):
         file_path = document.file.path
 
         if not os.path.exists(file_path):
-            logger.info('Документ не найден на сервере.')
+            logger.info('Документ не найден на сервере. ')
             raise Http404("Документ не найден на сервере.")
 
         try:
