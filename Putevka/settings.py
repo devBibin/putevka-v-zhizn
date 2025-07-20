@@ -14,8 +14,12 @@ from pathlib import Path
 
 import os
 from dotenv import load_dotenv
+
+import config as app_config
+
 load_dotenv()
 
+TG_TOKEN = os.getenv("TG_TOKEN")
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -203,31 +207,33 @@ LOGGING = {
             'backupCount': 10,
             'formatter': 'standard',
         },
-        'mail_admins': {
+        'telegram_errors': {
             'level': 'ERROR',
-            'class': 'django.utils.log.AdminEmailHandler',
-            'filters': ['require_debug_false'],
-        }
+            'class': 'Putevka.utils.telegram_logging_handler.TelegramHandler',
+            'token': TG_TOKEN,
+            'chat_id': app_config.TELEGRAM_LOG_CHAT_ID,
+            'formatter': 'standard',
+        },
     },
 
     'loggers': {
         'django': {
-            'handlers': ['console', 'file_info'],
+            'handlers': ['console', 'file_info',],
             'level': 'INFO',
             'propagate': False,
         },
         'django.request': {
-            'handlers': ['mail_admins', 'file_error'],
+            'handlers': ['telegram_errors', 'file_error'],
             'level': 'ERROR',
             'propagate': False,
         },
         'core': {
-            'handlers': ['console', 'file_info', 'file_error'],
+            'handlers': ['console', 'file_info', 'file_error', 'telegram_errors'],
             'level': 'DEBUG', # В разработке может быть DEBUG, на продакшене INFO
             'propagate': False,
         },
         'documents': {
-            'handlers': ['console', 'file_info', 'file_error'],
+            'handlers': ['console', 'file_info', 'file_error', 'telegram_errors'],
             'level': 'DEBUG', # В разработке может быть DEBUG, на продакшене INFO
             'propagate': False,
         },
