@@ -5,85 +5,91 @@
 {% block title %}Мои Документы{% endblock %}
 
 {% block content %}
-    <h1 class="mb-4">Мои Документы</h1>
+    <h1 class="mb-4 text-center">Мои Документы</h1>
 
-    <div class="row">
-        <div class="col-md-5">
-            <div class="card mb-4">
-                <div class="card-header bg-info text-white">
-                    <h2 class="card-title mb-0">Загрузить общий документ</h2>
-                </div>
-                <div class="card-body">
-                    <form method="post" enctype="multipart/form-data">
-                        {% csrf_token %}
-                        <input type="hidden" name="form_type" value="general_document_form">
-                        {% for field in general_document_form %}
-                            <div class="mb-3">
-                                {{ field.label_tag }}
-                                {% if field.name == 'file' %}
-                                    {{ field|add_class:"form-control"|attr:"accept:application/pdf,application/msword,text/plain,image/jpeg,image/png" }}
-                                {% else %}
-                                    {{ field|add_class:"form-control" }}
-                                {% endif %}
-                                {% if field.help_text %}
-                                    <div class="form-text text-muted">{{ field.help_text }}</div>
-                                {% endif %}
-                                {% for error in field.errors %}
-                                    <div class="text-danger small">{{ error }}</div>
-                                {% endfor %}
-                            </div>
-                        {% endfor %}
-                        {% if general_document_form.non_field_errors %}
-                            <div class="alert alert-danger">
-                                {% for error in general_document_form.non_field_errors %}
-                                    {{ error }}
-                                {% endfor %}
-                            </div>
-                        {% endif %}
-                        <button type="submit" class="btn btn-primary mt-3">Загрузить</button>
-                    </form>
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-12 col-md-8 mb-4">
+                <div class="card">
+                    <div class="card-header bg-info text-white">
+                        <h2 class="card-title mb-0">Загрузить документ</h2>
+                    </div>
+                    <div class="card-body">
+                        <form method="post" enctype="multipart/form-data">
+                            {% csrf_token %}
+                            <input type="hidden" name="form_type" value="general_document_form">
+                            {% for field in general_document_form %}
+                                <div class="mb-3">
+                                    {{ field.label_tag }}
+                                    {% if field.name == 'file' %}
+                                        {{ field|add_class:"form-control"|attr:"accept:application/pdf,application/msword,text/plain,image/jpeg,image/png" }}
+                                    {% else %}
+                                        {{ field|add_class:"form-control" }}
+                                    {% endif %}
+                                    {% if field.help_text %}
+                                        <div class="form-text text-muted">{{ field.help_text }}</div>
+                                    {% endif %}
+                                    {% for error in field.errors %}
+                                        <div class="text-danger small">{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                            {% endfor %}
+                            {% if general_document_form.non_field_errors %}
+                                <div class="alert alert-danger">
+                                    {% for error in general_document_form.non_field_errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <button type="submit" class="btn btn-primary mt-3">Загрузить</button>
+                        </form>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <div class="col-md-7">
-            <div class="card">
-                <div class="card-header bg-dark text-white">
-                    <h2 class="card-title mb-0">Все загруженные документы</h2>
-                </div>
-                <div class="card-body">
-                    {% if user_documents %}
-                        <ul class="list-group">
-                            {% for doc in user_documents %}
-                                <li class="list-group-item d-flex justify-content-between align-items-center">
-                                    <div>
-                                        <a href="{% url 'serve_document' doc.pk %}"
-                                           target="_blank">{{ doc.caption|default:doc.user_file_name }}</a>
-                                        <span class="badge
-                                            {% if doc.status == 'APPROVED' %}bg-success
-                                            {% elif doc.status == 'PENDING' %}bg-warning text-dark
-                                            {% elif doc.status == 'QUESTION' %}bg-danger
-                                            {% else %}bg-secondary{% endif %} ms-2">
-                                            {{ doc.get_status_display }}
-                                        </span>
-                                        {% if doc.caption %}
-                                            <small class="text-muted d-block">{{ doc.user_file_name }}</small>
-                                        {% endif %}
-                                    </div>
-                                    <span class="badge bg-info text-dark">{{ doc.uploaded_at|date:"d.m.Y H:i" }}</span>
-                                    <form action="{% url 'delete_document' doc.pk %}" method="post" class="ms-3"
-                                          onsubmit="return confirm('Вы уверены, что хотите удалить этот документ?');">
-                                        {% csrf_token %}
-                                        <button type="submit" class="btn btn-danger btn-sm">X</button>
-                                    </form>
-                                </li>
-                            {% endfor %}
-                        </ul>
-                    {% else %}
-                        <div class="alert alert-info" role="alert">
-                            У вас пока нет загруженных документов.
-                        </div>
-                    {% endif %}
+        <div class="row justify-content-center">
+            <div class="col-12 col-md-8">
+                <div class="card">
+                    <div class="card-header bg-dark text-white">
+                        <h2 class="card-title mb-0">Все загруженные документы</h2>
+                    </div>
+                    <div class="card-body">
+                        {% if user_documents %}
+                            <ul class="list-group">
+                                {% for doc in user_documents %}
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <a href="{% url 'serve_document' doc.pk %}"
+                                               target="_blank">{{ doc.caption|default:doc.user_file_name }}</a>
+                                            <span class="badge
+                                                {% if doc.status == 'APPROVED' %}bg-success
+                                                {% elif doc.status == 'PENDING' %}bg-warning text-dark
+                                                {% elif doc.status == 'QUESTION' %}bg-danger
+                                                {% else %}bg-secondary{% endif %} ms-2">
+                                                {{ doc.get_status_display }}
+                                            </span>
+                                            {% if doc.caption %}
+                                                <small class="text-muted d-block">{{ doc.user_file_name }}</small>
+                                            {% endif %}
+                                        </div>
+                                        <div class="d-flex align-items-center">
+                                            <span class="badge bg-info text-dark me-2">{{ doc.uploaded_at|date:"d.m.Y H:i" }}</span>
+                                            <form action="{% url 'delete_document' doc.pk %}" method="post"
+                                                  onsubmit="return confirm('Вы уверены, что хотите удалить этот документ?');">
+                                                {% csrf_token %}
+                                                <button type="submit" class="btn btn-danger btn-sm">X</button>
+                                            </form>
+                                        </div>
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        {% else %}
+                            <div class="alert alert-info" role="alert">
+                                У вас пока нет загруженных документов.
+                            </div>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
         </div>
