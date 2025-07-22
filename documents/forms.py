@@ -28,17 +28,33 @@ class DocumentUploadForm(forms.ModelForm):
 
     def clean_file(self):
         uploaded_file = self.cleaned_data.get('file')
+
         if not uploaded_file:
             raise forms.ValidationError("Выберите файл для загрузки.")
-        else:
-            initial_bytes = uploaded_file.read(1024)
-            uploaded_file.seek(0)
 
-            try:
-                file_mime_type = magic.from_buffer(initial_bytes, mime=True)
-            except Exception as e:
-                logger.info(f'При определении типа файла произошла ошибка: {e}')
-                raise forms.ValidationError(f"Не удалось определить тип файла: {e}")
+        max_upload_size = 20 * 1024 * 1024  # 20 MB
+
+        try:
+            file_content = uploaded_file.read()
+            file_size = len(file_content)
+        except Exception as e:
+            logger.error(f'Ошибка при чтении файла: {e}')
+            raise forms.ValidationError("Не удалось прочитать файл.")
+
+        if file_size > max_upload_size:
+            logger.info('Пользователь пытается загрузить слишком большой файл')
+            raise forms.ValidationError(
+                f"Размер файла не должен превышать {max_upload_size / (1024 * 1024):.0f} MB."
+            )
+
+        if not file_content:
+            raise forms.ValidationError("Файл пуст.")
+
+        try:
+            file_mime_type = magic.from_buffer(file_content[:1024], mime=True)
+        except Exception as e:
+            logger.info(f'При определении типа файла произошла ошибка: {e}')
+            raise forms.ValidationError(f"Не удалось определить тип файла: {e}")
 
         allowed_types = [
             'application/pdf',
@@ -54,18 +70,5 @@ class DocumentUploadForm(forms.ModelForm):
                 f"Недопустимый формат файла. Разрешены: {type_names.upper().replace('JPEG', 'JPG')}."
             )
 
-        max_upload_size = 20 * 1024 * 1024  # 20 MB
-        if hasattr(uploaded_file, 'size'):
-            file_size = uploaded_file.size
-        else:
-            try:
-                full_content = uploaded_file.read()
-                file_size = len(full_content)
-                uploaded_file.seek(0)
-            except Exception as e:
-                raise forms.ValidationError(f"Не удалось определить размер файла: {e}")
-
-        if file_size > max_upload_size:
-            raise forms.ValidationError(f"Размер файла не должен превышать {max_upload_size / (1024 * 1024):.0f} MB.")
-
+        uploaded_file.seek(0)
         return uploaded_file
