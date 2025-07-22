@@ -1,0 +1,30 @@
+{% extends "admin/base_site.html" %}
+{% load i18n admin_urls static %}
+
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+    <a href="{% url 'admin:index' %}">{% translate 'Home' %}</a>
+    &rsaquo; <a href="{% url 'admin:app_list' app_label %}">{{ app_label|capfirst|escape }}</a>
+    &rsaquo; <a href="{% url 'admin:auth_user_changelist' %}">Пользователи</a>
+    &rsaquo; Отправка оповещения
+</div>
+{% endblock %}
+
+{% block content %}
+<div id="content-main">
+    <h1>{{ title }}</h1>
+    <p>Выбрано пользователей: {{ users|length }}</p>
+    <ul>
+        {% for user in users %}
+            <li>{{ user.username }}</li>
+        {% endfor %}
+    </ul>
+
+    <form action="" method="post">{% csrf_token %}
+        {{ form.as_p }}
+        <div class="submit-row">
+            <input type="submit" value="Отправить оповещение">
+        </div>
+    </form>
+</div>
+{% endblock %}
