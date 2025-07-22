@@ -7,6 +7,31 @@ from .models import Document
 
 logger = logging.getLogger(__name__)
 
+class AttachDocumentsForm(forms.Form):
+    documents_to_attach = forms.ModelMultipleChoiceField(
+        queryset=Document.objects.none(),
+        widget=forms.CheckboxSelectMultiple,
+        required=False,
+        label="Выберите документы пользователя для прикрепления"
+    )
+
+    def __init__(self, *args, **kwargs):
+        user = kwargs.pop('user', None)
+        super().__init__(*args, **kwargs)
+
+        if user:
+            self.fields['documents_to_attach'].queryset = Document.objects.filter(
+                user=user,
+                uploaded_by_staff=False,
+                is_deleted=False
+            ).order_by('-uploaded_at')
+
+            self.fields['documents_to_attach'].label_from_instance = self._get_document_label
+
+    def _get_document_label(self, obj):
+        if obj.caption:
+            return f"{obj.caption} ({obj.user_file_name or 'файл без имени'})"
+        return obj.user_file_name or obj.file.name
 
 class DocumentUploadForm(forms.ModelForm):
     class Meta:

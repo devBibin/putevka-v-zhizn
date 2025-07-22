@@ -48,11 +48,94 @@
             </div>
         </div>
 
-        <div class="row justify-content-center">
+        <div class="row justify-content-center mt-4">
+            <div class="col-12 col-md-8">
+                <div class="card">
+                    <div class="card-header bg-warning text-dark">
+                        <h2 class="card-title mb-0">Документы, загруженные сотрудниками (для вас)</h2>
+                    </div>
+                    <div class="card-body">
+                        {% if staff_documents %}
+                            <ul class="list-group">
+                                {% for doc in staff_documents %}
+                                    <li class="list-group-item d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-2">
+                                        <div class="mb-2 mb-md-0">
+                                            <a href="{% url 'serve_document' doc.pk %}" target="_blank">
+                                                {{ doc.caption }} ({{ doc.user_file_name }})
+                                            </a>
+                                            <span class="badge
+                                                {% if doc.status == 'PENDING_SIGNATURE' %}bg-warning
+                                                {% elif doc.status == 'SIGNED' %}bg-success
+                                                {% elif doc.status == 'APPROVED' %}bg-success
+                                                {% elif doc.status == 'QUESTION' %}bg-danger
+                                                {% else %}bg-secondary{% endif %} text-dark ms-2">
+                                                {{ doc.get_status_display }}
+                                            </span>
+                                            <small class="text-muted d-block">
+                                                Загружен: {{ doc.uploaded_at|date:"d.m.Y H:i" }}
+                                            </small>
+
+                                            <button type="button" class="btn btn-sm btn-outline-secondary mt-2 attach-button" data-document-id="{{ doc.pk }}">
+                                                Прикрепить документы
+                                            </button>
+
+                                            <div class="attach-form-container mt-3" id="attach-form-{{ doc.pk }}" style="display:none;">
+                                                <form method="post" action="" class="attach-documents-form">
+                                                    {% csrf_token %}
+                                                    <input type="hidden" name="form_type" value="attach_documents_form">
+                                                    <input type="hidden" name="target_document_id" value="{{ doc.pk }}">
+                                                    <div class="mb-3">
+                                                        {{ attach_documents_form.documents_to_attach.label_tag }}
+                                                        {% for checkbox in attach_documents_form.documents_to_attach %}
+                                                            <div class="form-check">
+                                                                <input type="checkbox" name="documents_to_attach" id="{{ checkbox.id_for_label }}" value="{{ checkbox.data.value }}" {% if checkbox.data.selected %}checked{% endif %}> {# Использование checkbox.data.value и checkbox.data.selected для точного контроля #}
+                                                                <label class="form-check-label" for="{{ checkbox.id_for_label }}">
+                                                                    {{ checkbox.choice_label }}
+                                                                </label>
+                                                            </div>
+                                                        {% endfor %}
+                                                        {% for error in attach_documents_form.documents_to_attach.errors %}
+                                                            <div class="text-danger small">{{ error }}</div>
+                                                        {% endfor %}
+                                                    </div>
+                                                    <button type="submit" class="btn btn-success btn-sm">Прикрепить</button>
+                                                </form>
+                                            </div>
+
+                                            {% if doc.related_documents.all %}
+                                                <div class="mt-2">
+                                                    <strong>Прикрепленные документы:</strong>
+                                                    <ul class="list-unstyled">
+                                                        {% for related_doc in doc.related_documents.all %}
+                                                            <li>
+                                                                <a href="{% url 'serve_document' related_doc.pk %}" target="_blank">
+                                                                    {{ related_doc.caption }} ({{ related_doc.user_file_name }})
+                                                                </a>
+                                                            </li>
+                                                        {% endfor %}
+                                                    </ul>
+                                                </div>
+                                            {% endif %}
+
+                                        </div>
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        {% else %}
+                            <div class="alert alert-info" role="alert">
+                                У вас нет документов, загруженных сотрудниками.
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row justify-content-center mt-4">
             <div class="col-12 col-md-8">
                 <div class="card">
                     <div class="card-header bg-dark text-white">
-                        <h2 class="card-title mb-0">Все загруженные документы</h2>
+                        <h2 class="card-title mb-0">Мои загруженные документы</h2>
                     </div>
                     <div class="card-body">
                         {% if user_documents %}
@@ -94,4 +177,39 @@
             </div>
         </div>
     </div>
+
+    {% block extra_js %}
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const attachButtons = document.querySelectorAll('.attach-button');
+
+            attachButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const documentId = this.dataset.documentId;
+                    const formContainer = document.getElementById(`attach-form-${documentId}`);
+                    const attachedIdsString = this.dataset.attachedDocumentIds;
+                    const attachedIds = attachedIdsString ? attachedIdsString.split(',').map(Number) : [];
+
+                    if (formContainer.style.display === 'none') {
+                        formContainer.style.display = 'block';
+                        this.textContent = 'Скрыть форму прикрепления';
+
+                        const checkboxes = formContainer.querySelectorAll('input[type="checkbox"][name="documents_to_attach"]');
+                        checkboxes.forEach(checkbox => {
+                            if (attachedIds.includes(Number(checkbox.value))) {
+                                checkbox.checked = true;
+                            } else {
+                                checkbox.checked = false;
+                            }
+                        });
+
+                    } else {
+                        formContainer.style.display = 'none';
+                        this.textContent = 'Прикрепить документы';
+                    }
+                });
+            });
+        });
+    </script>
+    {% endblock %}
 {% endblock %}

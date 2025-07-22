@@ -17,6 +17,9 @@ class Document(models.Model):
         ('PENDING', 'На проверке'),
         ('APPROVED', 'Подтверждено'),
         ('QUESTION', 'Уточнить'),
+        ('PENDING_SIGNATURE', 'Ожидает подписи'),
+        ('SIGNED', 'Подписан'),
+        ('REJECTED_SIGNATURE', 'Подпись отклонена'),
     ]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='documents')
@@ -25,9 +28,13 @@ class Document(models.Model):
     caption = models.CharField(max_length=255, blank=False)
     uploaded_at = models.DateTimeField(auto_now_add=True)
     is_deleted = models.BooleanField(default=False)
-    status = models.CharField(max_length=12, choices=STATUSES, default='PENDING')
+    status = models.CharField(max_length=18, choices=STATUSES, default='PENDING')
 
-    only_staff_comment = models.CharField(max_length=1024, blank=True, null=True)
+    only_staff_comment = models.TextField(blank=True, null=True)
+
+    uploaded_by_staff = models.BooleanField(default=False)
+
+    related_documents = models.ManyToManyField('self', blank=True, symmetrical=False, related_name='document_relations')
 
     def clean(self):
         super().clean()
