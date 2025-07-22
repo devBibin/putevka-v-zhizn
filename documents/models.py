@@ -36,10 +36,15 @@ class Document(models.Model):
 
     related_documents = models.ManyToManyField('self', blank=True, symmetrical=False, related_name='document_relations')
 
+    is_locked = models.BooleanField(default=False, verbose_name="Заблокирован")
+
     def clean(self):
         super().clean()
         if not self.caption:
             raise ValidationError({'caption': 'Это поле не может быть пустым.'})
+
+        if self.pk and self.is_locked and not hasattr(self, '_ignore_lock_validation'):
+            raise ValidationError("Этот документ заблокирован и не может быть изменен.")
 
     def save(self, *args, **kwargs):
         if self.pk is None and self.file:
