@@ -4,6 +4,8 @@ echo "Waiting for PostgreSQL..."
 until pg_isready -h db -U "$POSTGRES_USER"; do sleep 0.1; done
 echo "PostgreSQL started."
 
+python manage.py makemigrations
+
 # Apply migrations
 python manage.py migrate
 
@@ -25,6 +27,9 @@ if not User.objects.filter(username='admin').exists():
 
 python telegram_bot_polling.py &
 
+python Shadows/gpt_reviewer.py &
+
 # Start Gunicorn server
 #exec gunicorn Putevka.wsgi:application --bind 0.0.0.0:8000
 exec python manage.py runserver 0.0.0.0:8000
+
