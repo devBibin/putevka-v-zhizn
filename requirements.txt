@@ -4,3 +4,5 @@ python-dotenv
 gunicorn
 pyTelegramBotAPI
 django-widget-tweaks
+psycopg2-binary
+openai

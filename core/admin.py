@@ -1,4 +1,6 @@
 from django.contrib import admin
+from django.db import models
+from django import forms
 
 from core.models import MotivationLetter
 
@@ -11,3 +13,8 @@ class MotivationLetterAdmin(admin.ModelAdmin):
 
     fields = ('user', 'letter_text', 'admin_rating', 'gpt_review', 'created_at', 'updated_at')
     readonly_fields = ('created_at', 'updated_at')
+
+
+    formfield_overrides = {
+        models.CharField: {'widget': forms.Textarea(attrs={'rows': 10, 'cols': 80})},
+    }

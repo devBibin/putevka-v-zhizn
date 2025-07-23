@@ -27,6 +27,9 @@ if not User.objects.filter(username='admin').exists():
 
 python telegram_bot_polling.py &
 
+python Shadows/gpt_reviewer.py &
+
 # Start Gunicorn server
 #exec gunicorn Putevka.wsgi:application --bind 0.0.0.0:8000
 exec python manage.py runserver 0.0.0.0:8000
+

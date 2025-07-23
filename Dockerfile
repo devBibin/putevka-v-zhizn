@@ -16,8 +16,11 @@ RUN pip install --no-cache-dir \
 
 COPY .env .
 COPY telegram_bot_polling.py .
+COPY Shadows/gpt_reviewer.py .
 
 COPY . .
+
+ENV PYTHONPATH=/app:$PYTHONPATH
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh

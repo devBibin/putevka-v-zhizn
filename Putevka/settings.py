@@ -141,3 +141,99 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 
 TG_TOKEN = os.getenv("TG_TOKEN")
+
+# ущербное логирование, при мердже забыть!
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
+        'standard': {
+            'format': '[{levelname}] {asctime} {pathname}:{lineno} {funcName} - {message}',
+            'style': '{',
+        },
+    },
+
+    'filters': {
+        'require_debug_true': {
+            '()': 'django.utils.log.RequireDebugTrue',
+        },
+        'require_debug_false': {
+            '()': 'django.utils.log.RequireDebugFalse',
+        },
+        # 'user_info_filter': {
+        #     '()': 'Putevka.utils.log_filters.UserInfoFilter',
+        # },
+    },
+
+    'handlers': {
+        'console': {
+            'level': 'INFO',
+            'filters': ['require_debug_true'],
+            'class': 'logging.StreamHandler',
+            'formatter': 'simple',
+        },
+        'file_info': {
+            'level': 'INFO',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': os.path.join(BASE_DIR, 'logs', 'info.log'),
+            'maxBytes': 1024*1024*5,
+            'backupCount': 5,
+            'formatter': 'standard',
+            # 'filters': ['user_info_filter'],
+        },
+        'file_error': {
+            'level': 'ERROR',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': os.path.join(BASE_DIR, 'logs', 'error.log'),
+            'maxBytes': 1024*1024*10,
+            'backupCount': 10,
+            'formatter': 'standard',
+            # 'filters': ['user_info_filter'],
+        },
+        # 'telegram_errors': {
+        #     'level': 'ERROR',
+        #     'class': 'Putevka.utils.telegram_logging_handler.TelegramHandler',
+        #     'token': TG_TOKEN,
+        #     'chat_id': app_config.TELEGRAM_LOG_CHAT_ID,
+        #     'formatter': 'standard',
+        #     'filters': ['user_info_filter'],
+        # },
+    },
+
+    'loggers': {
+        'django': {
+            'handlers': ['console', 'file_info',],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'django.request': {
+            'handlers': ['file_error'],
+            'level': 'ERROR',
+            'propagate': False,
+        },
+        'core': {
+            'handlers': ['console', 'file_info', 'file_error'],
+            'level': 'DEBUG', # В разработке может быть DEBUG, на продакшене INFO
+            'propagate': False,
+        },
+        'documents': {
+            'handlers': ['console', 'file_info', 'file_error'],
+            'level': 'DEBUG', # В разработке может быть DEBUG, на продакшене INFO
+            'propagate': False,
+        },
+        '': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': True,
+        }
+    }
+}
