@@ -19,8 +19,6 @@ BASE_URL = os.getenv('BASE_URL')
 
 logger = logging.getLogger(__name__)
 
-user_documents_attached = Signal()
-
 @receiver(post_save, sender=Document)
 def notify_telegram_on_document_upload(sender, instance, created, **kwargs):
     if created and bot:
@@ -41,18 +39,18 @@ def notify_telegram_on_document_upload(sender, instance, created, **kwargs):
                 logger.error(f"Ошибка при отправке уведомления Telegram пользователю (staff) {username}: {e}")
 
 
-@receiver(user_documents_attached)
-def notify_telegram_on_documents_attached(sender, instance, attached_documents, user, **kwargs):
+@receiver(post_save, sender=Document)
+def notify_telegram_on_documents_attached(sender, instance, **kwargs):
     if bot:
         document_url = f"/documents/view/{instance.pk}/"
 
         attached_docs_names = [
-            f"{doc.user_file_name}({doc.caption})" for doc in attached_documents
+            f"{doc.user_file_name}({doc.caption})" for doc in instance.related_documents.all()
         ]
         attached_docs_list = "\n- ".join(attached_docs_names) if attached_docs_names else "нет"
 
         message_text = (
-            f"Пользователь {user.username} прикрепил документы:\n"
+            f"Пользователь { instance.user.username} прикрепил документы:\n"
             f"К документу: '{instance.caption or os.path.basename(instance.file.name)}' (ID: {instance.pk})\n"
             f"Новый статус документа: {instance.get_status_display()}\n"
             f"Прикрепленные документы:\n- {attached_docs_list}\n"

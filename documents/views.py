@@ -11,7 +11,6 @@ from django.shortcuts import render, redirect
 from .decorators import rate_limit_uploads
 from .forms import DocumentUploadForm, AttachDocumentsForm
 from .models import Document
-from .signals import user_documents_attached
 
 logger = logging.getLogger(__name__)
 
@@ -96,13 +95,6 @@ def documents_dashboard(request):
 
                 target_document.status = 'PENDING'
                 target_document.save()
-
-                user_documents_attached.send(
-                    sender=Document,
-                    instance=target_document,
-                    attached_documents=selected_documents,
-                    user=request.user
-                )
 
                 messages.success(request, f'Документы успешно прикреплены к "{target_document.caption}".')
                 logger.info(f'{request.user.username} прикрепил документы к {target_document.caption}')
