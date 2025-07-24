@@ -15,14 +15,16 @@
                         <h2 class="card-title mb-0">Загрузить документ</h2>
                     </div>
                     <div class="card-body">
-                        <form method="post" enctype="multipart/form-data">
+                        <form method="post" enctype="multipart/form-data" id="generalDocumentForm">
                             {% csrf_token %}
                             <input type="hidden" name="form_type" value="general_document_form">
                             {% for field in general_document_form %}
                                 <div class="mb-3">
                                     {{ field.label_tag }}
                                     {% if field.name == 'file' %}
-                                        {{ field|add_class:"form-control"|attr:"accept:application/pdf,application/msword,text/plain,image/jpeg,image/png" }}
+                                        {{ field|add_class:"form-control"|attr:"accept:application/pdf,application/msword,text/plain,image/jpeg,image/png"|attr:"id:id_file_upload" }}
+                                    {% elif field.name == 'caption' %}
+                                        {{ field|add_class:"form-control"|attr:"id:id_caption_upload" }}
                                     {% else %}
                                         {{ field|add_class:"form-control" }}
                                     {% endif %}
@@ -41,7 +43,7 @@
                                     {% endfor %}
                                 </div>
                             {% endif %}
-                            <button type="submit" class="btn btn-primary mt-3">Загрузить</button>
+                            <button type="submit" class="btn btn-primary mt-3" id="uploadButton" disabled>Загрузить</button>
                         </form>
                     </div>
                 </div>
@@ -80,7 +82,7 @@
                                             </button>
 
                                             <div class="attach-form-container mt-3" id="attach-form-{{ doc.pk }}" style="display:none;">
-                                                <form method="post" action="" class="attach-documents-form">
+                                                <form method="post" action="" class="attach-documents-form" id="attachForm-{{ doc.pk }}">
                                                     {% csrf_token %}
                                                     <input type="hidden" name="form_type" value="attach_documents_form">
                                                     <input type="hidden" name="target_document_id" value="{{ doc.pk }}">
@@ -88,7 +90,7 @@
                                                         {{ attach_documents_form.documents_to_attach.label_tag }}
                                                         {% for checkbox in attach_documents_form.documents_to_attach %}
                                                             <div class="form-check">
-                                                                <input type="checkbox" name="documents_to_attach" id="{{ checkbox.id_for_label }}" value="{{ checkbox.data.value }}" {% if checkbox.data.selected %}checked{% endif %}> {# Использование checkbox.data.value и checkbox.data.selected для точного контроля #}
+                                                                <input type="checkbox" name="documents_to_attach" id="{{ checkbox.id_for_label }}" value="{{ checkbox.data.value }}" {% if checkbox.data.selected %}checked{% endif %}>
                                                                 <label class="form-check-label" for="{{ checkbox.id_for_label }}">
                                                                     {{ checkbox.choice_label }}
                                                                 </label>
@@ -98,7 +100,7 @@
                                                             <div class="text-danger small">{{ error }}</div>
                                                         {% endfor %}
                                                     </div>
-                                                    <button type="submit" class="btn btn-success btn-sm">Прикрепить</button>
+                                                    <button type="submit" class="btn btn-success btn-sm attach-submit-button" disabled>Прикрепить</button>
                                                 </form>
                                             </div>
 
@@ -181,33 +183,87 @@
     {% block extra_js %}
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            const captionInput = document.getElementById('id_caption_upload');
+            const fileInput = document.getElementById('id_file_upload');
+            const uploadButton = document.getElementById('uploadButton');
+
+            function checkUploadFormValidity() {
+                const isCaptionFilled = captionInput && captionInput.value.trim() !== '';
+                const isFileSelected = fileInput && fileInput.files.length > 0;
+
+                if (uploadButton) {
+                    uploadButton.disabled = !(isCaptionFilled && isFileSelected);
+                    if (uploadButton.disabled) {
+                        uploadButton.classList.remove('btn-primary');
+                        uploadButton.classList.add('btn-secondary');
+                    } else {
+                        uploadButton.classList.remove('btn-secondary');
+                        uploadButton.classList.add('btn-primary');
+                    }
+                }
+            }
+
+            if (captionInput) {
+                captionInput.addEventListener('input', checkUploadFormValidity);
+            }
+            if (fileInput) {
+                fileInput.addEventListener('change', checkUploadFormValidity);
+            }
+            checkUploadFormValidity();
+
+
             const attachButtons = document.querySelectorAll('.attach-button');
 
             attachButtons.forEach(button => {
                 button.addEventListener('click', function() {
                     const documentId = this.dataset.documentId;
                     const formContainer = document.getElementById(`attach-form-${documentId}`);
-                    const attachedIdsString = this.dataset.attachedDocumentIds;
-                    const attachedIds = attachedIdsString ? attachedIdsString.split(',').map(Number) : [];
+                    const attachForm = document.getElementById(`attachForm-${documentId}`);
+                    const attachSubmitButton = attachForm ? attachForm.querySelector('.attach-submit-button') : null;
+                    const checkboxes = attachForm ? attachForm.querySelectorAll('input[type="checkbox"][name="documents_to_attach"]') : [];
 
                     if (formContainer.style.display === 'none') {
                         formContainer.style.display = 'block';
                         this.textContent = 'Скрыть форму прикрепления';
-
-                        const checkboxes = formContainer.querySelectorAll('input[type="checkbox"][name="documents_to_attach"]');
-                        checkboxes.forEach(checkbox => {
-                            if (attachedIds.includes(Number(checkbox.value))) {
-                                checkbox.checked = true;
-                            } else {
-                                checkbox.checked = false;
-                            }
-                        });
-
+                        checkAttachFormValidity(checkboxes, attachSubmitButton);
                     } else {
                         formContainer.style.display = 'none';
                         this.textContent = 'Прикрепить документы';
                     }
                 });
+            });
+
+            function checkAttachFormValidity(checkboxes, submitButton) {
+                let anyCheckboxChecked = false;
+                checkboxes.forEach(checkbox => {
+                    if (checkbox.checked) {
+                        anyCheckboxChecked = true;
+                    }
+                });
+
+                if (submitButton) {
+                    submitButton.disabled = !anyCheckboxChecked;
+                    if (submitButton.disabled) {
+                        submitButton.classList.remove('btn-success');
+                        submitButton.classList.add('btn-secondary');
+                    } else {
+                        submitButton.classList.remove('btn-secondary');
+                        submitButton.classList.add('btn-success');
+                    }
+                }
+            }
+
+            document.querySelectorAll('.attach-documents-form').forEach(form => {
+                const checkboxes = form.querySelectorAll('input[type="checkbox"][name="documents_to_attach"]');
+                const submitButton = form.querySelector('.attach-submit-button');
+
+                checkboxes.forEach(checkbox => {
+                    checkbox.addEventListener('change', () => checkAttachFormValidity(checkboxes, submitButton));
+                });
+
+                if (form.closest('.attach-form-container') && form.closest('.attach-form-container').style.display !== 'none') {
+                    checkAttachFormValidity(checkboxes, submitButton);
+                }
             });
         });
     </script>
