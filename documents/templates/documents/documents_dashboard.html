@@ -1,0 +1,304 @@
+{% extends "core/base.html" %}
+{% load static %}
+{% load widget_tweaks %}
+
+{% block title %}Мои Документы{% endblock %}
+
+{% block content %}
+    <h1 class="mb-4 text-center">Мои Документы</h1>
+
+    {% if messages %}
+      {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+      {% endfor %}
+    {% endif %}
+
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-12 col-md-8 mb-4">
+                <div class="card">
+                    <div class="card-header bg-info text-white">
+                        <h2 class="card-title mb-0">Загрузить документ</h2>
+                    </div>
+                    <div class="card-body">
+                        <form method="post" enctype="multipart/form-data" id="generalDocumentForm">
+                            {% csrf_token %}
+                            <input type="hidden" name="form_type" value="general_document_form">
+                            {% for field in general_document_form %}
+                                <div class="mb-3">
+                                    {{ field.label_tag }}
+                                    {% if field.name == 'file' %}
+                                        {{ field|add_class:"form-control"|attr:"accept:application/pdf,application/msword,text/plain,image/jpeg,image/png"|attr:"id:id_file_upload" }}
+                                    {% elif field.name == 'caption' %}
+                                        {{ field|add_class:"form-control"|attr:"id:id_caption_upload" }}
+                                        <div id="captionCharCount" class="form-text text-muted">0 / {{ field.field.max_length }} символов</div>
+                                    {% else %}
+                                        {{ field|add_class:"form-control" }}
+                                    {% endif %}
+                                    {% if field.help_text %}
+                                        <div class="form-text text-muted">{{ field.help_text }}</div>
+                                    {% endif %}
+                                    {% for error in field.errors %}
+                                        <div class="text-danger small">{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                            {% endfor %}
+                            {% if general_document_form.non_field_errors %}
+                                <div class="alert alert-danger">
+                                    {% for error in general_document_form.non_field_errors %}
+                                        {{ error }}
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <button type="submit" class="btn btn-primary mt-3" id="uploadButton" disabled>Загрузить</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row justify-content-center mt-4">
+            <div class="col-12 col-md-8">
+                <div class="card">
+                    <div class="card-header bg-warning text-dark">
+                        <h2 class="card-title mb-0">Документы, загруженные сотрудниками (для вас)</h2>
+                    </div>
+                    <div class="card-body">
+                        {% if staff_documents %}
+                            <ul class="list-group">
+                                {% for doc in staff_documents %}
+                                    <li class="list-group-item d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-2">
+                                        <div class="mb-2 mb-md-0">
+                                            <a href="{% url 'serve_document' doc.pk %}" target="_blank">
+                                                {{ doc.caption }} ({{ doc.user_file_name }})
+                                            </a>
+                                            <span class="badge
+                                                {% if doc.status == 'PENDING_SIGNATURE' %}bg-warning
+                                                {% elif doc.status == 'SIGNED' %}bg-success
+                                                {% elif doc.status == 'APPROVED' %}bg-success
+                                                {% elif doc.status == 'QUESTION' %}bg-danger
+                                                {% else %}bg-secondary{% endif %} text-dark ms-2">
+                                                {{ doc.get_status_display }}
+                                            </span>
+                                            <small class="text-muted d-block">
+                                                Загружен: {{ doc.uploaded_at|date:"d.m.Y H:i" }}
+                                            </small>
+
+                                            <button type="button" class="btn btn-sm btn-outline-secondary mt-2 attach-button" data-document-id="{{ doc.pk }}">
+                                                Прикрепить документы
+                                            </button>
+
+                                            <div class="attach-form-container mt-3" id="attach-form-{{ doc.pk }}" style="display:none;">
+                                                <form method="post" action="" class="attach-documents-form" id="attachForm-{{ doc.pk }}">
+                                                    {% csrf_token %}
+                                                    <input type="hidden" name="form_type" value="attach_documents_form">
+                                                    <input type="hidden" name="target_document_id" value="{{ doc.pk }}">
+                                                    <div class="mb-3">
+                                                        {{ attach_documents_form.documents_to_attach.label_tag }}
+                                                        {% for checkbox in attach_documents_form.documents_to_attach %}
+                                                            <div class="form-check">
+                                                                <input type="checkbox" name="documents_to_attach" id="{{ checkbox.id_for_label }}" value="{{ checkbox.data.value }}" {% if checkbox.data.selected %}checked{% endif %}>
+                                                                <label class="form-check-label" for="{{ checkbox.id_for_label }}">
+                                                                    {{ checkbox.choice_label }}
+                                                                </label>
+                                                            </div>
+                                                        {% endfor %}
+                                                        {% for error in attach_documents_form.documents_to_attach.errors %}
+                                                            <div class="text-danger small">{{ error }}</div>
+                                                        {% endfor %}
+                                                    </div>
+                                                    <button type="submit" class="btn btn-success btn-sm attach-submit-button" disabled>Прикрепить</button>
+                                                </form>
+                                            </div>
+
+                                            {% if doc.related_documents.all %}
+                                                <div class="mt-2">
+                                                    <strong>Прикрепленные документы:</strong>
+                                                    <ul class="list-unstyled">
+                                                        {% for related_doc in doc.related_documents.all %}
+                                                            <li>
+                                                                <a href="{% url 'serve_document' related_doc.pk %}" target="_blank">
+                                                                    {{ related_doc.caption }} ({{ related_doc.user_file_name }})
+                                                                </a>
+                                                            </li>
+                                                        {% endfor %}
+                                                    </ul>
+                                                </div>
+                                            {% endif %}
+
+                                        </div>
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        {% else %}
+                            <div class="alert alert-info" role="alert">
+                                У вас нет документов, загруженных сотрудниками.
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row justify-content-center mt-4">
+            <div class="col-12 col-md-8">
+                <div class="card">
+                    <div class="card-header bg-dark text-white">
+                        <h2 class="card-title mb-0">Мои загруженные документы</h2>
+                    </div>
+                    <div class="card-body">
+                        {% if user_documents %}
+                            <ul class="list-group">
+                                {% for doc in user_documents %}
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <a href="{% url 'serve_document' doc.pk %}"
+                                               target="_blank">{{ doc.caption|default:doc.user_file_name }}</a>
+                                            <span class="badge
+                                                {% if doc.status == 'APPROVED' %}bg-success
+                                                {% elif doc.status == 'PENDING' %}bg-warning text-dark
+                                                {% elif doc.status == 'QUESTION' %}bg-danger
+                                                {% else %}bg-secondary{% endif %} ms-2">
+                                                {{ doc.get_status_display }}
+                                            </span>
+                                            {% if doc.caption %}
+                                                <small class="text-muted d-block">{{ doc.user_file_name }}</small>
+                                            {% endif %}
+                                        </div>
+                                        <div class="d-flex align-items-center">
+                                            <span class="badge bg-info text-dark me-2">{{ doc.uploaded_at|date:"d.m.Y H:i" }}</span>
+                                            <form action="{% url 'delete_document' doc.pk %}" method="post"
+                                                  onsubmit="return confirm('Вы уверены, что хотите удалить этот документ?');">
+                                                {% csrf_token %}
+                                                <button type="submit" class="btn btn-danger btn-sm">X</button>
+                                            </form>
+                                        </div>
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        {% else %}
+                            <div class="alert alert-info" role="alert">
+                                У вас пока нет загруженных документов.
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% block extra_js %}
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const captionInput = document.getElementById('id_caption_upload');
+            const fileInput = document.getElementById('id_file_upload');
+            const uploadButton = document.getElementById('uploadButton');
+            const captionCharCount = document.getElementById('captionCharCount');
+            let maxCaptionLength = 0;
+
+            if (captionInput) {
+                maxCaptionLength = parseInt(captionInput.getAttribute('maxlength'), 10);
+
+                captionInput.addEventListener('input', () => {
+                    updateCharCount();
+                    checkUploadFormValidity();
+                });
+            }
+            if (fileInput) {
+                fileInput.addEventListener('change', checkUploadFormValidity);
+            }
+
+            function updateCharCount() {
+                if (captionInput && captionCharCount && !isNaN(maxCaptionLength)) {
+                    const currentCount = captionInput.value.length;
+                    captionCharCount.textContent = `${currentCount} / ${maxCaptionLength} символов`;
+
+                    if (currentCount > maxCaptionLength) {
+                        captionCharCount.classList.remove('text-muted');
+                        captionCharCount.classList.add('text-danger');
+                    } else {
+                        captionCharCount.classList.remove('text-danger');
+                        captionCharCount.classList.add('text-muted');
+                    }
+                }
+            }
+
+            function checkUploadFormValidity() {
+                const isCaptionFilled = captionInput && captionInput.value.trim() !== '';
+                const isFileSelected = fileInput && fileInput.files.length > 0;
+                const isCaptionWithinLimit = captionInput && captionInput.value.length <= maxCaptionLength;
+
+                if (uploadButton) {
+                    uploadButton.disabled = !(isCaptionFilled && isFileSelected && isCaptionWithinLimit);
+
+                    if (uploadButton.disabled) {
+                        uploadButton.classList.remove('btn-primary');
+                        uploadButton.classList.add('btn-secondary');
+                    } else {
+                        uploadButton.classList.remove('btn-secondary');
+                        uploadButton.classList.add('btn-primary');
+                    }
+                }
+            }
+
+            updateCharCount();
+            checkUploadFormValidity();
+
+
+            const attachButtons = document.querySelectorAll('.attach-button');
+
+            attachButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const documentId = this.dataset.documentId;
+                    const formContainer = document.getElementById(`attach-form-${documentId}`);
+                    const attachForm = document.getElementById(`attachForm-${documentId}`);
+                    const attachSubmitButton = attachForm ? attachForm.querySelector('.attach-submit-button') : null;
+                    const checkboxes = attachForm ? attachForm.querySelectorAll('input[type="checkbox"][name="documents_to_attach"]') : [];
+
+                    if (formContainer.style.display === 'none') {
+                        formContainer.style.display = 'block';
+                        this.textContent = 'Скрыть форму прикрепления';
+                        checkAttachFormValidity(checkboxes, attachSubmitButton);
+                    } else {
+                        formContainer.style.display = 'none';
+                        this.textContent = 'Прикрепить документы';
+                    }
+                });
+            });
+
+            function checkAttachFormValidity(checkboxes, submitButton) {
+                let anyCheckboxChecked = false;
+                checkboxes.forEach(checkbox => {
+                    if (checkbox.checked) {
+                        anyCheckboxChecked = true;
+                    }
+                });
+
+                if (submitButton) {
+                    submitButton.disabled = !anyCheckboxChecked;
+                    if (submitButton.disabled) {
+                        submitButton.classList.remove('btn-success');
+                        submitButton.classList.add('btn-secondary');
+                    } else {
+                        submitButton.classList.remove('btn-secondary');
+                        submitButton.classList.add('btn-success');
+                    }
+                }
+            }
+
+            document.querySelectorAll('.attach-documents-form').forEach(form => {
+                const checkboxes = form.querySelectorAll('input[type="checkbox"][name="documents_to_attach"]');
+                const submitButton = form.querySelector('.attach-submit-button');
+
+                checkboxes.forEach(checkbox => {
+                    checkbox.addEventListener('change', () => checkAttachFormValidity(checkboxes, submitButton));
+                });
+
+                if (form.closest('.attach-form-container') && form.closest('.attach-form-container').style.display !== 'none') {
+                    checkAttachFormValidity(checkboxes, submitButton);
+                }
+            });
+        });
+    </script>
+    {% endblock %}
+{% endblock %}

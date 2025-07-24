@@ -34,3 +34,6 @@ docker-compose.override.yml
 **/migrations/*.py
 **/migrations/*.pyc
 !**/migrations/__init__.py
+
+# logging
+logs/
