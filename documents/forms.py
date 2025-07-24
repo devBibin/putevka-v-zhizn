@@ -43,13 +43,16 @@ class DocumentUploadForm(forms.ModelForm):
             'file': 'Выберите файл',
         }
 
+        widgets = {
+                'caption': forms.Textarea(attrs={'rows': 4, 'placeholder': 'Введите описание документа', 'max_length': '255'}),
+            }
+
     def __init__(self, *args, **kwargs):
         self.specific_caption = kwargs.pop('specific_caption', None)
 
         super().__init__(*args, **kwargs)
 
-        self.fields['caption'].required = False
-        self.fields['caption'].widget = forms.TextInput(attrs={'placeholder': 'Введите описание'})
+        self.fields['caption'].required = True
 
     def clean_file(self):
         uploaded_file = self.cleaned_data.get('file')

@@ -7,6 +7,12 @@
 {% block content %}
     <h1 class="mb-4 text-center">Мои Документы</h1>
 
+    {% if messages %}
+      {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+      {% endfor %}
+    {% endif %}
+
     <div class="container">
         <div class="row justify-content-center">
             <div class="col-12 col-md-8 mb-4">
@@ -25,6 +31,7 @@
                                         {{ field|add_class:"form-control"|attr:"accept:application/pdf,application/msword,text/plain,image/jpeg,image/png"|attr:"id:id_file_upload" }}
                                     {% elif field.name == 'caption' %}
                                         {{ field|add_class:"form-control"|attr:"id:id_caption_upload" }}
+                                        <div id="captionCharCount" class="form-text text-muted">0 / {{ field.field.max_length }} символов</div>
                                     {% else %}
                                         {{ field|add_class:"form-control" }}
                                     {% endif %}
@@ -186,13 +193,44 @@
             const captionInput = document.getElementById('id_caption_upload');
             const fileInput = document.getElementById('id_file_upload');
             const uploadButton = document.getElementById('uploadButton');
+            const captionCharCount = document.getElementById('captionCharCount');
+            let maxCaptionLength = 0;
+
+            if (captionInput) {
+                maxCaptionLength = parseInt(captionInput.getAttribute('maxlength'), 10);
+
+                captionInput.addEventListener('input', () => {
+                    updateCharCount();
+                    checkUploadFormValidity();
+                });
+            }
+            if (fileInput) {
+                fileInput.addEventListener('change', checkUploadFormValidity);
+            }
+
+            function updateCharCount() {
+                if (captionInput && captionCharCount && !isNaN(maxCaptionLength)) {
+                    const currentCount = captionInput.value.length;
+                    captionCharCount.textContent = `${currentCount} / ${maxCaptionLength} символов`;
+
+                    if (currentCount > maxCaptionLength) {
+                        captionCharCount.classList.remove('text-muted');
+                        captionCharCount.classList.add('text-danger');
+                    } else {
+                        captionCharCount.classList.remove('text-danger');
+                        captionCharCount.classList.add('text-muted');
+                    }
+                }
+            }
 
             function checkUploadFormValidity() {
                 const isCaptionFilled = captionInput && captionInput.value.trim() !== '';
                 const isFileSelected = fileInput && fileInput.files.length > 0;
+                const isCaptionWithinLimit = captionInput && captionInput.value.length <= maxCaptionLength;
 
                 if (uploadButton) {
-                    uploadButton.disabled = !(isCaptionFilled && isFileSelected);
+                    uploadButton.disabled = !(isCaptionFilled && isFileSelected && isCaptionWithinLimit);
+
                     if (uploadButton.disabled) {
                         uploadButton.classList.remove('btn-primary');
                         uploadButton.classList.add('btn-secondary');
@@ -203,12 +241,7 @@
                 }
             }
 
-            if (captionInput) {
-                captionInput.addEventListener('input', checkUploadFormValidity);
-            }
-            if (fileInput) {
-                fileInput.addEventListener('change', checkUploadFormValidity);
-            }
+            updateCharCount();
             checkUploadFormValidity();
 
 
