@@ -4,6 +4,44 @@ import sys
 import traceback
 import telebot
 from Putevka import settings
+from django.http import JsonResponse
+import json
+
+from users.models import TelegramAccount, User
+
+@csrf_exempt
+def telegram_webhook(request):
+    if request.method == "POST":
+        data = json.loads(request.body)
+        message = data.get("message")
+        if not message:
+            return JsonResponse({"ok": True})
+
+        chat = message.get("chat", {})
+        text = message.get("text", "")
+        telegram_id = chat.get("id")
+        username = chat.get("username")
+        first_name = chat.get("first_name")
+        last_name = chat.get("last_name")
+
+        if text.startswith("/start"):
+            try:
+                _, secret_code = text.split()
+                user = User.objects.get(telegram_account__secret_code=secret_code)
+                TelegramAccount.objects.update_or_create(
+                    user=user,
+                    defaults={
+                        "telegram_id": telegram_id,
+                        "username": username,
+                        "first_name": first_name,
+                        "last_name": last_name,
+                    }
+                )
+                send_message(telegram_id, "✅ Успешно привязано к аккаунту!")
+            except Exception as e:
+                send_message(telegram_id, "❌ Ошибка привязки. Неверный код или пользователь не найден.")
+
+        return JsonResponse({"ok": True})
 
 bot = telebot.TeleBot(settings.TG_TOKEN)
 

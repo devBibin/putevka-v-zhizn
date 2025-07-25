@@ -1,10 +1,4 @@
 from django.contrib import admin
 from .models import TelegramAccount
-import uuid
-
-def generate_secret_code():
-    return uuid.uuid4().hex
 
 admin.site.register(TelegramAccount)
-
-# Register your models here.
