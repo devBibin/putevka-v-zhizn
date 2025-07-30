@@ -1,27 +1,4 @@
-#!/bin/sh
-
-echo "Waiting for PostgreSQL..."
-until pg_isready -h db -U "$POSTGRES_USER"; do sleep 0.1; done
-echo "PostgreSQL started."
-
-# Apply migrations
-python manage.py migrate
-
-# Collect static files
-python manage.py collectstatic --noinput
-
-# Create superuser if it doesn't exist
-echo "
-from django.contrib.auth import get_user_model
-User = get_user_model()
-
-username = os.environ.get('DJANGO_SUPERUSER_USERNAME', 'admin')
-email = os.environ.get('DJANGO_SUPERUSER_EMAIL', '')
-password = os.environ.get('DJANGO_SUPERUSER_PASSWORD', '0000')
-
-if not User.objects.filter(username='admin').exists():
-    User.objects.create_superuser(username, email, password)
-" | python manage.py shell
+#!/bin/bash
 
 echo "Waiting for Ngrok tunnel to be established..."
 
@@ -46,11 +23,10 @@ done
 
 if [ -z "$NGROK_URL" ]; then
     echo "Failed to get Ngrok URL after multiple retries. Check ngrok logs."
+    exit 1
 fi
 
 echo "Your public Ngrok URL: $NGROK_URL"
-
-export NGROK_PUBLIC_URL="$NGROK_URL"
 
 echo "Attempting to set Telegram webhook..."
 
@@ -64,6 +40,4 @@ fi
 
 echo "Setup complete. Your bot should now be active at $NGROK_URL/telegram/webhook/${TG_TOKEN_USERS}/"
 
-# Start Gunicorn server
-#exec gunicorn Putevka.wsgi:application --bind 0.0.0.0:8000
-exec python manage.py runserver 0.0.0.0:8000
+exit 0
