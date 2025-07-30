@@ -9,8 +9,8 @@ import os
 
 import config as app_config
 
-CHAT_ID = os.getenv('CHAT_ID')
-TG_TOKEN = os.getenv("TG_TOKEN")
+CHAT_ID = os.getenv('TELEGRAM_LOG_CHAT_ID')
+TG_TOKEN = os.getenv("TG_TOKEN_ADMIN")
 bot = TeleBot(TG_TOKEN)
 
 TELEGRAM_CHAT_IDS = app_config.TELEGRAM_STAFF_CHAT_IDS

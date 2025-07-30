@@ -7,7 +7,7 @@ import os
 from dotenv import load_dotenv
 load_dotenv()
 
-token = os.getenv("TG_TOKEN")
+token = os.getenv("TG_TOKEN_ADMIN")
 base_url = "http://localhost:8000/bot/"
 if not token:
     raise ValueError("Token not found in the credentials file.")

@@ -5,7 +5,7 @@ import json
 logger = logging.getLogger(__name__)
 
 try:
-    CHAT_ID = os.getenv('CHAT_ID')
+    CHAT_ID = os.getenv('TELEGRAM_LOG_CHAT_ID')
     logger.info(f'Сообщения в тг отправляются локальному пользователю {CHAT_ID}')
 except Exception as e:
     CHAT_ID = None
