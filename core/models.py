@@ -63,6 +63,8 @@ class TelegramAccount(models.Model):
     activation_token = models.UUIDField(
         default=uuid.uuid4,
         unique=True,
+        null=True,
+        blank=True,
         verbose_name="Токен активации Telegram",
         help_text="Уникальный токен для активации аккаунта через Telegram."
     )

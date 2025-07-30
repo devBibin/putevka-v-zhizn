@@ -5,7 +5,7 @@ ENV PYTHONUNBUFFERED 1
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y netcat-openbsd postgresql-client && apt-get clean && apt-get install -y curl --no-install-recommends
+RUN apt-get update && apt-get install -y netcat-openbsd postgresql-client && apt-get clean
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir \

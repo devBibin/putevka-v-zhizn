@@ -69,18 +69,6 @@ def get_bot_instance(token):
 			else:
 				bot_instances[token].send_message(message.chat.id, "Привет! Чтобы активировать аккаунт, перейдите по ссылке с сайта.")
 
-		@bot_instances[token].message_handler(func=lambda message: True)
-		def echo_all(message):
-			try:
-				if message.text:
-					bot_instances[token].reply_to(message, f"Вы сказали: {message.text}")
-					logger.info(f"Повтор сообщения '{message.text}' пользователю {message.from_user.id}")
-				else:
-					bot_instances[token].reply_to(message, "Я получил нетекстовое сообщение.")
-					logger.warning(f"Получено нетекстовое сообщение от {message.from_user.id}")
-			except Exception as e:
-				logger.error(f"Ошибка при повторе сообщения: {e}")
-
 		@bot_instances[token].message_handler(content_types=['contact'])
 		def handle_contact(message):
 			if message.contact is not None:
@@ -108,21 +96,33 @@ def get_bot_instance(token):
 					telegram_account.user.save()
 
 					bot_instances[token].send_message(message.chat.id,
-									 f"Поздравляем, {telegram_account.user.username}! Ваш Telegram-аккаунт успешно привязан, и ваш веб-аккаунт активирован!",
-									 reply_markup=telebot.types.ReplyKeyboardRemove())
+													  f"Поздравляем, {telegram_account.user.username}! Ваш Telegram-аккаунт успешно привязан, и ваш веб-аккаунт активирован!",
+													  reply_markup=telebot.types.ReplyKeyboardRemove())
 					logger.info(
 						f"Аккаунт пользователя {telegram_account.user.username} успешно активирован через Telegram ID {telegram_id}.")
 
 				except TelegramAccount.DoesNotExist:
 					bot_instances[token].send_message(message.chat.id,
-									 "Не удалось найти аккаунт, ожидающий активации для этого Telegram ID. Пожалуйста, убедитесь, что вы нажали ссылку активации на сайте и поделились своим номером с того же аккаунта Telegram.")
+													  "Не удалось найти аккаунт, ожидающий активации для этого Telegram ID. Пожалуйста, убедитесь, что вы нажали ссылку активации на сайте и поделились своим номером с того же аккаунта Telegram.")
 					logger.warning(f"Не удалось найти профиль для активации от Telegram ID {telegram_id}.")
 				except Exception as e:
 					logger.error(f"Ошибка при обработке контакта: {e}", exc_info=True)
 					bot_instances[token].send_message(message.chat.id,
-									 "Произошла ошибка при привязке вашего номера. Пожалуйста, попробуйте еще раз.")
+													  "Произошла ошибка при привязке вашего номера. Пожалуйста, попробуйте еще раз.")
 			else:
 				bot_instances[token].send_message(message.chat.id, "Вы не поделились номером телефона.")
+
+		@bot_instances[token].message_handler(func=lambda message: True)
+		def echo_all(message):
+			try:
+				if message.text:
+					bot_instances[token].reply_to(message, f"Вы сказали: {message.text}")
+					logger.info(f"Повтор сообщения '{message.text}' пользователю {message.from_user.id}")
+				else:
+					bot_instances[token].reply_to(message, "Я получил нетекстовое сообщение.")
+					logger.warning(f"Получено нетекстовое сообщение от {message.from_user.id}")
+			except Exception as e:
+				logger.error(f"Ошибка при повторе сообщения: {e}")
 
 	logger.info(f"Инициализирован новый экземпляр бота для токена: {token[:5]}...")
 	return bot_instances[token]

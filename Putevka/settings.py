@@ -27,17 +27,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = 'django-insecure-(ct6qihahs$niey_!sj__0l4$o4wd8jz%nf&p%jgtf94upx^v('
 
-NGROK_HOST = os.environ.get('NGROK_PUBLIC_URL')
-
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
-
-if NGROK_HOST:
-    ALLOWED_HOSTS.append(NGROK_HOST.replace('https://', '').replace('http://', ''))
-elif DEBUG:
-    ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = []
 
 
 # Application definition
