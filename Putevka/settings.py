@@ -43,13 +43,13 @@ elif DEBUG:
 # Application definition
 
 INSTALLED_APPS = [
+    'core',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
-    'django.contrib.staticfiles',
-    'core'
+    'django.contrib.staticfiles'
 ]
 
 MIDDLEWARE = [
@@ -146,4 +146,5 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 
-TG_TOKEN = os.getenv("TG_TOKEN")
+TG_TOKEN_USERS = os.getenv("TG_TOKEN_USERS")
+TG_TOKEN_ADMIN = os.getenv("TG_TOKEN_ADMIN")
