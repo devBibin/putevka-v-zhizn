@@ -1,0 +1,42 @@
+{% extends "registration/base.html" %}
+
+{% load widget_tweaks %}
+
+{% block title %}Подключите Telegram{% endblock %}
+{% block heading %}Подключите Telegram{% endblock %}
+
+{% block content %}
+    <p class="text-center text-muted mb-4">
+        Чтобы продолжить, пожалуйста, привяжите ваш аккаунт Telegram.
+    </p>
+    <div class="text-center mb-4 p-4 bg-info bg-opacity-10 border border-info rounded">
+        <p class="fw-medium text-info mb-2">Инструкция:</p>
+        <ol class="list-group list-group-numbered list-group-flush text-start text-dark">
+            <li class="list-group-item border-0 bg-transparent">Откройте Telegram и перейдите по этой ссылке:</li>
+            <li class="list-group-item border-0 bg-transparent">
+                <a href="{{ telegram_bot_link }}" target="_blank" class="text-primary fw-semibold text-break">{{ telegram_bot_link }}</a>
+            </li>
+            <li class="list-group-item border-0 bg-transparent">Нажмите кнопку "Начать" в чате с ботом.</li>
+            <li class="list-group-item border-0 bg-transparent">(Опционально) Бот может попросить вас поделиться номером телефона. Если хотите, поделитесь им.</li>
+            <li class="list-group-item border-0 bg-transparent">Вернитесь на эту страницу и нажмите "Продолжить".</li>
+        </ol>
+    </div>
+
+    {% if error_message %}
+        <div class="alert alert-danger text-center mb-4" role="alert">
+            {{ error_message }}
+        </div>
+    {% endif %}
+
+    <form method="post" class="mb-3">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-success w-100">
+            Продолжить (Я взаимодействовал с ботом)
+        </button>
+    </form>
+
+    <div class="text-center">
+        <p class="text-muted">Нет Telegram или не хотите его использовать?</p>
+        <a href="{% url 'skip_telegram' %}" class="btn btn-link">Пропустить Telegram и подтвердить номер по звонку</a>
+    </div>
+{% endblock %}

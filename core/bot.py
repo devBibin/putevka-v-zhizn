@@ -7,18 +7,21 @@ import sys
 import traceback
 import telebot
 from Putevka import settings
-from core.models import TelegramAccount
+from core.models import TelegramAccount, RegistrationAttempt
 
 logger = logging.getLogger('django.request')
 
 bot_instances = {}
+
+bot_instances = {}
+
 
 def get_bot_instance(token):
 	if token not in bot_instances:
 		try:
 			bot_instances[token] = telebot.TeleBot(token, parse_mode='HTML')
 		except Exception as e:
-			logger.error(f'Невозможно подключиться к телеграмм-боту, {e}')
+			logger.error(f'Невозможно подключиться к телеграмм-боту: {e}')
 			return None
 
 		@bot_instances[token].message_handler(commands=['start'])
@@ -30,29 +33,34 @@ def get_bot_instance(token):
 					try:
 						telegram_account = TelegramAccount.objects.get(activation_token=activation_token_str)
 
-						if telegram_account.is_active_web:
+						if telegram_account.telegram_verified:
 							bot_instances[token].send_message(message.chat.id,
-											 "Ваш аккаунт Telegram уже привязан и веб-аккаунт активирован!")
+															  "Ваш аккаунт Telegram уже привязан и веб-аккаунт активирован!")
 							return
 
 						if telegram_account.telegram_id and str(telegram_account.telegram_id) != str(message.chat.id):
 							bot_instances[token].send_message(message.chat.id,
-											 "Этот токен активации привязан к другому Telegram-аккаунту, либо уже был использован.")
+															  "Этот токен активации привязан к другому Telegram-аккаунту, либо уже был использован.")
 							logger.warning(
 								f"Попытка активации токена {activation_token_str} с другого Telegram ID ({message.chat.id}).")
 							return
 
 						if not telegram_account.telegram_id:
 							telegram_account.telegram_id = str(message.chat.id)
-							telegram_account.save()
+						telegram_account.username = message.from_user.username
+						telegram_account.first_name = message.from_user.first_name
+						telegram_account.last_name = message.from_user.last_name
+						telegram_account.language_code = message.from_user.language_code
+						telegram_account.save()
 
 						markup = telebot.types.ReplyKeyboardMarkup(one_time_keyboard=True, resize_keyboard=True)
-						button_phone = telebot.types.KeyboardButton(text="Поделиться своим номером", request_contact=True)
+						button_phone = telebot.types.KeyboardButton(text="Поделиться своим номером",
+																	request_contact=True)
 						markup.add(button_phone)
 
 						bot_instances[token].send_message(message.chat.id,
-										 f"Привет, {telegram_account.user.username}! Для активации аккаунта на сайте, пожалуйста, поделитесь своим номером телефона.",
-										 reply_markup=markup)
+														  f"Привет, {telegram_account.user.username}! Для активации аккаунта на сайте, пожалуйста, поделитесь своим номером телефона.",
+														  reply_markup=markup)
 
 						logger.info(
 							f"Запрошен номер телефона для активации токена {activation_token_str} для пользователя {telegram_account.user.username}")
@@ -63,11 +71,13 @@ def get_bot_instance(token):
 							f"Неверный токен активации от Telegram ID {message.chat.id}: {activation_token_str}")
 					except Exception as e:
 						logger.error(f"Ошибка в handle_start с токеном: {e}", exc_info=True)
-						bot_instances[token].send_message(message.chat.id, "Произошла ошибка при обработке вашего запроса.")
+						bot_instances[token].send_message(message.chat.id,
+														  "Произошла ошибка при обработке вашего запроса.")
 				else:
 					bot_instances[token].send_message(message.chat.id, "Неизвестная команда /start.")
 			else:
-				bot_instances[token].send_message(message.chat.id, "Привет! Чтобы активировать аккаунт, перейдите по ссылке с сайта.")
+				bot_instances[token].send_message(message.chat.id,
+												  "Привет! Чтобы активировать аккаунт, перейдите по ссылке с сайта.")
 
 		@bot_instances[token].message_handler(content_types=['contact'])
 		def handle_contact(message):
@@ -78,8 +88,8 @@ def get_bot_instance(token):
 				try:
 					telegram_account = TelegramAccount.objects.get(
 						telegram_id=telegram_id,
+						telegram_verified=False,
 						user__is_active=False,
-						is_active_web=False,
 						activation_token__isnull=False
 					)
 
@@ -89,14 +99,21 @@ def get_bot_instance(token):
 					telegram_account.language_code = message.from_user.language_code
 
 					telegram_account.user.is_active = True
-					telegram_account.is_active_web = True
+					telegram_account.telegram_verified = True
 					telegram_account.activation_token = None
 
 					telegram_account.save()
 					telegram_account.user.save()
 
+					attempt = RegistrationAttempt.objects.filter(user=telegram_account.user).first()
+					if attempt:
+						attempt.phone_number = phone_number
+						attempt.phone_verified = True
+						attempt.current_step = 'finish'
+						attempt.save()
+
 					bot_instances[token].send_message(message.chat.id,
-													  f"Поздравляем, {telegram_account.user.username}! Ваш Telegram-аккаунт успешно привязан, и ваш веб-аккаунт активирован!",
+													  f"Поздравляем, {telegram_account.user.username}! Ваш Telegram-аккаунт успешно привязан, и ваш веб-аккаунт активирован! Теперь вы можете вернуться на сайт и завершить регистрацию.",
 													  reply_markup=telebot.types.ReplyKeyboardRemove())
 					logger.info(
 						f"Аккаунт пользователя {telegram_account.user.username} успешно активирован через Telegram ID {telegram_id}.")
@@ -136,14 +153,13 @@ def webhook(request, bot_token):
 			update = telebot.types.Update.de_json(json_string)
 
 			bot = get_bot_instance(bot_token)
+			if bot:
+				bot.process_new_updates([update])
+				return HttpResponse(status=200)
+			else:
+				logger.error("Не удалось получить экземпляр бота.")
+				return JsonResponse({'status': 'error', 'message': 'Bot instance not available'}, status=500)
 
-			bot.process_new_updates([update])
-
-			return HttpResponse(status=200)
-
-		except ValueError as ve:
-			logger.error(f"Ошибка токена в вебхуке: {ve}")
-			return JsonResponse({'status': 'error', 'message': str(ve)}, status=403)
 		except json.JSONDecodeError:
 			logger.error("Некорректный JSON в запросе вебхука.")
 			return JsonResponse({'status': 'error', 'message': 'Invalid JSON'}, status=400)

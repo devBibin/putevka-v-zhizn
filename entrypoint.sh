@@ -5,6 +5,7 @@ until pg_isready -h db -U "$POSTGRES_USER"; do sleep 0.1; done
 echo "PostgreSQL started."
 
 python manage.py makemigrations
+python manage.py makemigrations core
 
 # Apply migrations
 python manage.py migrate
