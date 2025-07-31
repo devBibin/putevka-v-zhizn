@@ -33,4 +33,4 @@ docker-compose.override.yml
 # Migrations (optional: keep if you want to version DB structure)
 **/migrations/*.py
 **/migrations/*.pyc
-!**/migrations/__init__.py
+**/migrations/__init__.py
