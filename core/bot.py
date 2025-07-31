@@ -15,6 +15,14 @@ bot_instances = {}
 
 bot_instances = {}
 
+def get_bot_messenger():
+    global _bot_messenger
+    if _bot_messenger is None:
+        if not settings.TG_TOKEN_USERS:
+            logger.error("TG_TOKEN_USERS не установлен в settings.py")
+            return None
+        _bot_messenger = telebot.TeleBot(settings.TG_TOKEN_USERS)
+    return _bot_messenger
 
 def get_bot_instance(token):
 	if token not in bot_instances:

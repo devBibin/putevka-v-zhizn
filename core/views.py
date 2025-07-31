@@ -19,88 +19,17 @@ from Putevka import settings
 from .forms import CustomUserCreationForm, RegistrationForm, VerifyEmailForm, PhoneNumberForm
 from .models import TelegramAccount, RegistrationAttempt
 from .bot import webhook
+from .services.email_service import _send_email_verification_code
+from .services.zvonok_service import initiate_zvonok_verification, _poll_zvonok_status
 
 logger = logging.getLogger(__name__)
 
 _bot_messenger = None
 
 
-def get_bot_messenger():
-    global _bot_messenger
-    if _bot_messenger is None:
-        if not settings.TG_TOKEN_USERS:
-            logger.error("TG_TOKEN_USERS не установлен в settings.py")
-            return None
-        _bot_messenger = telebot.TeleBot(settings.TG_TOKEN_USERS)
-    return _bot_messenger
-
-
 def index(request):
     return render(request, 'core/index.html')
 
-
-def _send_email_verification_code(attempt):
-    subject = 'Ваш код подтверждения регистрации'
-    message = f'Привет!\n\nВаш код подтверждения для регистрации: {attempt.email_verification_code}\n\n' \
-              f'Этот код действителен в течение 15 минут. Если вы не запрашивали этот код, просто проигнорируйте это письмо.'
-    email_from = settings.DEFAULT_FROM_EMAIL
-    recipient_list = [attempt.email]
-    try:
-        send_mail(subject, message, email_from, recipient_list, fail_silently=False)
-        print(f"DEBUG: Отправлен email на {attempt.email} с кодом: {attempt.email_verification_code}")
-        return True
-    except Exception as e:
-        print(f"ERROR: Не удалось отправить email на {attempt.email}: {e}")
-        return False
-
-
-def _initiate_zvonok_verification(phone_number, pincode=None):
-    url = settings.ZVONOK_API_INITIATE_URL
-    data = {
-        'public_key': settings.PUBLIC_KEY_CALL,
-        'phone': phone_number,
-        'campaign_id': settings.CAMPAIGN_ID,
-    }
-    if pincode:
-        data['pincode'] = pincode
-
-    try:
-        response = requests.post(url, data=data)
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.HTTPError as e:
-        logger.error(f"HTTP-ошибка при вызове API zvonok.com (initiate): {e.response.status_code} - {e.response.text}")
-        return {
-            "status": "error",
-            "message": f"Ошибка сервиса звонков: {e.response.status_code}. Пожалуйста, попробуйте позже."
-        }
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Ошибка подключения при вызове API zvonok.com (initiate): {e}")
-        return {
-            "status": "error",
-            "message": "Не удалось подключиться к сервису звонков. Пожалуйста, проверьте интернет-соединение или попробуйте позже."
-        }
-    except Exception as e:
-        logger.error(f"Непредвиденная ошибка в _initiate_zvonok_verification: {e}")
-        return {
-            "status": "error",
-            "message": "Произошла непредвиденная ошибка. Пожалуйста, попробуйте позже."
-        }
-
-def _poll_zvonok_status(phone_number):
-    url = settings.ZVONOK_API_POLLING_URL
-    params = {
-        'public_key': settings.PUBLIC_KEY_CALL,
-        'phone': phone_number,
-        'campaign_id': settings.CAMPAIGN_ID
-    }
-    try:
-        response = requests.get(url, params=params)
-        response.raise_for_status()
-        return response.json() if (isinstance(response.json(), dict)) else response.json()[0]
-    except requests.exceptions.RequestException as e:
-        print(f"Ошибка при вызове API zvonok.com (polling): {e}")
-        return None
 
 def get_current_registration_attempt(request):
     token_str = request.session.get('registration_attempt_token')
@@ -215,7 +144,6 @@ def verify_email(request):
         'email_code_expired': request.session.get('email_code_expired', False)
     })
 
-
 def resend_email_code(request):
     attempt = get_current_registration_attempt(request)
     if not attempt or attempt.email_verified:
@@ -288,7 +216,7 @@ def verify_phone_if_needed(request):
 
             pincode = str(random.randint(1000, 9999))
 
-            api_response = _initiate_zvonok_verification(phone_number, pincode=pincode)
+            api_response = initiate_zvonok_verification(phone_number, pincode=pincode)
 
             if api_response:
                 attempt.phone_number = phone_number
