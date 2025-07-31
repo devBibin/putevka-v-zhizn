@@ -65,12 +65,3 @@ class PhoneNumberForm(forms.Form):
         widget=forms.TextInput(attrs={'class': 'w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500', 'placeholder': '+7 (XXX) XXX-XX-XX'}),
         help_text="Введите номер телефона для подтверждения по звонку."
     )
-
-class VerifyPhoneForm(forms.Form):
-    code = forms.CharField(
-        label="Код из звонка",
-        max_length=6,
-        min_length=6,
-        widget=forms.TextInput(attrs={'class': 'w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500', 'placeholder': 'Введите 6-значный код'}),
-        error_messages={'required': 'Пожалуйста, введите код.', 'min_length': 'Код должен содержать 6 цифр.', 'max_length': 'Код должен содержать 6 цифр.'}
-    )

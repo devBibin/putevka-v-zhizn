@@ -10,8 +10,10 @@ urlpatterns = [
     path('register/connect-telegram/', views.connect_telegram, name='connect_telegram'),
     path('register/skip-telegram/', views.skip_telegram, name='skip_telegram'),
     path('register/verify-phone/', views.verify_phone_if_needed, name='verify_phone_if_needed'),
-    path('register/verify-phone-code/', views.verify_phone_code, name='verify_phone_code'),
-    path('register/resend-phone-code/', views.resend_phone_code, name='resend_phone_code'),
     path('register/complete/', views.finish_registration, name='finish_registration'),
     path('bot/<str:bot_token>/', views.webhook, name='bot'),
+
+    path('wait-for-call/', views.wait_for_phone_call, name='wait_for_phone_call'),
+    path('check-call-status/', views.check_phone_call_status, name='check_phone_call_status'),
+    path('registration-complete/', views.finish_registration, name='finish_registration'),
 ]

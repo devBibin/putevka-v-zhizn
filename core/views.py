@@ -1,5 +1,7 @@
 import logging
+import random
 import uuid
+import requests
 
 import telebot
 
@@ -8,12 +10,13 @@ from django.contrib.auth import authenticate, login
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import User
 from django.core.mail import send_mail
+from django.http import JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.views.decorators.csrf import csrf_exempt
 
 from Putevka import settings
-from .forms import CustomUserCreationForm, RegistrationForm, VerifyEmailForm, VerifyPhoneForm, PhoneNumberForm
+from .forms import CustomUserCreationForm, RegistrationForm, VerifyEmailForm, PhoneNumberForm
 from .models import TelegramAccount, RegistrationAttempt
 from .bot import webhook
 
@@ -51,9 +54,53 @@ def _send_email_verification_code(attempt):
         return False
 
 
-def _make_phone_call_verification(attempt):
-    print(f"DEBUG: Имитация звонка на номер {attempt.phone_number}. Код: {attempt.phone_verification_code}")
-    return True
+def _initiate_zvonok_verification(phone_number, pincode=None):
+    url = settings.ZVONOK_API_INITIATE_URL
+    data = {
+        'public_key': settings.PUBLIC_KEY_CALL,
+        'phone': phone_number,
+        'campaign_id': settings.CAMPAIGN_ID,
+    }
+    if pincode:
+        data['pincode'] = pincode
+
+    try:
+        response = requests.post(url, data=data)
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.HTTPError as e:
+        logger.error(f"HTTP-ошибка при вызове API zvonok.com (initiate): {e.response.status_code} - {e.response.text}")
+        return {
+            "status": "error",
+            "message": f"Ошибка сервиса звонков: {e.response.status_code}. Пожалуйста, попробуйте позже."
+        }
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Ошибка подключения при вызове API zvonok.com (initiate): {e}")
+        return {
+            "status": "error",
+            "message": "Не удалось подключиться к сервису звонков. Пожалуйста, проверьте интернет-соединение или попробуйте позже."
+        }
+    except Exception as e:
+        logger.error(f"Непредвиденная ошибка в _initiate_zvonok_verification: {e}")
+        return {
+            "status": "error",
+            "message": "Произошла непредвиденная ошибка. Пожалуйста, попробуйте позже."
+        }
+
+def _poll_zvonok_status(phone_number):
+    url = settings.ZVONOK_API_POLLING_URL
+    params = {
+        'public_key': settings.PUBLIC_KEY_CALL,
+        'phone': phone_number,
+        'campaign_id': settings.CAMPAIGN_ID
+    }
+    try:
+        response = requests.get(url, params=params)
+        response.raise_for_status()
+        return response.json() if (isinstance(response.json(), dict)) else response.json()[0]
+    except requests.exceptions.RequestException as e:
+        print(f"Ошибка при вызове API zvonok.com (polling): {e}")
+        return None
 
 def get_current_registration_attempt(request):
     token_str = request.session.get('registration_attempt_token')
@@ -66,20 +113,21 @@ def get_current_registration_attempt(request):
 
 
 def register_initial(request):
+    if request.user.is_authenticated:
+        return redirect('/')
+
     attempt = get_current_registration_attempt(request)
 
     if attempt:
         if not attempt.email_verified:
             return redirect(reverse('verify_email'))
-        elif attempt.telegram_account and not attempt.telegram_account.telegram_verified and not attempt.phone_verified:
+        elif attempt.telegram_account and not attempt.telegram_account.is_active_web and not attempt.phone_verified:
             return redirect(reverse('connect_telegram'))
-        elif attempt.current_step == 'phone_verification_needed':
-            return redirect(reverse('verify_phone_if_needed'))
-        elif attempt.current_step == 'phone_verification_code':
-            return redirect(reverse('verify_phone_code'))
+        elif not attempt.phone_verified and attempt.current_step in ['phone_verification_needed', 'wait_for_call']:
+            return redirect(reverse('wait_for_phone_call'))  # Перенаправляем на страницу ожидания
         elif attempt.current_step == 'finish':
             return redirect(reverse('finish_registration'))
-        return redirect(reverse('login'))
+        return redirect('login')
 
     if request.method == 'POST':
         form = RegistrationForm(request.POST)
@@ -237,82 +285,71 @@ def verify_phone_if_needed(request):
         form = PhoneNumberForm(request.POST)
         if form.is_valid():
             phone_number = form.cleaned_data['phone_number']
-            attempt.phone_number = phone_number
-            attempt.generate_phone_code()
-            attempt.current_step = 'phone_verification_code'
-            attempt.save()
-            _make_phone_call_verification(attempt)
-            return redirect(reverse('verify_phone_code'))
+
+            pincode = str(random.randint(1000, 9999))
+
+            api_response = _initiate_zvonok_verification(phone_number, pincode=pincode)
+
+            if api_response:
+                attempt.phone_number = phone_number
+                attempt.phone_verification_code = pincode
+                attempt.current_step = 'wait_for_call'
+                attempt.save()
+
+                return redirect(reverse('wait_for_phone_call'))
+            else:
+                error_message = api_response.get('message', 'Произошла ошибка при инициации проверки звонка.')
+                form.add_error(None, error_message)
     else:
-        initial_phone = None
-        if attempt.telegram_account and attempt.telegram_account.telegram_id and not attempt.telegram_account.telegram_verified:
-            initial_phone = attempt.phone_number
+        form = PhoneNumberForm()
 
-        form = PhoneNumberForm(initial={'phone_number': initial_phone})
+    return render(request, 'registration/enter_phone_number.html', {'form': form})
 
-    return render(request, 'registration/enter_phone_number.html', {
-        'form': form,
-        'is_telegram_account_active_web': attempt.telegram_account and attempt.telegram_account.telegram_verified
+def wait_for_phone_call(request):
+    attempt = get_current_registration_attempt(request)
+    if not attempt or not attempt.email_verified or not attempt.phone_number or attempt.phone_verified:
+        return redirect(reverse('register_initial'))
+
+    return render(request, 'registration/wait_for_phone_call.html', {
+        'phone_number': attempt.phone_number,
     })
 
 
-def verify_phone_code(request):
-    attempt = get_current_registration_attempt(request)
-    if not attempt:
-        return redirect(reverse('register_initial'))
-
-    if not attempt.email_verified:
-        return redirect(reverse('verify_email'))
-
-    if attempt.user and attempt.user.is_active:
-        return redirect(reverse('finish_registration'))
-
-    if not attempt.phone_number:
-        return redirect(reverse('verify_phone_if_needed'))
-
+@csrf_exempt
+def check_phone_call_status(request):
     if request.method == 'POST':
-        form = VerifyPhoneForm(request.POST)
-        if form.is_valid():
-            code = form.cleaned_data['code']
-            if code == attempt.phone_verification_code and not attempt.is_phone_code_expired():
+        attempt = get_current_registration_attempt(request)
+        if not attempt or not attempt.phone_number:
+            return JsonResponse({'status': 'error', 'message': 'Незавершенная регистрация не найдена.'})
+
+        api_response = _poll_zvonok_status(attempt.phone_number)
+
+        if api_response:
+            is_call_successful = False
+            dial_status = api_response.get("dial_status_display")
+
+            if dial_status == 'Абонент ответил':
+                is_call_successful = True
+
+            if is_call_successful:
                 attempt.phone_verified = True
                 if attempt.user and not attempt.user.is_active:
                     attempt.user.is_active = True
                     attempt.user.save()
                     if attempt.telegram_account and not attempt.telegram_account.telegram_verified:
-                        attempt.telegram_account.telegram_verified = True
-                        attempt.telegram_account.activation_token = None  # Обнуляем токен
+                        attempt.telegram_account.is_active_web = True
+                        attempt.telegram_account.activation_token = None
                         attempt.telegram_account.save()
 
                 attempt.current_step = 'finish'
                 attempt.save()
-                return redirect(reverse('finish_registration'))
-            else:
-                form.add_error('code', 'Неверный или истекший код. Пожалуйста, попробуйте снова или запросите новый.')
-    else:
-        form = VerifyPhoneForm()
+                return JsonResponse({'status': 'success', 'message': 'Номер телефона успешно подтвержден!'})
 
-    if attempt.is_phone_code_expired() or not attempt.phone_verification_code:
-        request.session['phone_code_expired'] = True  # Флаг для шаблона
-    else:
-        request.session['phone_code_expired'] = False
+            return JsonResponse({'status': 'pending', 'message': 'Ожидание звонка...'})
 
-    return render(request, 'registration/verify_phone_code.html', {
-        'form': form,
-        'phone_number': attempt.phone_number,
-        'phone_code_expired': request.session.get('phone_code_expired', False)
-    })
+        return JsonResponse({'status': 'error', 'message': 'Ошибка API zvonok.com.'})
 
-
-def resend_phone_code(request):
-    attempt = get_current_registration_attempt(request)
-    if not attempt or attempt.phone_verified or not attempt.phone_number:
-        return redirect(reverse('register_initial'))
-
-    attempt.generate_phone_code()
-    _make_phone_call_verification(attempt)
-    request.session['phone_code_expired'] = False
-    return redirect(reverse('verify_phone_code'))
+    return JsonResponse({'status': 'error', 'message': 'Доступен только POST-запрос.'}, status=405)
 
 
 def finish_registration(request):

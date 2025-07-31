@@ -1,0 +1,77 @@
+{% extends "registration/base.html" %}
+
+{% block title %}Ожидание звонка{% endblock %}
+{% block heading %}Подтвердите номер телефона{% endblock %}
+
+{% block content %}
+    <p class="text-center text-muted mb-4">
+        Чтобы подтвердить номер <span class="fw-semibold">{{ phone_number }}</span>, пожалуйста, совершите звонок на специальный номер.
+    </p>
+
+    <div class="card bg-info bg-opacity-10 border border-info mb-4 p-4 text-center">
+        <p class="mb-2 fw-medium text-info">Номер для звонка:</p>
+        <h2 class="display-5 fw-bold mb-3 text-info">+7 800 555-86-07</h2>
+        <p class="text-muted small">
+            Звонок будет автоматически сброшен. Важно звонить с номера, который вы указали.
+        </p>
+    </div>
+
+    <div id="status-message" class="alert alert-info text-center" role="alert">
+        Ожидание вашего звонка...
+    </div>
+
+    <div class="text-center mt-4">
+        <a href="{% url 'verify_phone_if_needed' %}" class="btn btn-link">
+            Ввести другой номер
+        </a>
+    </div>
+
+    <script>
+        const statusMessage = document.getElementById('status-message');
+        const pollingUrl = "{% url 'check_phone_call_status' %}";
+        const redirectUrl = "{% url 'finish_registration' %}";
+        const csrfToken = '{{ csrf_token }}';
+        let pollingInterval;
+
+        function checkStatus() {
+            fetch(pollingUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify({})
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    statusMessage.classList.remove('alert-info');
+                    statusMessage.classList.add('alert-success');
+                    statusMessage.innerText = data.message;
+                    clearInterval(pollingInterval);
+                    setTimeout(() => {
+                        window.location.href = redirectUrl;
+                    }, 2000);
+                } else if (data.status === 'pending') {
+                    statusMessage.innerText = data.message;
+                } else {
+                    statusMessage.classList.remove('alert-info');
+                    statusMessage.classList.add('alert-danger');
+                    statusMessage.innerText = data.message || 'Произошла ошибка, попробуйте снова.';
+                    clearInterval(pollingInterval);
+                }
+            })
+            .catch(error => {
+                console.error('Ошибка поллинга:', error);
+                statusMessage.classList.remove('alert-info');
+                statusMessage.classList.add('alert-danger');
+                statusMessage.innerText = 'Произошла ошибка сети. Попробуйте снова.';
+                clearInterval(pollingInterval);
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            pollingInterval = setInterval(checkStatus, 3000);
+        });
+    </script>
+{% endblock %}
