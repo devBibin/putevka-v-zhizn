@@ -4,13 +4,15 @@ import logging
 import telebot
 import requests
 
-import os
 from dotenv import load_dotenv
+
+import config
+
 load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-token = os.getenv("TG_TOKEN_USERS")
+token = config.TG_TOKEN_USERS
 base_url = "http://localhost:8000/bot/"
 if not token:
     raise ValueError("Token not found in the credentials file.")

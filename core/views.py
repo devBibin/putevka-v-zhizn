@@ -15,9 +15,10 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.views.decorators.csrf import csrf_exempt
 
+import config
 from Putevka import settings
 from .forms import CustomUserCreationForm, RegistrationForm, VerifyEmailForm, PhoneNumberForm
-from .models import TelegramAccount, RegistrationAttempt
+from .models import TelegramAccount, RegistrationAttempt, UserInfo
 from .bot import webhook
 from .services.email_service import _send_email_verification_code
 from .services.zvonok_service import initiate_zvonok_verification, _poll_zvonok_status
@@ -43,17 +44,28 @@ def get_current_registration_attempt(request):
 
 def register_initial(request):
     if request.user.is_authenticated:
-        return redirect('/')
+        try:
+            attempt = request.user.registrationattempt
+            if attempt.current_step == 'email_verification':
+                return redirect(reverse('verify_email'))
+            elif attempt.current_step == 'telegram_connection':
+                return redirect(reverse('connect_telegram'))
+            elif attempt.current_step in ['phone_verification_needed', 'wait_for_call']:
+                return redirect(reverse('verify_phone_if_needed'))
+            elif attempt.current_step == 'finish':
+                return redirect(reverse('finish_registration'))
+        except RegistrationAttempt.DoesNotExist:
+            return redirect('/')
 
     attempt = get_current_registration_attempt(request)
 
     if attempt:
         if not attempt.email_verified:
             return redirect(reverse('verify_email'))
-        elif attempt.telegram_account and not attempt.telegram_account.is_active_web and not attempt.phone_verified:
+        elif attempt.telegram_account and not attempt.telegram_account.telegram_verified and not attempt.phone_verified:
             return redirect(reverse('connect_telegram'))
         elif not attempt.phone_verified and attempt.current_step in ['phone_verification_needed', 'wait_for_call']:
-            return redirect(reverse('wait_for_phone_call'))  # Перенаправляем на страницу ожидания
+            return redirect(reverse('wait_for_phone_call'))
         elif attempt.current_step == 'finish':
             return redirect(reverse('finish_registration'))
         return redirect('login')
@@ -70,7 +82,7 @@ def register_initial(request):
                 existing_attempt = RegistrationAttempt.objects.filter(email=email).first()
                 if existing_attempt:
                     if not existing_attempt.email_verified:
-                        existing_attempt.generate_email_code() # Генерируем новый код
+                        existing_attempt.generate_email_code()
                         _send_email_verification_code(existing_attempt)
                         request.session['registration_attempt_token'] = str(existing_attempt.token)
                         return redirect(reverse('verify_email'))
@@ -83,13 +95,14 @@ def register_initial(request):
                     user = User.objects.create_user(
                         username=email,
                         email=email,
-                        password=make_password(password),
-                        is_active=False
+                        password=password,
+                        is_active=True,
                     )
                     telegram_account = TelegramAccount.objects.create(
                         user=user,
                         activation_token=uuid.uuid4()
                     )
+                    user_info = UserInfo.objects.create(user=user)
 
                     new_attempt = RegistrationAttempt.objects.create(
                         user=user,
@@ -102,6 +115,7 @@ def register_initial(request):
                     new_attempt.generate_email_code()
                     _send_email_verification_code(new_attempt)
                     request.session['registration_attempt_token'] = str(new_attempt.token)
+                    login(request, user)
                     return redirect(reverse('verify_email'))
         else:
             pass
@@ -112,7 +126,7 @@ def register_initial(request):
 
 
 def verify_email(request):
-    attempt = get_current_registration_attempt(request)
+    attempt = request.user.registrationattempt
     if not attempt:
         return redirect(reverse('register_initial'))
 
@@ -145,7 +159,7 @@ def verify_email(request):
     })
 
 def resend_email_code(request):
-    attempt = get_current_registration_attempt(request)
+    attempt = request.user.registrationattempt
     if not attempt or attempt.email_verified:
         return redirect(reverse('register_initial'))
 
@@ -156,7 +170,7 @@ def resend_email_code(request):
 
 
 def connect_telegram(request):
-    attempt = get_current_registration_attempt(request)
+    attempt = request.user.registrationattempt
     if not attempt:
         return redirect(reverse('register_initial'))
 
@@ -168,7 +182,7 @@ def connect_telegram(request):
         attempt.save()
         return redirect(reverse('finish_registration'))
 
-    telegram_bot_link = f"https://t.me/{settings.TG_BOT_USERS_USERNAME}?start=activate_{attempt.telegram_account.activation_token}"
+    telegram_bot_link = f"https://t.me/{config.TG_BOT_USERS_USERNAME}?start=activate_{attempt.telegram_account.activation_token}"
 
     if request.method == 'POST':
         attempt.telegram_account.refresh_from_db()
@@ -189,8 +203,8 @@ def connect_telegram(request):
 
 
 def skip_telegram(request):
-    attempt = get_current_registration_attempt(request)
-    if not attempt or not attempt.email_verified:
+    attempt = request.user.registrationattempt
+    if not attempt.email_verified:
         return redirect(reverse('register_initial'))
 
     attempt.current_step = 'phone_verification_needed'
@@ -201,25 +215,29 @@ def skip_telegram(request):
 def verify_phone_if_needed(request):
     attempt = get_current_registration_attempt(request)
     if not attempt:
-        return redirect(reverse('register_initial'))
+        attempt = request.user.registrationattempt
 
     if not attempt.email_verified:
         return redirect(reverse('verify_email'))
 
-    if attempt.user and attempt.user.is_active:
+    if attempt.phone_verified:
         return redirect(reverse('finish_registration'))
+
+    if attempt.phone_number and attempt.current_step == 'wait_for_call':
+        return redirect(reverse('wait_for_phone_call'))
 
     if request.method == 'POST':
         form = PhoneNumberForm(request.POST)
         if form.is_valid():
             phone_number = form.cleaned_data['phone_number']
-
             pincode = str(random.randint(1000, 9999))
 
             api_response = initiate_zvonok_verification(phone_number, pincode=pincode)
 
             if api_response:
                 attempt.phone_number = phone_number
+                request.user.user_info.phone_number = phone_number
+                request.user.user_info.save()
                 attempt.phone_verification_code = pincode
                 attempt.current_step = 'wait_for_call'
                 attempt.save()
@@ -233,10 +251,12 @@ def verify_phone_if_needed(request):
 
     return render(request, 'registration/enter_phone_number.html', {'form': form})
 
+
+
 def wait_for_phone_call(request):
     attempt = get_current_registration_attempt(request)
-    if not attempt or not attempt.email_verified or not attempt.phone_number or attempt.phone_verified:
-        return redirect(reverse('register_initial'))
+    if not attempt:
+        attempt = request.user.registrationattempt
 
     return render(request, 'registration/wait_for_phone_call.html', {
         'phone_number': attempt.phone_number,
@@ -246,7 +266,7 @@ def wait_for_phone_call(request):
 @csrf_exempt
 def check_phone_call_status(request):
     if request.method == 'POST':
-        attempt = get_current_registration_attempt(request)
+        attempt = request.user.registrationattempt
         if not attempt or not attempt.phone_number:
             return JsonResponse({'status': 'error', 'message': 'Незавершенная регистрация не найдена.'})
 
@@ -281,7 +301,7 @@ def check_phone_call_status(request):
 
 
 def finish_registration(request):
-    attempt = get_current_registration_attempt(request)
+    attempt = request.user.registrationattempt
     if not attempt:
         return redirect(reverse('register_initial'))
 

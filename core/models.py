@@ -143,15 +143,11 @@ class RegistrationAttempt(models.Model):
     def is_email_code_expired(self):
         return self.email_code_expires_at and self.email_code_expires_at < timezone.now()
 
-    def is_phone_code_expired(self):
-        return self.phone_code_expires_at and self.phone_code_expires_at < timezone.now()
-
     def generate_email_code(self):
         self.email_verification_code = str(random.randint(100000, 999999))
         self.email_code_expires_at = datetime.now() + timedelta(minutes=15)
         self.save()
 
-    def generate_phone_code(self):
-        self.phone_verification_code = str(random.randint(100000, 999999))
-        self.phone_code_expires_at = datetime.now() + timedelta(minutes=5)
-        self.save()
+class UserInfo(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, null=True, blank=True, related_name='user_info',)
+    phone_number = models.CharField(max_length=20, blank=True, null=True,)

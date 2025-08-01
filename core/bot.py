@@ -3,25 +3,21 @@ import logging
 
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
-import sys
-import traceback
 import telebot
-from Putevka import settings
-from core.models import TelegramAccount, RegistrationAttempt
+from core.models import TelegramAccount, RegistrationAttempt, UserInfo
+import config
 
 logger = logging.getLogger('django.request')
-
-bot_instances = {}
 
 bot_instances = {}
 
 def get_bot_messenger():
     global _bot_messenger
     if _bot_messenger is None:
-        if not settings.TG_TOKEN_USERS:
-            logger.error("TG_TOKEN_USERS не установлен в settings.py")
+        if not config.TG_TOKEN_USERS:
+            logger.error("TG_TOKEN_USERS не установлен в config.py")
             return None
-        _bot_messenger = telebot.TeleBot(settings.TG_TOKEN_USERS)
+        _bot_messenger = telebot.TeleBot(config.TG_TOKEN_USERS)
     return _bot_messenger
 
 def get_bot_instance(token):
@@ -97,7 +93,6 @@ def get_bot_instance(token):
 					telegram_account = TelegramAccount.objects.get(
 						telegram_id=telegram_id,
 						telegram_verified=False,
-						user__is_active=False,
 						activation_token__isnull=False
 					)
 
@@ -114,8 +109,18 @@ def get_bot_instance(token):
 					telegram_account.user.save()
 
 					attempt = RegistrationAttempt.objects.filter(user=telegram_account.user).first()
+
+					user = UserInfo.objects.filter(phone_number=phone_number).first()
+
+					if user:
+						bot_instances[token].send_message(message.chat.id,
+														  f'Этот номер телефона уже зарегистрирован.')
+						return None
+
 					if attempt:
 						attempt.phone_number = phone_number
+						attempt.user.user_info.phone_number = phone_number
+						attempt.user.user_info.save()
 						attempt.phone_verified = True
 						attempt.current_step = 'finish'
 						attempt.save()

@@ -54,6 +54,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'core.middleware.IncompleteRegistrationRedirectMiddleware',
 ]
 
 ROOT_URLCONF = 'Putevka.urls'
@@ -139,11 +140,6 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
-
-TG_TOKEN_USERS = os.getenv("TG_TOKEN_USERS")
-TG_TOKEN_ADMIN = os.getenv("TG_TOKEN_ADMIN")
-TG_BOT_USERS_USERNAME = os.getenv("TG_BOT_USERS_USERNAME")
-
 DEFAULT_FROM_EMAIL = 'no-reply@yourdomain.com'
 
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
@@ -153,8 +149,3 @@ EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_HOST_USER = 'your_email@gmail.com'
 EMAIL_HOST_PASSWORD = 'your_email_password_or_app_password'
-
-PUBLIC_KEY_CALL = os.getenv("PUBLIC_KEY_CALL")
-CAMPAIGN_ID = os.getenv("CAMPAIGN_ID")
-ZVONOK_API_INITIATE_URL = os.getenv("ZVONOK_API_INITIATE_URL")
-ZVONOK_API_POLLING_URL = os.getenv("ZVONOK_API_POLLING_URL")

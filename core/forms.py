@@ -1,7 +1,8 @@
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
-from .models import TelegramAccount
+from .models import TelegramAccount, UserInfo
+
 
 class CustomUserCreationForm(UserCreationForm):
     class Meta(UserCreationForm.Meta):
@@ -10,7 +11,7 @@ class CustomUserCreationForm(UserCreationForm):
 
     def save(self, commit=True):
         user = super().save(commit=False)
-        user.is_active = False
+        user.is_active = True
         if commit:
             user.save()
             TelegramAccount.objects.create(user=user, telegram_id=None, telegram_verified=False)
@@ -46,7 +47,7 @@ class RegistrationForm(forms.Form):
     def clean_email(self):
         email = self.cleaned_data['email']
         if User.objects.filter(email=email).filter(is_active=True).exists():
-            raise forms.ValidationError("Пользователь с таким email уже зарегистрирован и активен.")
+            raise forms.ValidationError("Пользователь с таким email уже зарегистрирован, если вы не закончили регистрацию, попробуйте авторизоваться")
         return email
 
 class VerifyEmailForm(forms.Form):
@@ -65,3 +66,10 @@ class PhoneNumberForm(forms.Form):
         widget=forms.TextInput(attrs={'class': 'w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500', 'placeholder': '+7 (XXX) XXX-XX-XX'}),
         help_text="Введите номер телефона для подтверждения по звонку."
     )
+
+    def clean_phone_number(self):
+        phone_number = self.cleaned_data['phone_number']
+
+        user = UserInfo.objects.filter(phone_number=phone_number).first()
+        if user:
+            raise forms.ValidationError("Этот номер уже зарегистрирован")

@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from .middleware import redirect_to_current_step
 
 urlpatterns = [
     path('', views.index, name='index'),
@@ -13,7 +14,7 @@ urlpatterns = [
     path('register/complete/', views.finish_registration, name='finish_registration'),
     path('bot/<str:bot_token>/', views.webhook, name='bot'),
 
-    path('wait-for-call/', views.wait_for_phone_call, name='wait_for_phone_call'),
+    path('register/wait-for-call/', views.wait_for_phone_call, name='wait_for_phone_call'),
     path('check-call-status/', views.check_phone_call_status, name='check_phone_call_status'),
-    path('registration-complete/', views.finish_registration, name='finish_registration'),
+    path('redirect-registration/', redirect_to_current_step, name='redirect_to_current_step'),
 ]

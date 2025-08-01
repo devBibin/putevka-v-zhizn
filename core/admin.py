@@ -2,7 +2,13 @@ from django.contrib import admin
 from django.contrib.auth.models import User
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 
-from core.models import TelegramAccount, RegistrationAttempt
+from core.models import TelegramAccount, RegistrationAttempt, UserInfo
+
+
+class UserInfoInline(admin.StackedInline):
+    model = UserInfo
+    can_delete = False
+    verbose_name_plural = 'Доп. информация о пользователе'
 
 
 class TelegramAccountInline(admin.StackedInline):
@@ -71,3 +77,11 @@ class RegistrationAttemptAdmin(admin.ModelAdmin):
 
     get_telegram_verified_display.short_description = "Telegram Verified"  # Заголовок столбца
     get_telegram_verified_display.boolean = True
+
+
+class UserAdmin(BaseUserAdmin):
+    inlines = (UserInfoInline, TelegramAccountInline)
+
+
+admin.site.unregister(User)
+admin.site.register(User, UserAdmin)

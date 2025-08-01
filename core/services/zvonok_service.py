@@ -4,15 +4,17 @@ import requests
 
 from Putevka import settings
 
+import config
+
 logger = logging.getLogger(__name__)
 
 
 def initiate_zvonok_verification(phone_number, pincode=None):
-    url = settings.ZVONOK_API_INITIATE_URL
+    url = config.ZVONOK_API_INITIATE_URL
     data = {
-        'public_key': settings.PUBLIC_KEY_CALL,
+        'public_key': config.PUBLIC_KEY_CALL,
         'phone': phone_number,
-        'campaign_id': settings.CAMPAIGN_ID,
+        'campaign_id': config.CAMPAIGN_ID,
     }
     if pincode:
         data['pincode'] = pincode
@@ -42,11 +44,11 @@ def initiate_zvonok_verification(phone_number, pincode=None):
 
 
 def _poll_zvonok_status(phone_number):
-    url = settings.ZVONOK_API_POLLING_URL
+    url = config.ZVONOK_API_POLLING_URL
     params = {
-        'public_key': settings.PUBLIC_KEY_CALL,
+        'public_key': config.PUBLIC_KEY_CALL,
         'phone': phone_number,
-        'campaign_id': settings.CAMPAIGN_ID
+        'campaign_id': config.CAMPAIGN_ID
     }
     try:
         response = requests.get(url, params=params)
