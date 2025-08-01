@@ -19,8 +19,6 @@ import config as app_config
 
 load_dotenv()
 
-TG_TOKEN = os.getenv("TG_TOKEN_ADMIN")
-
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -198,7 +196,7 @@ LOGGING = {
         'file_info': {
             'level': 'INFO',
             'class': 'logging.handlers.RotatingFileHandler',
-            'filename': os.path.join(BASE_DIR, 'logs', 'info.log'),
+            'filename': os.path.join(BASE_DIR, 'logs', 'output_to_file_level_info.log'),
             'maxBytes': 1024*1024*5,
             'backupCount': 5,
             'formatter': 'standard',
@@ -207,7 +205,7 @@ LOGGING = {
         'file_error': {
             'level': 'ERROR',
             'class': 'logging.handlers.RotatingFileHandler',
-            'filename': os.path.join(BASE_DIR, 'logs', 'error.log'),
+            'filename': os.path.join(BASE_DIR, 'logs', 'output_to_file_level_error.log'),
             'maxBytes': 1024*1024*10,
             'backupCount': 10,
             'formatter': 'standard',
@@ -216,7 +214,7 @@ LOGGING = {
         'telegram_errors': {
             'level': 'ERROR',
             'class': 'Putevka.utils.telegram_logging_handler.TelegramHandler',
-            'token': TG_TOKEN,
+            'token': app_config.TG_TOKEN_ADMIN,
             'chat_id': app_config.TELEGRAM_LOG_CHAT_ID,
             'formatter': 'standard',
             'filters': ['user_info_filter'],
@@ -255,5 +253,3 @@ LOGGING = {
 LOG_DIR = os.path.join(BASE_DIR, 'logs')
 if not os.path.exists(LOG_DIR):
     os.makedirs(LOG_DIR)
-
-CHAT_ID = os.getenv("TELEGRAM_LOG_CHAT_ID")

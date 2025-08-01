@@ -56,10 +56,6 @@ def documents_dashboard(request):
 
     document_upload_form = DocumentUploadForm()
 
-    # max_length = document_upload_form.fields['caption'].max_length
-    # if max_length is not None:
-    #     document_upload_form.fields['caption'].widget.attrs['data-maxlength'] = str(max_length)
-
     attach_documents_form = AttachDocumentsForm(user=request.user)
 
     if request.method == 'POST':
