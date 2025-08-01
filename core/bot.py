@@ -4,8 +4,9 @@ import sys
 import traceback
 import telebot
 from Putevka import settings
+import config
 
-bot = telebot.TeleBot(settings.TG_TOKEN)
+bot = telebot.TeleBot(config.TG_TOKEN_ADMIN)
 
 @csrf_exempt
 def webhook(request, code):
@@ -13,7 +14,7 @@ def webhook(request, code):
 		json_string = request.body.decode("utf-8")
 		update = telebot.types.Update.de_json(json_string)
 		
-		if code == settings.TG_TOKEN.replace(":", ""):
+		if code == config.TG_TOKEN_ADMIN.replace(":", ""):
 			bot.process_new_updates([update])
 
 		# Return immediately after starting the background thread

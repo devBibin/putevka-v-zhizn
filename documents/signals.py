@@ -7,15 +7,15 @@ from telebot import TeleBot
 from django.conf import settings
 import os
 
-import config as app_config
+import config
 
-CHAT_ID = os.getenv('TELEGRAM_LOG_CHAT_ID')
-TG_TOKEN = os.getenv("TG_TOKEN_ADMIN")
+CHAT_ID = config.CHAT_ID
+TG_TOKEN = config.TG_TOKEN_ADMIN
 bot = TeleBot(TG_TOKEN)
 
-TELEGRAM_CHAT_IDS = app_config.TELEGRAM_STAFF_CHAT_IDS
+TELEGRAM_CHAT_IDS = config.TELEGRAM_STAFF_CHAT_IDS
 
-BASE_URL = os.getenv('BASE_URL')
+BASE_URL = config.BASE_URL
 
 logger = logging.getLogger(__name__)
 
@@ -40,8 +40,8 @@ def notify_telegram_on_document_upload(sender, instance, created, **kwargs):
 
 
 @receiver(post_save, sender=Document)
-def notify_telegram_on_documents_attached(sender, instance, **kwargs):
-    if bot:
+def notify_telegram_on_documents_attached(sender, instance, created, **kwargs):
+    if not created and bot:
         document_url = f"/documents/view/{instance.pk}/"
 
         attached_docs_names = [
