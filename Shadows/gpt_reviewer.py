@@ -7,6 +7,8 @@ from dotenv import load_dotenv
 import psycopg2
 from django.db import models
 
+import config
+
 load_dotenv()
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'Putevka.settings')
@@ -16,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 from core.models import MotivationLetter
 
-openai.api_key = os.getenv("GPT_TOKEN")
+openai.api_key = config.GPT_TOKEN
 
 POLLING_INTERVAL = int(os.getenv("SHADOW_POLLING_INTERVAL", 60))
 

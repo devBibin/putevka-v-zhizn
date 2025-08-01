@@ -3,9 +3,11 @@ from django.views.decorators.csrf import csrf_exempt
 import sys
 import traceback
 import telebot
+
+import config
 from Putevka import settings
 
-bot = telebot.TeleBot(settings.TG_TOKEN)
+bot = telebot.TeleBot(config.TG_TOKEN_ADMIN)
 
 @csrf_exempt
 def webhook(request, code):

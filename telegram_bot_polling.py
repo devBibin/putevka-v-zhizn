@@ -5,9 +5,12 @@ import requests
 # Load the bot token from credentials.json
 import os
 from dotenv import load_dotenv
+
+import config
+
 load_dotenv()
 
-token = os.getenv("TG_TOKEN")
+token = config.TG_TOKEN_ADMIN
 base_url = "http://localhost:8000/bot/"
 if not token:
     raise ValueError("Token not found in the credentials file.")

@@ -6,17 +6,18 @@ from telebot import TeleBot
 from django.conf import settings
 import os
 
+import config
 from core.models import MotivationLetter
 
-TELEGRAM_STAFF_CHAT_IDS = os.getenv('TELEGRAM_STAFF_CHAT_IDS')
-TG_TOKEN = os.getenv("TG_TOKEN")
+TELEGRAM_STAFF_CHAT_IDS = config.TELEGRAM_STAFF_CHAT_IDS
+TG_TOKEN = config.TG_TOKEN_ADMIN
 bot = TeleBot(TG_TOKEN)
 
 import config as app_config
 
 TELEGRAM_CHAT_IDS = app_config.TELEGRAM_STAFF_CHAT_IDS
 
-BASE_URL = os.getenv('BASE_URL')
+BASE_URL = config.BASE_URL
 
 logger = logging.getLogger(__name__)
 
