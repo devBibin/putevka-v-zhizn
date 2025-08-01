@@ -1,0 +1,36 @@
+{% extends "registration/base.html" %}
+
+{% load widget_tweaks %}
+
+{% block title %}Подтвердите Email{% endblock %}
+{% block heading %}Подтвердите ваш Email{% endblock %}
+
+{% block content %}
+    <p class="text-center text-muted mb-4">
+        Мы отправили 6-значный код на ваш адрес: <span class="fw-semibold">{{ email }}</span>.
+        Пожалуйста, проверьте папку "Входящие" и "Спам".
+    </p>
+
+    <form method="post" class="needs-validation" novalidate>
+        {% csrf_token %}
+        <div class="mb-3">
+            <label for="{{ form.code.id_for_label }}" class="form-label">{{ form.code.label }}</label>
+            {{ form.code|add_class:"form-control" }}
+            {% if form.code.errors %}
+                <div class="invalid-feedback d-block">
+                    {{ form.code.errors.0 }}
+                </div>
+            {% endif %}
+        </div>
+        <button type="submit" class="btn btn-primary w-100">
+            Подтвердить Email
+        </button>
+    </form>
+
+    {% if email_code_expired %}
+        <p class="mt-4 text-center text-danger">Срок действия кода истек или код не был отправлен.</p>
+        <div class="mt-2 text-center">
+            <a href="{% url 'resend_email_code' %}" class="btn btn-link">Отправить код повторно</a>
+        </div>
+    {% endif %}
+{% endblock %}

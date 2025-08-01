@@ -1,0 +1,29 @@
+{% extends "registration/base.html" %}
+
+{% load widget_tweaks %}
+
+{% block title %}Регистрация завершена!{% endblock %}
+{% block heading %}Добро пожаловать!{% endblock %}
+
+{% block content %}
+    {% if user %}
+        <p class="text-center text-dark mb-4">
+            Поздравляем, <span class="fw-semibold">{{ user.email }}</span>! Ваша регистрация успешно завершена.
+            Вы теперь можете пользоваться всеми функциями нашего сайта.
+        </p>
+        <div class="text-center">
+            <a href="{% url 'login' %}" class="btn btn-primary btn-lg">
+                Перейти в личный кабинет
+            </a>
+        </div>
+    {% else %}
+        <p class="text-center text-danger mb-4">
+            Произошла ошибка при завершении регистрации. Пожалуйста, попробуйте позже.
+        </p>
+        <div class="text-center">
+            <a href="{% url 'register_initial' %}" class="btn btn-primary btn-lg">
+                Начать регистрацию заново
+            </a>
+        </div>
+    {% endif %}
+{% endblock %}

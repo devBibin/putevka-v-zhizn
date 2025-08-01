@@ -3,3 +3,5 @@ psycopg2-binary
 python-dotenv
 gunicorn
 pyTelegramBotAPI
+django-widget-tweaks
+requests
