@@ -1,4 +1,4 @@
-from django.contrib import admin
-from .models import TelegramAccount
+# from django.contrib import admin
+# from .models import TelegramAccount
 
-admin.site.register(TelegramAccount)
+# admin.site.register(TelegramAccount)
