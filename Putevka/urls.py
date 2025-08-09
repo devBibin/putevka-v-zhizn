@@ -19,7 +19,10 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 
+import core.views
+
 urlpatterns = [
+    path('admin/send-notification-to-users/', core.views.send_notification_to_users, name='send_notification_to_users'),
     path('admin/', admin.site.urls),
     path('', include('core.urls')),
     path('documents/', include('documents.urls')),
