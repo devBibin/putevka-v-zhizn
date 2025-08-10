@@ -1,6 +1,6 @@
 from django.urls import path
 from . import views
-from .middleware import redirect_to_current_step
+from .views_helper import redirect_to_current_step
 
 urlpatterns = [
     path('', views.index, name='index'),
@@ -17,4 +17,6 @@ urlpatterns = [
     path('register/wait-for-call/', views.wait_for_phone_call, name='wait_for_phone_call'),
     path('check-call-status/', views.check_phone_call_status, name='check_phone_call_status'),
     path('redirect-registration/', redirect_to_current_step, name='redirect_to_current_step'),
+    path('change_phone_number/', views.change_phone_number, name='change_phone_number'),
+    path('return_telegram_connection/', views.return_to_telegram_connection, name='return_telegram_connection'),
 ]

@@ -63,13 +63,26 @@ class PhoneNumberForm(forms.Form):
     phone_number = forms.CharField(
         label="Ваш номер телефона",
         max_length=20,
+        required=True,
         widget=forms.TextInput(attrs={'class': 'w-full px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500', 'placeholder': '+7 (XXX) XXX-XX-XX'}),
         help_text="Введите номер телефона для подтверждения по звонку."
     )
 
     def clean_phone_number(self):
         phone_number = self.cleaned_data['phone_number']
+        normalized = (
+            phone_number.replace(' ', '')
+            .replace('(', '')
+            .replace(')', '')
+            .replace('-', '')
+        )
+        if normalized.startswith('8') and len(normalized) == 11:
+            normalized = '+7' + normalized[1:]
+        if normalized.startswith('7') and len(normalized) == 11:
+            normalized = '+7' + normalized[1:]
 
-        user = UserInfo.objects.filter(phone_number=phone_number).first()
-        if user:
+        from core.models import UserInfo
+        if UserInfo.objects.filter(phone_number=normalized).exists():
             raise forms.ValidationError("Этот номер уже зарегистрирован")
+
+        return normalized

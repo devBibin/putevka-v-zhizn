@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.models import User
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 
-from core.models import TelegramAccount, RegistrationAttempt, UserInfo
+from core.models import TelegramAccount, RegistrationPersonalData, UserInfo
 
 
 class UserInfoInline(admin.StackedInline):
@@ -31,7 +31,7 @@ class TelegramAccountInline(admin.StackedInline):
         'telegram_verified',
     )
 
-@admin.register(RegistrationAttempt)
+@admin.register(RegistrationPersonalData)
 class RegistrationAttemptAdmin(admin.ModelAdmin):
     list_display = (
         'email',

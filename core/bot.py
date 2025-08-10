@@ -4,7 +4,7 @@ import logging
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 import telebot
-from core.models import TelegramAccount, RegistrationAttempt, UserInfo
+from core.models import TelegramAccount, RegistrationPersonalData, UserInfo
 import config
 
 logger = logging.getLogger('django.request')
@@ -108,7 +108,7 @@ def get_bot_instance(token):
 					telegram_account.save()
 					telegram_account.user.save()
 
-					attempt = RegistrationAttempt.objects.filter(user=telegram_account.user).first()
+					attempt = RegistrationPersonalData.objects.filter(user=telegram_account.user).first()
 
 					user = UserInfo.objects.filter(phone_number=phone_number).first()
 

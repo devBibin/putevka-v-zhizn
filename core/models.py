@@ -1,14 +1,11 @@
-from datetime import datetime, timedelta
 import random
 import uuid
+from datetime import datetime, timedelta
 
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.db import models
-
 from django.utils import timezone
-
-from django.db import models
-from django.conf import settings
 
 
 class TelegramAccount(models.Model):
@@ -90,7 +87,8 @@ class TelegramAccount(models.Model):
     def __str__(self):
         return f"{self.user.username}'s Telegram Account ({self.telegram_id if self.telegram_id else 'Не привязан'})"
 
-class RegistrationAttempt(models.Model):
+
+class RegistrationPersonalData(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, null=True, blank=True,
                                 help_text="Ссылка на созданного пользователя после завершения регистрации.")
 
@@ -99,8 +97,10 @@ class RegistrationAttempt(models.Model):
 
     email_verification_code = models.CharField(max_length=6, blank=True, null=True,
                                                help_text="Код для подтверждения email.")
+
     email_code_expires_at = models.DateTimeField(blank=True, null=True,
-                                                  help_text="Время истечения срока действия кода email.")
+                                                 help_text="Время истечения срока действия кода email.")
+
     email_verified = models.BooleanField(default=False,
                                          help_text="True, если email был успешно подтвержден.")
 
@@ -109,10 +109,7 @@ class RegistrationAttempt(models.Model):
 
     phone_number = models.CharField(max_length=20, blank=True, null=True,
                                     help_text="Номер телефона, введенный пользователем (если не из Telegram).")
-    phone_verification_code = models.CharField(max_length=6, blank=True, null=True,
-                                               help_text="Код для подтверждения номера телефона по звонку.")
-    phone_code_expires_at = models.DateTimeField(blank=True, null=True,
-                                                  help_text="Время истечения срока действия кода телефона.")
+
     phone_verified = models.BooleanField(default=False,
                                          help_text="True, если номер телефона был успешно подтвержден.")
 
@@ -148,6 +145,7 @@ class RegistrationAttempt(models.Model):
         self.email_code_expires_at = datetime.now() + timedelta(minutes=15)
         self.save()
 
+
 class UserInfo(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE, null=True, blank=True, related_name='user_info',)
-    phone_number = models.CharField(max_length=20, blank=True, null=True,)
+    user = models.OneToOneField(User, on_delete=models.CASCADE, null=True, blank=True, related_name='user_info', )
+    phone_number = models.CharField(max_length=20, blank=True, null=True, )
