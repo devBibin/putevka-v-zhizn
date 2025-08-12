@@ -4,6 +4,8 @@ from django.shortcuts import redirect
 from .models import UserInfo
 from formtools.wizard.views import SessionWizardView
 
+from django.db import transaction
+
 class PersonalForm(forms.ModelForm):
     class Meta:
         model = UserInfo
@@ -121,11 +123,33 @@ class ApplicationWizard(SessionWizardView):
                 self.user_info_instance = UserInfo(user=self.request.user)
         return self.user_info_instance
 
+    def get_form_initial(self, step):
+        instance = self.get_form_instance(step)
+        initial = {}
+        form_class = self.form_list[step]
+        model_fields = {f.name for f in UserInfo._meta.get_fields() if getattr(f, 'attname', None)}
+        for name in form_class.base_fields.keys():
+            if name in model_fields:
+                initial[name] = getattr(instance, name, None)
+        return initial
+
+    @transaction.atomic
+    def process_step(self, form):
+        instance = self.get_form_instance(self.steps.current)
+        model_fields = {f.name for f in UserInfo._meta.get_fields() if getattr(f, 'attname', None)}
+        for field, value in form.cleaned_data.items():
+            if field in model_fields:
+                setattr(instance, field, value)
+        instance.save()
+        return super().process_step(form)
+
     def done(self, form_list, **kwargs):
         instance = self.get_form_instance(None)
+        model_fields = {f.name for f in UserInfo._meta.get_fields() if getattr(f, 'attname', None)}
         for form in form_list:
             for field, value in form.cleaned_data.items():
-                setattr(instance, field, value)
+                if field in model_fields:
+                    setattr(instance, field, value)
         instance.save()
         return redirect('thank_you')
 
