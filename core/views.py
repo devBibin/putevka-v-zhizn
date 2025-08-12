@@ -1,4 +1,5 @@
 import logging
+from datetime import timezone, datetime
 
 from django.contrib import messages
 from django.contrib.auth import authenticate, login
@@ -63,10 +64,11 @@ def motivation_letter(request):
         pass
 
     if request.method == 'POST':
-        if letter:
-            form = MotivationLetterForm(request.POST, instance=letter)
-        else:
-            form = MotivationLetterForm(request.POST)
+        if letter and letter.status == MotivationLetter.Status.SUBMITTED:
+            messages.warning(request, 'Письмо уже отправлено и не может быть отредактировано.')
+            return redirect('motivation_letter')
+
+        form = MotivationLetterForm(request.POST, instance=letter)
 
         if form.is_valid():
             saved_letter = form.save(commit=False)
@@ -75,16 +77,28 @@ def motivation_letter(request):
                 saved_letter.user = user
             else:
                 original_letter_instance = MotivationLetter.objects.get(pk=letter.pk)
-
                 if not original_letter_instance.admin_rating:
                     saved_letter.gpt_review = None
 
-            saved_letter.save()
-            messages.success(request, 'Ваше мотивационное письмо успешно сохранено!')
+            if 'submit' in request.POST:
+                saved_letter.status = MotivationLetter.Status.SUBMITTED
+                saved_letter.submitted_at = datetime.now()
 
-            logger.info('Мотивационное письмо успешно создано')
-
-            return redirect('motivation_letter')
+                try:
+                    saved_letter.full_clean()
+                    saved_letter.save()
+                    messages.success(request, 'Письмо отправлено. Дальнейшее редактирование невозможно.')
+                    logger.info('Мотивационное письмо отправлено пользователем %s', user.pk)
+                    return redirect('motivation_letter')
+                except Exception as e:
+                    form.add_error(None, e)
+                    messages.error(request, 'Не удалось отправить письмо. Проверьте ошибки.')
+            else:
+                saved_letter.status = MotivationLetter.Status.DRAFT
+                saved_letter.save()
+                messages.success(request, 'Черновик успешно сохранён!')
+                logger.info('Черновик мотивационного письма сохранён пользователем %s', user.pk)
+                return redirect('motivation_letter')
         else:
             messages.error(request, 'Пожалуйста, исправьте ошибки в форме.')
     else:
@@ -96,4 +110,3 @@ def motivation_letter(request):
         'user': user,
         'letter': letter,
     })
-

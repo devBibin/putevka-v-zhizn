@@ -7,72 +7,107 @@
 {% endblock %}
 
 {% block content %}
-<div class="container py-5">
-    <div class="row justify-content-center">
-        <div class="col-lg-8 col-md-10">
-            <h1 class="mb-4 text-center">
-                {% if is_new_letter %}Создать новое мотивационное письмо{% else %}Редактировать мотивационное письмо{% endif %}
-            </h1>
-            <p class="lead text-center mb-5">
-                {% if is_new_letter %}Заполните форму ниже, чтобы создать свое мотивационное письмо.{% else %}Внесите необходимые изменения в ваше мотивационное письмо.{% endif %}
-            </p>
+    <div class="container py-5">
+        <div class="row justify-content-center">
+            <div class="col-lg-8 col-md-10">
+                <h1 class="mb-4 text-center">
+                    {% if is_new_letter %}Создать новое мотивационное письмо{% else %}Редактировать мотивационное
+                        письмо{% endif %}
+                </h1>
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+                    {% endfor %}
+                {% endif %}
+                <p class="lead text-center mb-5">
+                    {% if is_new_letter %}
+                        Заполните форму ниже, чтобы создать свое мотивационное письмо.
+                    {% else %}
+                        Внесите необходимые изменения в ваше мотивационное письмо.
+                    {% endif %}
+                </p>
 
-            <div class="card shadow-sm mb-5">
-                <div class="card-body p-4 p-md-5">
-                    <form method="post">
-                        {% csrf_token %}
-
-                        {% for field in form %}
-                            <div class="mb-4">
-                                <label for="{{ field.id_for_label }}" class="form-label fs-5">{{ field.label }}</label>
-                                {% if field.field.widget.input_type == 'textarea' %}
-                                    {{ field|add_class:"form-control form-control-lg" }}
-                                {% else %}
-                                    {{ field|add_class:"form-control" }}
-                                {% endif %}
-                                {% if field.help_text %}
-                                    <div class="form-text text-muted mt-2">{{ field.help_text }}</div>
-                                {% endif %}
-                                {% if field.errors %}
-                                    <div class="alert alert-danger mt-2 small">
-                                        {% for error in field.errors %}
-                                            {{ error }}
-                                        {% endfor %}
-                                    </div>
-                                {% endif %}
-                            </div>
-                        {% endfor %}
-
-                        <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
-                            <button type="submit" class="btn btn-primary btn-lg px-4 me-md-2">
-                                {% if is_new_letter %}Сохранить письмо{% else %}Обновить письмо{% endif %}
-                            </button>
-                            <a href="{% url 'motivation_letter' %}" class="btn btn-secondary btn-lg px-4">
-                                <i class="bi bi-arrow-left-circle me-2"></i>Вернуться
-                            </a>
-                        </div>
-                    </form>
-                </div>
-            </div>
-
-            {% if not is_new_letter %}
-                {% if letter.admin_rating %}
-                    <div class="card bg-success-subtle text-success-emphasis border-success-subtle shadow-sm">
-                        <div class="card-body">
-                            <h4 class="card-title mb-3"><i class="bi bi-check-circle-fill me-2"></i>Ваше письмо оценено!</h4>
-                            <p class="card-text fs-5"><strong>Оценка администратора:</strong> <span class="badge bg-success fs-5">{{ letter.admin_rating }}</span></p>
-                        </div>
-                    </div>
-                {% else %}
-                    <div class="alert alert-info shadow-sm" role="alert">
-                        <h4 class="alert-heading"><i class="bi bi-info-circle-fill me-2"></i>Письмо ожидает оценки</h4>
-                        <p>Ваше письмо успешно сохранено. Оно будет рассмотрено администратором в ближайшее время.</p>
-                        <hr>
-                        <p class="mb-0">Пожалуйста, проверьте эту страницу позже для обновления статуса.</p>
+                {% if letter and letter.status == 'submitted' %}
+                    <div class="alert alert-success shadow-sm mb-4" role="alert">
+                        <i class="bi bi-check-circle me-2"></i>
+                        Письмо отправлено {{ letter.submitted_at|date:"d.m.Y H:i" }} и больше не редактируется.
                     </div>
                 {% endif %}
-            {% endif %}
+
+                <div class="card shadow-sm mb-5">
+                    <div class="card-body p-4 p-md-5">
+                        <form method="post">
+                            {% csrf_token %}
+
+                            {% for field in form %}
+                                <div class="mb-4">
+                                    <label for="{{ field.id_for_label }}"
+                                           class="form-label fs-5">{{ field.label }}</label>
+
+                                    {# поле уже будет disabled из формы при submitted #}
+                                    {% if field.field.widget.input_type == 'textarea' %}
+                                        {{ field|add_class:"form-control form-control-lg" }}
+                                    {% else %}
+                                        {{ field|add_class:"form-control" }}
+                                    {% endif %}
+
+                                    {% if field.help_text %}
+                                        <div class="form-text text-muted mt-2">{{ field.help_text }}</div>
+                                    {% endif %}
+                                    {% if field.errors %}
+                                        <div class="alert alert-danger mt-2 small">
+                                            {% for error in field.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            {% endfor %}
+
+                            <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
+                                {% if not letter or letter.status == 'draft' %}
+                                    <button type="submit" name="save_draft"
+                                            class="btn btn-outline-primary btn-lg px-4 me-md-2">
+                                        Сохранить черновик
+                                    </button>
+                                    <button type="submit" name="submit" class="btn btn-primary btn-lg px-4">
+                                        Отправить
+                                    </button>
+                                {% else %}
+                                    <a href="{% url 'motivation_letter' %}" class="btn btn-secondary btn-lg px-4">
+                                        <i class="bi bi-arrow-left-circle me-2"></i>Обновить страницу
+                                    </a>
+                                {% endif %}
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                {% if letter.status == 'submitted' %}
+                    {% if letter.admin_rating %}
+                        <div class="card bg-success-subtle text-success-emphasis border-success-subtle shadow-sm">
+                            <div class="card-body">
+                                <h4 class="card-title mb-3">
+                                    <i class="bi bi-check-circle-fill me-2"></i>Ваше письмо оценено!
+                                </h4>
+                                <p class="card-text fs-5">
+                                    <strong>Оценка администратора:</strong>
+                                    <span class="badge bg-success fs-5">{{ letter.admin_rating }}</span>
+                                </p>
+                            </div>
+                        </div>
+                    {% else %}
+                        <div class="alert alert-info shadow-sm" role="alert">
+                            <h4 class="alert-heading">
+                                <i class="bi bi-info-circle-fill me-2"></i>Письмо ожидает оценки
+                            </h4>
+                            <p>Ваше письмо сохранено и будет рассмотрено администратором.</p>
+                            <hr>
+                            <p class="mb-0">Пожалуйста, проверьте эту страницу позже для обновления статуса.</p>
+                        </div>
+                    {% endif %}
+                {% endif %}
+            </div>
         </div>
     </div>
-</div>
 {% endblock %}

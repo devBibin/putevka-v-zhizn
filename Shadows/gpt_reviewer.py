@@ -50,7 +50,8 @@ def review_unreviewed_letters():
 
     letters_to_review = MotivationLetter.objects.filter(
         models.Q(gpt_review__isnull=True) | models.Q(gpt_review__exact=''),
-        models.Q(admin_rating__isnull=True) | models.Q(admin_rating__exact='')
+        models.Q(admin_rating__isnull=True) | models.Q(admin_rating__exact=''),
+        status=MotivationLetter.Status.SUBMITTED
     ).exclude(
         letter_text__exact=''
     )

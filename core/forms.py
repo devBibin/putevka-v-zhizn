@@ -2,16 +2,6 @@ from django import forms
 from .models import MotivationLetter
 
 class MotivationLetterForm(forms.ModelForm):
-    class Meta:
-        model = MotivationLetter
-        fields = ['letter_text']
-        widgets = {
-            'letter_text': forms.Textarea(attrs={'rows': 15, 'cols': 80, 'placeholder': 'Начните вводить текст мотивационного письма здесь...'}),
-        }
-        labels = {
-            'letter_text': 'Мотивационное письмо',
-        }
-
     def clean_letter_text(self):
         new_letter_text = self.cleaned_data.get('letter_text')
 
@@ -27,3 +17,18 @@ class MotivationLetterForm(forms.ModelForm):
                         "Невозможно изменить текст письма, так как администратор уже выставил оценку.")
 
         return new_letter_text
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance and self.instance.status == MotivationLetter.Status.SUBMITTED:
+            self.fields["letter_text"].disabled = True
+
+    class Meta:
+        model = MotivationLetter
+        fields = ['letter_text']
+        widgets = {
+            'letter_text': forms.Textarea(attrs={'rows': 15, 'cols': 80, 'placeholder': 'Начните вводить текст мотивационного письма здесь...'}),
+        }
+        labels = {
+            'letter_text': 'Мотивационное письмо',
+        }
