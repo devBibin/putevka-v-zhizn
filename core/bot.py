@@ -3,6 +3,8 @@ from django.views.decorators.csrf import csrf_exempt
 import sys
 import traceback
 import telebot
+
+import config
 from Putevka import settings
 import config
 

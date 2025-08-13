@@ -2,6 +2,8 @@ Django>=4.2
 psycopg2-binary
 python-dotenv
 gunicorn
-django-widget-tweaks
-python-magic
 pyTelegramBotAPI
+django-widget-tweaks
+psycopg2-binary
+openai
+python-magic

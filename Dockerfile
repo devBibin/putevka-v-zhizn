@@ -16,9 +16,11 @@ RUN pip install --no-cache-dir \
 
 COPY .env .
 COPY telegram_bot_polling.py .
+COPY Shadows/gpt_reviewer.py .
 
 COPY . .
 
+ENV PYTHONPATH=/app:$PYTHONPATH
 RUN mkdir -p /media/documents && \
     chmod 755 /media && \
     chmod 755 /media/documents
