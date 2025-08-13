@@ -7,4 +7,6 @@ urlpatterns = [
     path('login/', views.login_view, name='login'),
     path('bot/<str:code>/', views.webhook, name='bot'),
     path('motivation/', views.motivation_letter, name='motivation_letter'),
+    path('notifications/', views.notification_list, name='notifications'),
+    path('mark-as-seen/<int:user_notification_id>', views.mark_notification_as_seen, name='mark_as_seen'),
 ]

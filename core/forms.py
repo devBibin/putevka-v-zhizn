@@ -32,3 +32,6 @@ class MotivationLetterForm(forms.ModelForm):
         labels = {
             'letter_text': 'Мотивационное письмо',
         }
+
+class SendNotificationForm(forms.Form):
+    message = forms.CharField(widget=forms.Textarea, label="Текст оповещения")

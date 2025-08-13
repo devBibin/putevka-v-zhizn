@@ -14,8 +14,10 @@ from pathlib import Path
 
 import os
 from dotenv import load_dotenv
-load_dotenv()
 
+import config
+
+load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -43,10 +45,12 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'core',
+    'documents',
     'widget_tweaks',
 ]
 
 MIDDLEWARE = [
+    'Putevka.utils.middlewares.RequestMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -61,13 +65,17 @@ ROOT_URLCONF = 'Putevka.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / 'templates'],
+        'DIRS': [
+            BASE_DIR / 'templates',
+            BASE_DIR / 'documents' / 'templates',
+        ],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'core.context_processors.unread_notifications'
             ],
         },
     },
@@ -139,7 +147,6 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
-# ущербное логирование, при мердже забыть!
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -154,7 +161,7 @@ LOGGING = {
             'style': '{',
         },
         'standard': {
-            'format': '[{levelname}] {asctime} {pathname}:{lineno} {funcName} - {message}',
+            'format': '[{levelname}] {asctime} {pathname}:{lineno} {funcName} [user:{user_id} {username}] - {message}',
             'style': '{',
         },
     },
@@ -166,44 +173,44 @@ LOGGING = {
         'require_debug_false': {
             '()': 'django.utils.log.RequireDebugFalse',
         },
-        # 'user_info_filter': {
-        #     '()': 'Putevka.utils.log_filters.UserInfoFilter',
-        # },
+        'user_info_filter': {
+            '()': 'Putevka.utils.log_filters.UserInfoFilter',
+        },
     },
 
     'handlers': {
         'console': {
             'level': 'INFO',
-            'filters': ['require_debug_true'],
+            'filters': ['require_debug_true', 'user_info_filter'],
             'class': 'logging.StreamHandler',
             'formatter': 'simple',
         },
         'file_info': {
             'level': 'INFO',
             'class': 'logging.handlers.RotatingFileHandler',
-            'filename': os.path.join(BASE_DIR, 'logs', 'info.log'),
+            'filename': os.path.join(BASE_DIR, 'logs', 'output_to_file_level_info.log'),
             'maxBytes': 1024*1024*5,
             'backupCount': 5,
             'formatter': 'standard',
-            # 'filters': ['user_info_filter'],
+            'filters': ['user_info_filter'],
         },
         'file_error': {
             'level': 'ERROR',
             'class': 'logging.handlers.RotatingFileHandler',
-            'filename': os.path.join(BASE_DIR, 'logs', 'error.log'),
+            'filename': os.path.join(BASE_DIR, 'logs', 'output_to_file_level_error.log'),
             'maxBytes': 1024*1024*10,
             'backupCount': 10,
             'formatter': 'standard',
-            # 'filters': ['user_info_filter'],
+            'filters': ['user_info_filter'],
         },
-        # 'telegram_errors': {
-        #     'level': 'ERROR',
-        #     'class': 'Putevka.utils.telegram_logging_handler.TelegramHandler',
-        #     'token': TG_TOKEN,
-        #     'chat_id': app_config.TELEGRAM_LOG_CHAT_ID,
-        #     'formatter': 'standard',
-        #     'filters': ['user_info_filter'],
-        # },
+        'telegram_errors': {
+            'level': 'ERROR',
+            'class': 'Putevka.utils.telegram_logging_handler.TelegramHandler',
+            'token': config.TG_TOKEN_ADMIN,
+            'chat_id': config.TELEGRAM_LOG_CHAT_ID,
+            'formatter': 'standard',
+            'filters': ['user_info_filter'],
+        },
     },
 
     'loggers': {
@@ -213,17 +220,17 @@ LOGGING = {
             'propagate': False,
         },
         'django.request': {
-            'handlers': ['file_error'],
+            'handlers': ['telegram_errors', 'file_error'],
             'level': 'ERROR',
             'propagate': False,
         },
         'core': {
-            'handlers': ['console', 'file_info', 'file_error'],
+            'handlers': ['console', 'file_info', 'file_error', 'telegram_errors'],
             'level': 'DEBUG', # В разработке может быть DEBUG, на продакшене INFO
             'propagate': False,
         },
         'documents': {
-            'handlers': ['console', 'file_info', 'file_error'],
+            'handlers': ['console', 'file_info', 'file_error', 'telegram_errors'],
             'level': 'DEBUG', # В разработке может быть DEBUG, на продакшене INFO
             'propagate': False,
         },
@@ -234,3 +241,7 @@ LOGGING = {
         }
     }
 }
+
+LOG_DIR = os.path.join(BASE_DIR, 'logs')
+if not os.path.exists(LOG_DIR):
+    os.makedirs(LOG_DIR)
