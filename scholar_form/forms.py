@@ -123,6 +123,14 @@ class ApplicationWizard(SessionWizardView):
                 self.user_info_instance = UserInfo(user=self.request.user)
         return self.user_info_instance
 
+    def get_form(self, step=None, data=None, files=None):
+        form = super().get_form(step, data, files)
+        for f in form.fields.values():
+            f.required = True
+            if hasattr(f.widget, 'attrs'):
+                f.widget.attrs.setdefault('required', 'required')
+        return form
+
     def get_form_initial(self, step):
         instance = self.get_form_instance(step)
         initial = {}

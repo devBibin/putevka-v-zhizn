@@ -25,6 +25,8 @@ if not User.objects.filter(username='admin').exists():
     User.objects.create_superuser(username, email, password)
 " | python manage.py shell
 
+django-admin compilemessages
+
 python telegram_bot_polling.py &
 
 # Start Gunicorn server
