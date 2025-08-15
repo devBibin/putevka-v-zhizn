@@ -161,6 +161,31 @@ class ApplicationWizard(SessionWizardView):
         instance.save()
         return redirect('thank_you')
 
+    def post(self, *args, **kwargs):
+        request = self.request
+        is_autosave = request.POST.get("_autosave") == "1"
+
+        if is_autosave:
+            form = self.get_form(
+                data=request.POST, files=request.FILES, step=self.steps.current
+            )
+            for f in form.fields.values():
+                f.required = False
+
+            if form.is_valid():
+                instance = self.get_form_instance(self.steps.current)
+                model_fields = {f.name for f in UserInfo._meta.get_fields() if getattr(f, 'attname', None)}
+                for field, value in form.cleaned_data.items():
+                    if field in model_fields:
+                        setattr(instance, field, value)
+                instance.save()
+                from django.http import HttpResponse
+                return HttpResponse(status=204)
+            else:
+                return self.render(self.get_form_step_data(form))
+
+        return super().post(*args, **kwargs)
+
 
 class UserInfoForm(forms.ModelForm):
     class Meta:

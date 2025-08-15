@@ -6,7 +6,7 @@ class UserInfo(models.Model):
 
     # Step 1: Personal Info
     full_name = models.CharField(max_length=255, verbose_name="ФИО", blank=True)
-    birth_date = models.DateField(verbose_name="Дата рождения", blank=True)
+    birth_date = models.DateField(verbose_name="Дата рождения", null=True)
     phone = models.CharField(max_length=20, verbose_name="Телефон", blank=True)
     email = models.EmailField(verbose_name="Email", blank=True)
     region = models.CharField(max_length=1000, verbose_name="Регион проживания", blank=True)
