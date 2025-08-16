@@ -98,7 +98,10 @@ class RegistrationPersonalData(models.Model):
     email_verification_code = models.CharField(max_length=6, blank=True, null=True,
                                                help_text="Код для подтверждения email.")
 
-    email_code_expires_at = models.DateTimeField(blank=True, null=True,
+    email_code_sent_at = models.DateTimeField(null=True, blank=True,
+                                                help_text="Время истечения срока действия кода email.")
+
+    email_code_expires_at = models.DateTimeField(null=True, blank=True,
                                                  help_text="Время истечения срока действия кода email.")
 
     email_verified = models.BooleanField(default=False,
@@ -124,9 +127,6 @@ class RegistrationPersonalData(models.Model):
                                     ],
                                     help_text="Текущий шаг в процессе регистрации.")
 
-    token = models.UUIDField(default=uuid.uuid4, unique=True,
-                             help_text="Уникальный токен для отслеживания сессии регистрации.")
-
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -142,7 +142,8 @@ class RegistrationPersonalData(models.Model):
 
     def generate_email_code(self):
         self.email_verification_code = str(random.randint(100000, 999999))
-        self.email_code_expires_at = datetime.now() + timedelta(minutes=15)
+        self.email_code_sent_at = timezone.now()
+        self.email_code_expires_at = timezone.now() + timedelta(minutes=15)
         self.save()
 
 

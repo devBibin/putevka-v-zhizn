@@ -62,7 +62,7 @@ class RegistrationAttemptAdmin(admin.ModelAdmin):
             'fields': ('telegram_account',)
         }),
         ('Подтверждение Телефона', {
-            'fields': ('phone_number', 'phone_verification_code', 'phone_code_expires_at', 'phone_verified')
+            'fields': ('phone_number', 'phone_verified')
         }),
         ('Даты', {
             'fields': ('created_at', 'updated_at'),

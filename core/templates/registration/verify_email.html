@@ -1,5 +1,4 @@
 {% extends "registration/base.html" %}
-
 {% load widget_tweaks %}
 
 {% block title %}Подтвердите Email{% endblock %}
@@ -27,10 +26,27 @@
         </button>
     </form>
 
-    {% if email_code_expired %}
-        <p class="mt-4 text-center text-danger">Срок действия кода истек или код не был отправлен.</p>
-        <div class="mt-2 text-center">
-            <a href="{% url 'resend_email_code' %}" class="btn btn-link">Отправить код повторно</a>
-        </div>
-    {% endif %}
+    <hr class="my-4"/>
+
+    <div class="text-center">
+        {% if email_code_expired %}
+            <p class="text-danger mb-2">Срок действия кода истек или код не был отправлен.</p>
+        {% endif %}
+
+        <form method="post" action="{% url 'resend_email_code' %}" class="d-inline">
+            {% csrf_token %}
+            <button type="submit"
+                    class="btn btn-link"
+                    {% if not can_resend_now %}disabled{% endif %}>
+                Отправить код повторно
+            </button>
+        </form>
+
+        {% if not can_resend_now and can_resend_at %}
+            <div class="small text-muted mt-2">
+                Повторная отправка будет доступна после {{ can_resend_at|date:"H:i:s" }}.
+            </div>
+        {% endif %}
+    </div>
+
 {% endblock %}

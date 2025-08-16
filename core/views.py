@@ -1,7 +1,7 @@
 import logging
 import random
 import uuid
-from datetime import timezone
+from datetime import timedelta, datetime
 
 import requests
 
@@ -27,6 +27,7 @@ from .bot import webhook
 from .services.email_service import _send_email_verification_code
 from .services.zvonok_service import initiate_zvonok_verification, _poll_zvonok_status
 from django.db import transaction
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +80,8 @@ def register_initial(request):
     return render(request, 'registration/register_initial.html', {'form': form})
 
 
+COOLDOWN_SECONDS = 60
+
 @ensure_registration_gate('registration_step')
 def verify_email(request):
     attempt = request.user.registrationpersonaldata
@@ -94,29 +97,44 @@ def verify_email(request):
                 attempt.current_step = 'telegram_connection'
                 attempt.save(update_fields=['email_verified', 'current_step'])
                 return redirect(reverse('connect_telegram'))
-            form.add_error('code', 'Неверный или истекший код. Пожалуйста, попробуйте снова или запросите новый.')
+            messages.error(request, 'Неверный или истекший код. Пожалуйста, попробуйте снова или запросите новый.')
     else:
         form = VerifyEmailForm()
+
+    can_resend_at = None
+    can_resend_now = True
+    if attempt.email_code_sent_at:
+        can_resend_at = attempt.email_code_sent_at + timedelta(seconds=COOLDOWN_SECONDS)
+        can_resend_now = timezone.now() >= can_resend_at
 
     return render(request, 'registration/verify_email.html', {
         'form': form,
         'email': attempt.email,
         'email_code_expired': email_code_expired,
+        'can_resend_now': can_resend_now,
+        'can_resend_at': can_resend_at,
+        'cooldown_seconds': COOLDOWN_SECONDS,
     })
 
-@require_POST
-@ensure_registration_gate('registration_step')
 def resend_email_code(request):
     attempt = request.user.registrationpersonaldata
 
-    attempt.generate_email_code()
-    if hasattr(attempt, 'email_code_sent_at'):
-        attempt.email_code_sent_at = timezone.now()
-        attempt.save(update_fields=['email_verification_code', 'email_code_expires_at', 'email_code_sent_at'])
-    else:
-        attempt.save(update_fields=['email_verification_code', 'email_code_expires_at'])
+    if attempt.email_code_sent_at:
+        next_allowed_time = attempt.email_code_sent_at + timedelta(seconds=COOLDOWN_SECONDS)
+        if timezone.now() < next_allowed_time:
+            wait_left = int((next_allowed_time - timezone.now()).total_seconds())
+            messages.warning(request, f'Слишком часто. Можно отправить новый код через {wait_left} сек.')
+            print('kdklfl')
+            return redirect(reverse('verify_email'))
 
-    _send_email_verification_code(attempt)
+    attempt.generate_email_code()
+
+    try:
+        _send_email_verification_code(attempt)
+        messages.success(request, 'Новый код отправлен. Пожалуйста, проверьте почту (и папку «Спам»).')
+    except Exception:
+        messages.error(request, 'Не удалось отправить письмо. Попробуйте ещё раз чуть позже.')
+
     return redirect(reverse('verify_email'))
 
 
