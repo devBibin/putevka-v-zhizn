@@ -50,10 +50,10 @@ class RegistrationAttemptAdmin(admin.ModelAdmin):
         'created_at',
     )
     search_fields = ('email', 'telegram_username', 'phone_number')
-    readonly_fields = ('token', 'created_at', 'updated_at', 'telegram_account')
+    readonly_fields = ('created_at', 'updated_at', 'telegram_account')
     fieldsets = (
         (None, {
-            'fields': ('user', 'email', 'password', 'current_step', 'token')
+            'fields': ('user', 'email', 'password', 'current_step')
         }),
         ('Подтверждение Email', {
             'fields': ('email_verification_code', 'email_code_expires_at', 'email_verified')

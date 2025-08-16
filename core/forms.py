@@ -1,6 +1,8 @@
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
+from django.contrib.auth.password_validation import validate_password
+
 from .models import TelegramAccount, UserInfo
 
 
@@ -43,6 +45,11 @@ class RegistrationForm(forms.Form):
         if password and password_confirm and password != password_confirm:
             self.add_error('password_confirm', 'Пароли не совпадают.')
         return cleaned_data
+
+    def clean_password(self):
+        password = self.cleaned_data.get("password")
+        validate_password(password, user=None)
+        return password
 
     def clean_email(self):
         email = self.cleaned_data['email']

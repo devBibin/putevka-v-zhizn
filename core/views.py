@@ -9,8 +9,10 @@ import telebot
 
 from django.contrib import messages
 from django.contrib.auth import authenticate, login
+from django.contrib.auth.decorators import login_required
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import User
+from django.contrib.auth.password_validation import validate_password, password_validators_help_text_html
 from django.core.mail import send_mail
 from django.http import JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
@@ -24,7 +26,7 @@ from .decorators import ensure_registration_gate
 from .forms import CustomUserCreationForm, RegistrationForm, VerifyEmailForm, PhoneNumberForm
 from .models import TelegramAccount, RegistrationPersonalData, UserInfo
 from .bot import webhook
-from .services.email_service import _send_email_verification_code
+from .services.email_service import send_email_verification_code
 from .services.zvonok_service import initiate_zvonok_verification, _poll_zvonok_status
 from django.db import transaction
 from django.utils import timezone
@@ -67,39 +69,33 @@ def register_initial(request):
                     telegram_account=telegram_account,
                     email=email,
                     password=user.password,
-                    current_step='email_verification',
-                    token=uuid.uuid4()
+                    current_step='email_verification'
                 )
                 new_attempt.generate_email_code()
-                _send_email_verification_code(new_attempt)
+                send_email_verification_code(new_attempt)
                 login(request, user)
                 return redirect(reverse('verify_email'))
     else:
         form = RegistrationForm()
 
-    return render(request, 'registration/register_initial.html', {'form': form})
+    return render(request, 'registration/register_initial.html', {'form': form, "password_help": password_validators_help_text_html()})
 
 
-COOLDOWN_SECONDS = 60
+COOLDOWN_SECONDS = 10
 
 @ensure_registration_gate('registration_step')
 def verify_email(request):
     attempt = request.user.registrationpersonaldata
 
-    email_code_expired = attempt.is_email_code_expired() or not attempt.email_verification_code
-
-    if request.method == 'POST':
-        form = VerifyEmailForm(request.POST)
-        if form.is_valid():
-            code = form.cleaned_data['code']
-            if not email_code_expired and code == attempt.email_verification_code:
-                attempt.email_verified = True
-                attempt.current_step = 'telegram_connection'
-                attempt.save(update_fields=['email_verified', 'current_step'])
-                return redirect(reverse('connect_telegram'))
-            messages.error(request, 'Неверный или истекший код. Пожалуйста, попробуйте снова или запросите новый.')
-    else:
-        form = VerifyEmailForm()
+    if not attempt.email_verification_code or attempt.is_email_code_expired():
+        attempt.generate_email_code()
+        try:
+            from .services.email_service import send_email_verification_code
+            send_email_verification_code(attempt)
+            messages.success(request, 'Мы отправили ссылку для подтверждения на вашу почту.')
+        except Exception as e:
+            print('error', e)
+            messages.error(request, 'Не удалось отправить письмо. Попробуйте ещё раз позже.')
 
     can_resend_at = None
     can_resend_now = True
@@ -108,9 +104,7 @@ def verify_email(request):
         can_resend_now = timezone.now() >= can_resend_at
 
     return render(request, 'registration/verify_email.html', {
-        'form': form,
         'email': attempt.email,
-        'email_code_expired': email_code_expired,
         'can_resend_now': can_resend_now,
         'can_resend_at': can_resend_at,
         'cooldown_seconds': COOLDOWN_SECONDS,
@@ -124,19 +118,41 @@ def resend_email_code(request):
         if timezone.now() < next_allowed_time:
             wait_left = int((next_allowed_time - timezone.now()).total_seconds())
             messages.warning(request, f'Слишком часто. Можно отправить новый код через {wait_left} сек.')
-            print('kdklfl')
             return redirect(reverse('verify_email'))
 
     attempt.generate_email_code()
 
     try:
-        _send_email_verification_code(attempt)
+        send_email_verification_code(attempt)
         messages.success(request, 'Новый код отправлен. Пожалуйста, проверьте почту (и папку «Спам»).')
-    except Exception:
+    except Exception as e:
+        print('error', e)
         messages.error(request, 'Не удалось отправить письмо. Попробуйте ещё раз чуть позже.')
 
     return redirect(reverse('verify_email'))
 
+@login_required
+def verify_email_confirm(request, token):
+    user = request.user
+    attempt = user.registrationpersonaldata
+
+    if attempt.email_verified:
+        return redirect(reverse('connect_telegram'))
+
+    if attempt.is_email_code_expired():
+        attempt.email_verification_code = None
+        attempt.save(update_fields=['email_verification_code'])
+        messages.error(request, 'Ссылка истекла. Отправили новую.')
+        return redirect(reverse('verify_email'))
+
+    with transaction.atomic():
+        attempt.email_verified = True
+        attempt.current_step = 'telegram_connection'
+        attempt.email_verification_code = None
+        attempt.save(update_fields=['email_verified', 'current_step', 'email_verification_code'])
+
+    messages.success(request, 'Email подтвержден.')
+    return redirect(reverse('connect_telegram'))
 
 @ensure_registration_gate('registration_step')
 def connect_telegram(request):
