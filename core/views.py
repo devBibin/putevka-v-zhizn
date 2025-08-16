@@ -49,47 +49,30 @@ def register_initial(request):
             if User.objects.filter(email=email, is_active=True).exists():
                 form.add_error('email', 'Пользователь с таким email уже зарегистрирован.')
             else:
-                existing_attempt = RegistrationPersonalData.objects.filter(email=email).first()
-                if existing_attempt:
-                    if not existing_attempt.email_verified:
-                        existing_attempt.generate_email_code()
-                        _send_email_verification_code(existing_attempt)
-                        if existing_attempt.user:
-                            login(request, existing_attempt.user)
-                        return redirect(reverse('verify_email'))
-                    elif (existing_attempt.telegram_account and
-                          not existing_attempt.telegram_account.telegram_verified and
-                          not existing_attempt.phone_verified):
-                        if existing_attempt.user:
-                            login(request, existing_attempt.user)
-                        return redirect(reverse('connect_telegram'))
-                    else:
-                        form.add_error('email', 'Пользователь с таким email уже существует или завершает регистрацию.')
-                else:
-                    user = User.objects.create_user(
-                        username=email,
-                        email=email,
-                        password=password,
-                        is_active=True,
-                    )
-                    telegram_account = TelegramAccount.objects.create(
-                        user=user,
-                        activation_token=uuid.uuid4()
-                    )
-                    user_info = UserInfo.objects.create(user=user)
+                user = User.objects.create_user(
+                    username=email,
+                    email=email,
+                    password=password,
+                    is_active=True,
+                )
+                telegram_account = TelegramAccount.objects.create(
+                    user=user,
+                    activation_token=uuid.uuid4()
+                )
+                user_info = UserInfo.objects.create(user=user)
 
-                    new_attempt = RegistrationPersonalData.objects.create(
-                        user=user,
-                        telegram_account=telegram_account,
-                        email=email,
-                        password=user.password,
-                        current_step='email_verification',
-                        token=uuid.uuid4()
-                    )
-                    new_attempt.generate_email_code()
-                    _send_email_verification_code(new_attempt)
-                    login(request, user)
-                    return redirect(reverse('verify_email'))
+                new_attempt = RegistrationPersonalData.objects.create(
+                    user=user,
+                    telegram_account=telegram_account,
+                    email=email,
+                    password=user.password,
+                    current_step='email_verification',
+                    token=uuid.uuid4()
+                )
+                new_attempt.generate_email_code()
+                _send_email_verification_code(new_attempt)
+                login(request, user)
+                return redirect(reverse('verify_email'))
     else:
         form = RegistrationForm()
 
@@ -98,7 +81,7 @@ def register_initial(request):
 
 @ensure_registration_gate('registration_step')
 def verify_email(request):
-    attempt = getattr(request, '_cached_registration_attempt', None) or request.user.registrationpersonaldata
+    attempt = request.user.registrationpersonaldata
 
     email_code_expired = attempt.is_email_code_expired() or not attempt.email_verification_code
 
@@ -124,7 +107,7 @@ def verify_email(request):
 @require_POST
 @ensure_registration_gate('registration_step')
 def resend_email_code(request):
-    attempt = getattr(request, '_cached_registration_attempt', None) or request.user.registrationpersonaldata
+    attempt = request.user.registrationpersonaldata
 
     attempt.generate_email_code()
     if hasattr(attempt, 'email_code_sent_at'):
@@ -139,9 +122,9 @@ def resend_email_code(request):
 
 @ensure_registration_gate('registration_step')
 def connect_telegram(request):
-    attempt = getattr(request, '_cached_registration_attempt', None) or request.user.registrationpersonaldata
+    attempt = request.user.registrationpersonaldata
 
-    bot_username = getattr(config, "TG_BOT_USERS_USERNAME", None)
+    bot_username = config.TG_BOT_USERS_USERNAME
     activation_token = attempt.telegram_account.activation_token
     telegram_bot_link = f"https://t.me/{bot_username}?start=activate_{activation_token}"
 
@@ -159,7 +142,7 @@ def connect_telegram(request):
             'error_message': 'Пожалуйста, сначала нажмите Start у бота и дождитесь привязки аккаунта.'
         })
 
-    is_verified = bool(getattr(attempt.telegram_account, 'telegram_verified', False))
+    is_verified = attempt.telegram_account.telegram_verified
     return render(request, 'registration/connect_telegram.html', {
         'telegram_bot_link': telegram_bot_link,
         'is_telegram_account_active_web': is_verified
@@ -178,7 +161,7 @@ def skip_telegram(request):
 
 @ensure_registration_gate('registration_step')
 def verify_phone_if_needed(request):
-    attempt = getattr(request, '_cached_registration_attempt', None) or request.user.registrationpersonaldata
+    attempt = request.user.registrationpersonaldata
 
     if attempt.current_step == 'wait_for_call':
         return redirect(reverse('wait_for_phone_call'))
@@ -205,7 +188,7 @@ def verify_phone_if_needed(request):
                 attempt.current_step = 'wait_for_call'
                 attempt.save(update_fields=['phone_number', 'current_step'])
 
-                user_info = getattr(request.user, 'user_info', None)
+                user_info = request.user.user_info
                 if user_info:
                     user_info.phone_number = phone_number
                     user_info.save(update_fields=['phone_number'])
@@ -220,14 +203,14 @@ def verify_phone_if_needed(request):
 
 
 def wait_for_phone_call(request):
-    attempt = getattr(request, '_cached_registration_attempt', None) or request.user.registrationpersonaldata
+    attempt = request.user.registrationpersonaldata
     return render(request, 'registration/wait_for_phone_call.html', {
         'phone_number': attempt.phone_number,
     })
 
 
 def check_phone_call_status(request):
-    attempt = getattr(request, '_cached_registration_attempt', None) or request.user.registrationpersonaldata
+    attempt = request.user.registrationpersonaldata
 
     if not attempt or not attempt.phone_number:
         return JsonResponse({'status': 'error', 'message': 'Незавершенная регистрация не найдена.'}, status=400)
@@ -252,8 +235,8 @@ def check_phone_call_status(request):
                 user.is_active = True
                 user.save(update_fields=['is_active'])
 
-            tg = getattr(attempt, 'telegram_account', None)
-            if tg and not getattr(tg, 'telegram_verified', False):
+            tg = attempt.telegram_account
+            if tg and not tg.telegram_verified:
                 tg.telegram_verified = True
                 tg.activation_token = None
                 tg.save(update_fields=['telegram_verified', 'activation_token'])
@@ -282,7 +265,7 @@ def return_to_telegram_connection(request):
 
 @ensure_registration_gate('registration_step')
 def finish_registration(request):
-    attempt = getattr(request, '_cached_registration_attempt', None) or request.user.registrationpersonaldata
+    attempt = request.user.registrationpersonaldata
 
     user = attempt.user
     if user and not user.is_active:

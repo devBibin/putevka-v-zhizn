@@ -34,16 +34,13 @@ def _should_bypass(request):
     return False
 
 def _get_attempt_from_user(request):
-    if hasattr(request, '_cached_registration_attempt'):
-        return request._cached_registration_attempt
     attempt = None
-    user = getattr(request, 'user', None)
-    if getattr(user, 'is_authenticated', False):
+    user = request.user
+    if user.is_authenticated:
         try:
             attempt = user.registrationpersonaldata
         except RegistrationPersonalData.DoesNotExist:
             attempt = None
-    request._cached_registration_attempt = attempt
     return attempt
 
 def ensure_registration_gate(mode: str, *, step: str | None = None):
@@ -66,7 +63,7 @@ def ensure_registration_gate(mode: str, *, step: str | None = None):
                 return view_func(request, *args, **kwargs)
 
             user = request.user
-            is_auth = getattr(user, 'is_authenticated', False)
+            is_auth = user.is_authenticated
 
             if is_auth and (user.is_staff or user.is_superuser):
                 return view_func(request, *args, **kwargs)
