@@ -309,20 +309,3 @@ def finish_registration(request):
     login(request, user)
 
     return render(request, 'registration/registration_complete.html', {'user': user})
-
-
-def login_view(request):
-    if request.method == 'POST':
-        username = request.POST.get("username")
-        password = request.POST.get("password")
-        user = authenticate(request, username=username, password=password)
-
-        if user is not None:
-            login(request, user)
-            messages.success(request, f"Welcome, {user.username}!")
-            return redirect('index')
-        else:
-            messages.error(request, "Invalid credentials")
-            return redirect('index')
-
-    return redirect('index')

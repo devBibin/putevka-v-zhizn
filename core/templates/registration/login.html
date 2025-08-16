@@ -1,0 +1,54 @@
+{% extends "core/base.html" %}
+{% load widget_tweaks %}
+
+{% block title %}Вход{% endblock %}
+
+{% block content %}
+    <div class="container d-flex align-items-center justify-content-center" style="min-height: 80vh;">
+        <div class="card shadow-sm p-4" style="max-width: 400px; width: 100%;">
+            <h2 class="text-center mb-4">Войти</h2>
+
+            {% if form.non_field_errors %}
+                <div class="alert alert-danger" role="alert">
+                    {% for err in form.non_field_errors %}{{ err }}{% if not forloop.last %}<br>{% endif %}{% endfor %}
+                </div>
+            {% endif %}
+
+            <form method="post" novalidate>
+                {% csrf_token %}
+
+                <div class="mb-3">
+                    <label for="id_username" class="form-label">Email или логин</label>
+                    {% if form.username.errors %}
+                        {% render_field form.username class+="form-control is-invalid" placeholder="Введите ваш email или логин" %}
+                        <div class="invalid-feedback">
+                            {% for err in form.username.errors %}{{ err }}{% if not forloop.last %}<br>
+                            {% endif %}{% endfor %}
+                        </div>
+                    {% else %}
+                        {% render_field form.username class+="form-control" placeholder="Введите ваш email или логин" %}
+                    {% endif %}
+                </div>
+
+                <div class="mb-3">
+                    <label for="id_password" class="form-label">Пароль</label>
+                    {% if form.password.errors %}
+                        {% render_field form.password class+="form-control is-invalid" placeholder="Введите пароль" %}
+                        <div class="invalid-feedback">
+                            {% for err in form.password.errors %}{{ err }}{% if not forloop.last %}<br>
+                            {% endif %}{% endfor %}
+                        </div>
+                    {% else %}
+                        {% render_field form.password class+="form-control" placeholder="Введите пароль" %}
+                    {% endif %}
+                </div>
+
+                <button type="submit" class="btn btn-primary w-100">Войти</button>
+            </form>
+
+            <div class="text-center mt-3">
+                <a href="{% url 'password_reset' %}">Забыли пароль?</a>
+            </div>
+        </div>
+    </div>
+{% endblock %}
