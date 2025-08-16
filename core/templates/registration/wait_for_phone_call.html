@@ -17,7 +17,7 @@
     </div>
 
     <div id="status-message" class="alert alert-info text-center" role="alert">
-        Ожидание вашего звонка...
+        Ожидание звонка<span class="dots"></span>
     </div>
 
     <div class="text-center mt-4">
@@ -25,6 +25,20 @@
             Ввести другой номер
         </a>
     </div>
+
+    <style>
+      .dots::after {
+        content: '';
+        animation: dots 1.5s steps(3, end) infinite;
+      }
+
+      @keyframes dots {
+        0%   { content: ''; }
+        33%  { content: '.'; }
+        66%  { content: '..'; }
+        100% { content: '...'; }
+      }
+    </style>
 
     <script>
         const statusMessage = document.getElementById('status-message');
@@ -53,7 +67,8 @@
                         window.location.href = redirectUrl;
                     }, 2000);
                 } else if (data.status === 'pending') {
-                    statusMessage.innerText = data.message;
+                    // Оставляем dots-анимацию
+                    statusMessage.innerHTML = `${data.message}<span class="dots"></span>`;
                 } else {
                     statusMessage.classList.remove('alert-info');
                     statusMessage.classList.add('alert-danger');

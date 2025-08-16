@@ -279,7 +279,7 @@ def check_phone_call_status(request):
 
     return JsonResponse({
         'status': 'pending',
-        'message': 'Ожидание звонка...',
+        'message': 'Ожидание звонка',
         'dial_status': dial_status
     })
 
