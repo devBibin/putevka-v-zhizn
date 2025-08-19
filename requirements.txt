@@ -3,6 +3,7 @@ psycopg2-binary
 python-dotenv
 gunicorn
 pyTelegramBotAPI
+django-formtools
 django-widget-tweaks
 psycopg2-binary
 openai

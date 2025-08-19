@@ -26,6 +26,8 @@ if not User.objects.filter(username='admin').exists():
     User.objects.create_superuser(username, email, password)
 " | python manage.py shell
 
+django-admin compilemessages
+
 python telegram_bot_polling.py &
 
 python Shadows/gpt_reviewer.py &
@@ -33,4 +35,3 @@ python Shadows/gpt_reviewer.py &
 # Start Gunicorn server
 #exec gunicorn Putevka.wsgi:application --bind 0.0.0.0:8000
 exec python manage.py runserver 0.0.0.0:8000
-

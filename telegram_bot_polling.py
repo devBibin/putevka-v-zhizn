@@ -1,6 +1,7 @@
 import json
 import telebot
 import requests
+import config
 
 # Load the bot token from credentials.json
 import os
