@@ -19,9 +19,16 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 
+import core.views
+
 urlpatterns = [
+    path('admin/send-notification-to-users/', core.views.send_notification_to_users, name='send_notification_to_users'),
     path('admin/', admin.site.urls),
     path('', include('core.urls')),
-    path('', include('scholar_form.urls')),
+    path('form/', include('scholar_form.urls')),
+    path('documents/', include('documents.urls')),
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT) \
 + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

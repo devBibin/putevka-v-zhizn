@@ -6,6 +6,9 @@ import config
 # Load the bot token from credentials.json
 import os
 from dotenv import load_dotenv
+
+import config
+
 load_dotenv()
 
 token = config.TG_TOKEN_ADMIN
@@ -19,7 +22,7 @@ endpoint_url = f"{base_url}{token.replace(':', '')}/"
 bot = telebot.TeleBot(token)
 
 # Remove webhook before starting polling
-#bot.remove_webhook() 
+bot.remove_webhook()
 
 @bot.message_handler(func=lambda message: True)
 def handle_message(message):

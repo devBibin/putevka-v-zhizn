@@ -5,3 +5,6 @@ gunicorn
 pyTelegramBotAPI
 django-formtools
 django-widget-tweaks
+psycopg2-binary
+openai
+python-magic

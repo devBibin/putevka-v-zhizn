@@ -6,6 +6,7 @@ import telebot
 
 import config
 from Putevka import settings
+import config
 
 bot = telebot.TeleBot(config.TG_TOKEN_ADMIN)
 
