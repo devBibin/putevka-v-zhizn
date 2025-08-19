@@ -1,0 +1,17 @@
+{% extends 'registration/base.html' %}
+{% block content %}
+<div class="container py-5">
+  <h1 class="mb-3">Подтверждение email</h1>
+  <p>Мы отправили письмо со ссылкой на <strong>{{ email }}</strong>.</p>
+  <p>Откройте письмо и нажмите на ссылку для подтверждения.</p>
+
+  {% if can_resend_now %}
+    <form method="post" action="{% url 'resend_email_code' %}">
+      {% csrf_token %}
+      <button class="btn btn-primary">Отправить ссылку ещё раз</button>
+    </form>
+  {% else %}
+    <p class="text-muted">Повторная отправка будет доступна в {{ can_resend_at|date:"H:i:s" }}.</p>
+  {% endif %}
+</div>
+{% endblock %}

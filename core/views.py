@@ -1,6 +1,30 @@
 import logging
-from datetime import timezone, datetime
-from .forms import MotivationLetterForm
+import random
+import uuid
+
+import requests
+
+import telebot
+
+from django.contrib import messages
+from django.contrib.auth import authenticate, login
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.hashers import make_password
+from django.contrib.auth.models import User
+from django.contrib.auth.password_validation import validate_password, password_validators_help_text_html
+from django.core.mail import send_mail
+from django.http import JsonResponse
+from django.shortcuts import render, redirect, get_object_or_404
+from django.urls import reverse
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_POST
+
+import config
+from Putevka import settings
+from .decorators import ensure_registration_gate
+from .forms import CustomUserCreationForm, RegistrationForm, VerifyEmailForm, PhoneNumberForm, MotivationLetterForm
+from .models import TelegramAccount, RegistrationPersonalData, UserInfo
+from datetime import timezone, datetime, timedelta
 from .models import MotivationLetter
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
@@ -15,45 +39,290 @@ from .forms import SendNotificationForm
 from .models import UserNotification, Notification
 
 from .bot import webhook
+from .services.email_service import send_email_verification_code
+from .services.zvonok_service import initiate_zvonok_verification, _poll_zvonok_status
+from django.db import transaction
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
+_bot_messenger = None
+
+logger = logging.getLogger(__name__)
+
+@ensure_registration_gate('protected')
 def index(request):
     return render(request, 'core/index.html')
 
 
-def register(request):
+@ensure_registration_gate('entry')
+def register_initial(request):
     if request.method == 'POST':
-        username = request.POST.get("username")
-        password = request.POST.get("password")
+        form = RegistrationForm(request.POST)
+        if form.is_valid():
+            email = form.cleaned_data['email']
+            password = form.cleaned_data['password']
 
-        if User.objects.filter(username=username).exists():
-            messages.error(request, "Username already exists")
-            return redirect('index')
+            if User.objects.filter(email=email, is_active=True).exists():
+                form.add_error('email', 'Пользователь с таким email уже зарегистрирован.')
+            else:
+                user = User.objects.create_user(
+                    username=email,
+                    email=email,
+                    password=password,
+                    is_active=True,
+                )
+                telegram_account = TelegramAccount.objects.create(
+                    user=user,
+                    activation_token=uuid.uuid4()
+                )
+                user_info = UserInfo.objects.create(user=user)
 
-        User.objects.create_user(username=username, password=password)
-        messages.success(request, "Registration successful. You can now log in.")
-        return redirect('index')
+                new_attempt = RegistrationPersonalData.objects.create(
+                    user=user,
+                    telegram_account=telegram_account,
+                    email=email,
+                    password=user.password,
+                    current_step='email_verification'
+                )
+                new_attempt.generate_email_code()
+                send_email_verification_code(new_attempt)
+                login(request, user)
+                return redirect(reverse('verify_email'))
+    else:
+        form = RegistrationForm()
 
-    return redirect('index')
+    return render(request, 'registration/register_initial.html', {'form': form, "password_help": password_validators_help_text_html()})
 
 
-def login_view(request):
+COOLDOWN_SECONDS = 10
+
+@ensure_registration_gate('registration_step')
+def verify_email(request):
+    attempt = request.user.registrationpersonaldata
+
+    if not attempt.email_verification_code or attempt.is_email_code_expired():
+        attempt.generate_email_code()
+        try:
+            from .services.email_service import send_email_verification_code
+            send_email_verification_code(attempt)
+            messages.success(request, 'Мы отправили ссылку для подтверждения на вашу почту.')
+        except Exception as e:
+            print('error', e)
+            messages.error(request, 'Не удалось отправить письмо. Попробуйте ещё раз позже.')
+
+    can_resend_at = None
+    can_resend_now = True
+    if attempt.email_code_sent_at:
+        can_resend_at = attempt.email_code_sent_at + timedelta(seconds=COOLDOWN_SECONDS)
+        can_resend_now = timezone.now() >= can_resend_at
+
+    return render(request, 'registration/verify_email.html', {
+        'email': attempt.email,
+        'can_resend_now': can_resend_now,
+        'can_resend_at': can_resend_at,
+        'cooldown_seconds': COOLDOWN_SECONDS,
+    })
+
+def resend_email_code(request):
+    attempt = request.user.registrationpersonaldata
+
+    if attempt.email_code_sent_at:
+        next_allowed_time = attempt.email_code_sent_at + timedelta(seconds=COOLDOWN_SECONDS)
+        if timezone.now() < next_allowed_time:
+            wait_left = int((next_allowed_time - timezone.now()).total_seconds())
+            messages.warning(request, f'Слишком часто. Можно отправить новый код через {wait_left} сек.')
+            return redirect(reverse('verify_email'))
+
+    attempt.generate_email_code()
+
+    try:
+        send_email_verification_code(attempt)
+        messages.success(request, 'Новый код отправлен. Пожалуйста, проверьте почту (и папку «Спам»).')
+    except Exception as e:
+        print('error', e)
+        messages.error(request, 'Не удалось отправить письмо. Попробуйте ещё раз чуть позже.')
+
+    return redirect(reverse('verify_email'))
+
+@login_required
+def verify_email_confirm(request, token):
+    user = request.user
+    attempt = user.registrationpersonaldata
+
+    if attempt.email_verified:
+        return redirect(reverse('connect_telegram'))
+
+    if attempt.is_email_code_expired():
+        attempt.email_verification_code = None
+        attempt.save(update_fields=['email_verification_code'])
+        messages.error(request, 'Ссылка истекла. Отправили новую.')
+        return redirect(reverse('verify_email'))
+
+    with transaction.atomic():
+        attempt.email_verified = True
+        attempt.current_step = 'telegram_connection'
+        attempt.email_verification_code = None
+        attempt.save(update_fields=['email_verified', 'current_step', 'email_verification_code'])
+
+    messages.success(request, 'Email подтвержден.')
+    return redirect(reverse('connect_telegram'))
+
+@ensure_registration_gate('registration_step')
+def connect_telegram(request):
+    attempt = request.user.registrationpersonaldata
+
+    bot_username = config.TG_BOT_USERS_USERNAME
+    activation_token = attempt.telegram_account.activation_token
+    telegram_bot_link = f"https://t.me/{bot_username}?start=activate_{activation_token}"
+
     if request.method == 'POST':
-        username = request.POST.get("username")
-        password = request.POST.get("password")
-        user = authenticate(request, username=username, password=password)
+        attempt.telegram_account.refresh_from_db()
 
-        if user is not None:
-            login(request, user)
-            messages.success(request, f"Welcome, {user.username}!")
-            return redirect('index')
-        else:
-            messages.error(request, "Invalid credentials")
-            return redirect('index')
+        if attempt.telegram_account.telegram_verified:
+            attempt.current_step = 'finish'
+            attempt.save(update_fields=['current_step'])
+            return redirect(reverse('finish_registration'))
 
-    return redirect('index')
+        return render(request, 'registration/connect_telegram.html', {
+            'telegram_bot_link': telegram_bot_link,
+            'is_telegram_account_active_web': False,
+            'error_message': 'Пожалуйста, сначала нажмите Start у бота и дождитесь привязки аккаунта.'
+        })
 
+    is_verified = attempt.telegram_account.telegram_verified
+    return render(request, 'registration/connect_telegram.html', {
+        'telegram_bot_link': telegram_bot_link,
+        'is_telegram_account_active_web': is_verified
+    })
+
+
+def skip_telegram(request):
+    attempt = request.user.registrationpersonaldata
+    if not attempt.email_verified:
+        return redirect(reverse('register_initial'))
+
+    attempt.current_step = 'phone_verification_needed'
+    attempt.save()
+    return redirect(reverse('verify_phone_if_needed'))
+
+
+@ensure_registration_gate('registration_step')
+def verify_phone_if_needed(request):
+    attempt = request.user.registrationpersonaldata
+
+    if attempt.current_step == 'wait_for_call':
+        return redirect(reverse('wait_for_phone_call'))
+
+    if request.method == 'POST':
+        form = PhoneNumberForm(request.POST)
+        if form.is_valid():
+            print("CLEANED:", form.cleaned_data)
+            phone_number = form.cleaned_data['phone_number']
+            pincode = f"{random.randint(1000, 9999)}"
+
+            api_resp = initiate_zvonok_verification(phone_number, pincode=pincode)
+            ok = False
+            err_msg = None
+            if isinstance(api_resp, dict):
+                ok = api_resp.get('ok', bool(api_resp))
+                err_msg = api_resp.get('message')
+            else:
+                ok = bool(api_resp)
+
+            if ok:
+                print(phone_number)
+                attempt.phone_number = phone_number
+                attempt.current_step = 'wait_for_call'
+                attempt.save(update_fields=['phone_number', 'current_step'])
+
+                user_info = request.user.user_info
+                if user_info:
+                    user_info.phone_number = phone_number
+                    user_info.save(update_fields=['phone_number'])
+
+                return redirect(reverse('wait_for_phone_call'))
+
+            form.add_error(None, err_msg or 'Не удалось инициировать проверку звонком. Попробуйте ещё раз.')
+    else:
+        form = PhoneNumberForm()
+
+    return render(request, 'registration/enter_phone_number.html', {'form': form})
+
+
+def wait_for_phone_call(request):
+    attempt = request.user.registrationpersonaldata
+    return render(request, 'registration/wait_for_phone_call.html', {
+        'phone_number': attempt.phone_number,
+    })
+
+
+def check_phone_call_status(request):
+    attempt = request.user.registrationpersonaldata
+
+    if not attempt or not attempt.phone_number:
+        return JsonResponse({'status': 'error', 'message': 'Незавершенная регистрация не найдена.'}, status=400)
+
+    api_resp = _poll_zvonok_status(attempt.phone_number)
+    if api_resp is None or api_resp is False:
+        return JsonResponse({'status': 'error', 'message': 'Ошибка API zvonok.com.'}, status=502)
+
+    dial_status = None
+    if isinstance(api_resp, dict):
+        dial_status = api_resp.get('dial_status_display')
+
+    SUCCESS_STATUSES = {'Абонент ответил'}
+    if dial_status in SUCCESS_STATUSES:
+        with transaction.atomic():
+            attempt.phone_verified = True
+            attempt.current_step = 'finish'
+            attempt.save(update_fields=['phone_verified', 'current_step'])
+
+            user = attempt.user
+            if user and not user.is_active:
+                user.is_active = True
+                user.save(update_fields=['is_active'])
+
+            tg = attempt.telegram_account
+            if tg and not tg.telegram_verified:
+                tg.telegram_verified = True
+                tg.activation_token = None
+                tg.save(update_fields=['telegram_verified', 'activation_token'])
+
+        return JsonResponse({'status': 'success', 'message': 'Номер телефона успешно подтвержден!'})
+
+    return JsonResponse({
+        'status': 'pending',
+        'message': 'Ожидание звонка',
+        'dial_status': dial_status
+    })
+
+
+def change_phone_number(request):
+    attempt = request.user.registrationpersonaldata
+    attempt.phone_number = None
+    attempt.current_step = 'phone_verification_needed'
+    attempt.save(update_fields=['phone_number', 'current_step'])
+    return redirect(reverse('verify_phone_if_needed'))
+
+def return_to_telegram_connection(request):
+    attempt = request.user.registrationpersonaldata
+    attempt.current_step = 'telegram_connection'
+    attempt.save(update_fields=['current_step'])
+    return redirect(reverse('connect_telegram'))
+
+@ensure_registration_gate('registration_step')
+def finish_registration(request):
+    attempt = request.user.registrationpersonaldata
+
+    user = attempt.user
+    if user and not user.is_active:
+        user.is_active = True
+        user.save(update_fields=['is_active'])
+
+    login(request, user)
+
+    return render(request, 'registration/registration_complete.html', {'user': user})
 
 @login_required
 def motivation_letter(request):

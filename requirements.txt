@@ -3,8 +3,10 @@ psycopg2-binary
 python-dotenv
 gunicorn
 pyTelegramBotAPI
+requests
 django-formtools
 django-widget-tweaks
 psycopg2-binary
 openai
 python-magic
+
