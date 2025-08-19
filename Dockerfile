@@ -5,7 +5,7 @@ ENV PYTHONUNBUFFERED 1
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y netcat-openbsd postgresql-client && apt-get clean
+RUN apt-get update && apt-get install -y netcat-openbsd postgresql-client libmagic1 && apt-get clean
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir \
@@ -16,8 +16,14 @@ RUN pip install --no-cache-dir \
 
 COPY .env .
 COPY telegram_bot_polling.py .
+COPY Shadows/gpt_reviewer.py .
 
 COPY . .
+
+ENV PYTHONPATH=/app:$PYTHONPATH
+RUN mkdir -p /media/documents && \
+    chmod 755 /media && \
+    chmod 755 /media/documents
 
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh

@@ -6,6 +6,7 @@ from django.contrib.auth import views as auth_views
 
 urlpatterns = [
     path('', views.index, name='index'),
+
     path('register/', views.register_initial, name='register_initial'),
     path('register/verify-email/', views.verify_email, name='verify_email'),
     path('register/verify-email/confirm/<str:token>/', views.verify_email_confirm, name='verify_email_confirm'),
@@ -47,4 +48,8 @@ urlpatterns = [
     path('reset/done/', auth_views.PasswordResetCompleteView.as_view(
         template_name='registration/password_reset_complete.html'
     ), name='password_reset_complete'),
+
+    path('motivation/', views.motivation_letter, name='motivation_letter'),
+    path('notifications/', views.notification_list, name='notifications'),
+    path('mark-as-seen/<int:user_notification_id>', views.mark_notification_as_seen, name='mark_as_seen'),
 ]
