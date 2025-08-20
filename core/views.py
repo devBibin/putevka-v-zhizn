@@ -23,8 +23,9 @@ import config
 from Putevka import settings
 from .decorators import ensure_registration_gate
 from .forms import CustomUserCreationForm, RegistrationForm, VerifyEmailForm, PhoneNumberForm, MotivationLetterForm
-from .models import TelegramAccount, RegistrationPersonalData, UserInfo
-from datetime import timezone, datetime, timedelta
+from .models import TelegramAccount, RegistrationPersonalData
+from scholar_form.models import UserInfo
+from datetime import datetime, timedelta
 from .models import MotivationLetter
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
@@ -218,10 +219,10 @@ def verify_phone_if_needed(request):
         form = PhoneNumberForm(request.POST)
         if form.is_valid():
             print("CLEANED:", form.cleaned_data)
-            phone_number = form.cleaned_data['phone_number']
+            phone = form.cleaned_data['phone']
             pincode = f"{random.randint(1000, 9999)}"
 
-            api_resp = initiate_zvonok_verification(phone_number, pincode=pincode)
+            api_resp = initiate_zvonok_verification(phone, pincode=pincode)
             ok = False
             err_msg = None
             if isinstance(api_resp, dict):
@@ -231,15 +232,16 @@ def verify_phone_if_needed(request):
                 ok = bool(api_resp)
 
             if ok:
-                print(phone_number)
-                attempt.phone_number = phone_number
+                print(phone)
+                attempt.phone = phone
+                attempt.user.user_info.phone = phone
                 attempt.current_step = 'wait_for_call'
-                attempt.save(update_fields=['phone_number', 'current_step'])
+                attempt.save(update_fields=['phone', 'current_step'])
 
                 user_info = request.user.user_info
                 if user_info:
-                    user_info.phone_number = phone_number
-                    user_info.save(update_fields=['phone_number'])
+                    user_info.phone = phone
+                    user_info.save(update_fields=['phone'])
 
                 return redirect(reverse('wait_for_phone_call'))
 
@@ -253,17 +255,17 @@ def verify_phone_if_needed(request):
 def wait_for_phone_call(request):
     attempt = request.user.registrationpersonaldata
     return render(request, 'registration/wait_for_phone_call.html', {
-        'phone_number': attempt.phone_number,
+        'phone': attempt.phone,
     })
 
 
 def check_phone_call_status(request):
     attempt = request.user.registrationpersonaldata
 
-    if not attempt or not attempt.phone_number:
+    if not attempt or not attempt.phone:
         return JsonResponse({'status': 'error', 'message': 'Незавершенная регистрация не найдена.'}, status=400)
 
-    api_resp = _poll_zvonok_status(attempt.phone_number)
+    api_resp = _poll_zvonok_status(attempt.phone)
     if api_resp is None or api_resp is False:
         return JsonResponse({'status': 'error', 'message': 'Ошибка API zvonok.com.'}, status=502)
 
@@ -275,6 +277,8 @@ def check_phone_call_status(request):
     if dial_status in SUCCESS_STATUSES:
         with transaction.atomic():
             attempt.phone_verified = True
+            attempt.user.user_info.phone = attempt.phone
+            attempt.user.user_info.save()
             attempt.current_step = 'finish'
             attempt.save(update_fields=['phone_verified', 'current_step'])
 
@@ -300,9 +304,9 @@ def check_phone_call_status(request):
 
 def change_phone_number(request):
     attempt = request.user.registrationpersonaldata
-    attempt.phone_number = None
+    attempt.phone = None
     attempt.current_step = 'phone_verification_needed'
-    attempt.save(update_fields=['phone_number', 'current_step'])
+    attempt.save(update_fields=['phone', 'current_step'])
     return redirect(reverse('verify_phone_if_needed'))
 
 def return_to_telegram_connection(request):

@@ -5,7 +5,7 @@
 
 {% block content %}
     <p class="text-center text-muted mb-4">
-        Чтобы подтвердить номер <span class="fw-semibold">{{ phone_number }}</span>, пожалуйста, совершите звонок на специальный номер.
+        Чтобы подтвердить номер <span class="fw-semibold">{{ phone }}</span>, пожалуйста, совершите звонок на специальный номер.
     </p>
 
     <div class="card bg-info bg-opacity-10 border border-info mb-4 p-4 text-center">
@@ -67,7 +67,6 @@
                         window.location.href = redirectUrl;
                     }, 2000);
                 } else if (data.status === 'pending') {
-                    // Оставляем dots-анимацию
                     statusMessage.innerHTML = `${data.message}<span class="dots"></span>`;
                 } else {
                     statusMessage.classList.remove('alert-info');

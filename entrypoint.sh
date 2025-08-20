@@ -27,7 +27,8 @@ if not User.objects.filter(username='admin').exists():
     User.objects.create_superuser(username, email, password)
 " | python manage.py shell
 
-django-admin compilemessages
+#django-admin compilemessages
+#TODO: включить в проде, когда понадобится перевод на русский (очень долго грузит пакеты)
 
 python telegram_bot_polling.py &
 

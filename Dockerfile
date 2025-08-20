@@ -5,7 +5,7 @@ ENV PYTHONUNBUFFERED 1
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y netcat-openbsd postgresql-client libmagic1 && apt-get clean
+RUN apt-get update && apt-get install -y netcat-openbsd postgresql-client libmagic1 gettext && apt-get clean
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir \

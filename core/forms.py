@@ -3,7 +3,8 @@ from .models import MotivationLetter
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
-from .models import TelegramAccount, UserInfo
+from .models import TelegramAccount
+from scholar_form.models import UserInfo
 
 class CustomUserCreationForm(UserCreationForm):
     class Meta(UserCreationForm.Meta):
@@ -66,7 +67,7 @@ class VerifyEmailForm(forms.Form):
     )
 
 class PhoneNumberForm(forms.Form):
-    phone_number = forms.CharField(
+    phone = forms.CharField(
         label="Ваш номер телефона",
         max_length=20,
         required=True,
@@ -74,10 +75,10 @@ class PhoneNumberForm(forms.Form):
         help_text="Введите номер телефона для подтверждения по звонку."
     )
 
-    def clean_phone_number(self):
-        phone_number = self.cleaned_data['phone_number']
+    def clean_phone(self):
+        phone = self.cleaned_data['phone']
         normalized = (
-            phone_number.replace(' ', '')
+            phone.replace(' ', '')
             .replace('(', '')
             .replace(')', '')
             .replace('-', '')
@@ -87,8 +88,7 @@ class PhoneNumberForm(forms.Form):
         if normalized.startswith('7') and len(normalized) == 11:
             normalized = '+7' + normalized[1:]
 
-        from core.models import UserInfo
-        if UserInfo.objects.filter(phone_number=normalized).exists():
+        if UserInfo.objects.filter(phone=normalized).exists():
             raise forms.ValidationError("Этот номер уже зарегистрирован")
 
         return normalized

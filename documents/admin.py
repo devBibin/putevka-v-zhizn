@@ -63,11 +63,3 @@ class DocumentInline(admin.TabularInline):
         return "Нет прикрепленных документов"
 
     display_related_documents.short_description = "Прикрепленные документы"
-
-
-class CustomUserAdmin(UserAdmin):
-    inlines = [DocumentInline, ]
-
-
-admin.site.unregister(User)
-admin.site.register(User, CustomUserAdmin)

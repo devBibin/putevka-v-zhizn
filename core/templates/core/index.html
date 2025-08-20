@@ -14,24 +14,6 @@
     <div class="col-md-6 mb-4">
       <div class="card shadow-sm">
         <div class="card-body">
-          <h3 class="card-title text-center mb-3">Регистрация</h3>
-          <form method="post" action="{% url 'register' %}">
-            {% csrf_token %}
-            <div class="mb-3">
-              <input type="text" name="username" class="form-control" placeholder="Ваш email" required>
-            </div>
-            <div class="mb-3">
-              <input type="password" name="password" class="form-control" placeholder="Пароль" required>
-            </div>
-            <button type="submit" class="btn btn-orange w-100">Подать заявку</button>
-          </form>
-        </div>
-      </div>
-    </div>
-
-    <div class="col-md-6 mb-4">
-      <div class="card shadow-sm">
-        <div class="card-body">
           <h3 class="card-title text-center mb-3">Вход</h3>
           <form method="post" action="{% url 'login' %}">
             {% csrf_token %}

@@ -2,7 +2,7 @@ from django.contrib.auth.models import User
 from django.db import models
 
 class UserInfo(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE, null=True)
+    user = models.OneToOneField(User, on_delete=models.CASCADE, null=True, related_name='user_info')
 
     # Step 1: Personal Info
     full_name = models.CharField(max_length=255, verbose_name="ФИО", blank=True)

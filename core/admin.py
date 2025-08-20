@@ -5,24 +5,30 @@ from django.http import HttpResponseRedirect
 from django.urls import reverse
 
 from django.contrib import admin
-from django.contrib.auth.models import User
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 
-from core.models import TelegramAccount, RegistrationPersonalData, UserInfo
+from core.models import TelegramAccount, RegistrationPersonalData
+from scholar_form.forms import UserInfoForm
+from scholar_form.models import UserInfo
 from django.db import models
 from django import forms
 
 from core.models import Notification, UserNotification
 from core.models import MotivationLetter
+from documents.admin import DocumentInline
+
 
 class UserInfoInline(admin.StackedInline):
     model = UserInfo
+    form = UserInfoForm
+    fk_name = 'user'
     can_delete = False
     verbose_name_plural = 'Доп. информация о пользователе'
 
 
 class TelegramAccountInline(admin.StackedInline):
     model = TelegramAccount
+    fk_name = 'user'
     can_delete = False
     verbose_name_plural = 'Аккаунт Telegram'
     fields = (
@@ -59,7 +65,7 @@ class RegistrationAttemptAdmin(admin.ModelAdmin):
         'current_step',
         'created_at',
     )
-    search_fields = ('email', 'telegram_username', 'phone_number')
+    search_fields = ('email', 'telegram_username', 'phone')
     readonly_fields = ('created_at', 'updated_at', 'telegram_account')
     fieldsets = (
         (None, {
@@ -72,7 +78,7 @@ class RegistrationAttemptAdmin(admin.ModelAdmin):
             'fields': ('telegram_account',)
         }),
         ('Подтверждение Телефона', {
-            'fields': ('phone_number', 'phone_verified')
+            'fields': ('phone', 'phone_verified')
         }),
         ('Даты', {
             'fields': ('created_at', 'updated_at'),
@@ -87,17 +93,6 @@ class RegistrationAttemptAdmin(admin.ModelAdmin):
 
     get_telegram_verified_display.short_description = "Telegram Verified"  # Заголовок столбца
     get_telegram_verified_display.boolean = True
-
-
-class UserAdmin(BaseUserAdmin):
-    inlines = (UserInfoInline, TelegramAccountInline)
-
-
-admin.site.unregister(User)
-admin.site.register(User, UserAdmin)
-=======
-
-User = get_user_model()
 
 logger = logging.getLogger(__name__)
 
@@ -154,24 +149,28 @@ class UserNotificationAdmin(admin.ModelAdmin):
     raw_id_fields = ('notification', 'recipient')
 
 
-try:
-    admin.site.unregister(User)
-except admin.sites.NotRegistered:
-    pass
+class CustomUserAdmin(BaseUserAdmin):
+    inlines = (UserInfoInline, TelegramAccountInline, DocumentInline)
 
-
-@admin.register(User)
-class MyUserAdmin(admin.ModelAdmin):
     list_display = ('username', 'email', 'first_name', 'last_name', 'is_staff')
     search_fields = ('username', 'first_name', 'last_name', 'email')
     list_filter = ('is_staff', 'is_active', 'groups')
     actions = ['send_notification_to_selected_users']
 
+    def has_userinfo(self, obj):
+        return hasattr(obj, 'userinfo')
+    has_userinfo.short_description = 'Анкета'
+    has_userinfo.boolean = True
+
     def send_notification_to_selected_users(self, request, queryset):
         selected_ids = queryset.values_list('id', flat=True)
         request.session['selected_users_for_notification'] = list(selected_ids)
-
         url = reverse('send_notification_to_users')
         return HttpResponseRedirect(url)
 
     send_notification_to_selected_users.short_description = "Отправить оповещение выбранным пользователям"
+
+User = get_user_model()
+
+admin.site.unregister(User)
+admin.site.register(User, CustomUserAdmin)

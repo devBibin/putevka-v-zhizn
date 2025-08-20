@@ -9,11 +9,11 @@ import config
 logger = logging.getLogger(__name__)
 
 
-def initiate_zvonok_verification(phone_number, pincode=None):
+def initiate_zvonok_verification(phone, pincode=None):
     url = config.ZVONOK_API_INITIATE_URL
     data = {
         'public_key': config.PUBLIC_KEY_CALL,
-        'phone': phone_number,
+        'phone': phone,
         'campaign_id': config.CAMPAIGN_ID,
     }
     if pincode:
@@ -43,11 +43,11 @@ def initiate_zvonok_verification(phone_number, pincode=None):
         }
 
 
-def _poll_zvonok_status(phone_number):
+def _poll_zvonok_status(phone):
     url = config.ZVONOK_API_POLLING_URL
     params = {
         'public_key': config.PUBLIC_KEY_CALL,
-        'phone': phone_number,
+        'phone': phone,
         'campaign_id': config.CAMPAIGN_ID
     }
     try:

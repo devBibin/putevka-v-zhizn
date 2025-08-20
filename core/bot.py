@@ -4,7 +4,8 @@ import logging
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 import telebot
-from core.models import TelegramAccount, RegistrationPersonalData, UserInfo
+from core.models import TelegramAccount, RegistrationPersonalData
+from scholar_form.models import UserInfo
 import config
 
 logger = logging.getLogger('django.request')
@@ -87,7 +88,7 @@ def get_bot_instance(token):
 		def handle_contact(message):
 			if message.contact is not None:
 				telegram_id = str(message.from_user.id)
-				phone_number = message.contact.phone_number
+				phone = message.contact.phone_number
 
 				try:
 					telegram_account = TelegramAccount.objects.get(
@@ -110,7 +111,7 @@ def get_bot_instance(token):
 
 					attempt = RegistrationPersonalData.objects.filter(user=telegram_account.user).first()
 
-					user = UserInfo.objects.filter(phone_number=phone_number).first()
+					user = UserInfo.objects.filter(phone=phone).first()
 
 					if user:
 						bot_instances[token].send_message(message.chat.id,
@@ -118,15 +119,15 @@ def get_bot_instance(token):
 						return None
 
 					if attempt:
-						attempt.phone_number = phone_number
-						attempt.user.user_info.phone_number = phone_number
+						attempt.phone = phone
+						attempt.user.user_info.phone = phone
 						attempt.user.user_info.save()
 						attempt.phone_verified = True
 						attempt.current_step = 'finish'
 						attempt.save()
 
 					bot_instances[token].send_message(message.chat.id,
-													  f"Поздравляем, {telegram_account.user.username}! Ваш Telegram-аккаунт успешно привязан, и ваш веб-аккаунт активирован! Теперь вы можете вернуться на сайт и завершить регистрацию.",
+													  f"Поздравляем, {telegram_account.user.username}! Ваш Telegram-аккаунт успешно привязан! Теперь вы можете вернуться на сайт и завершить регистрацию.",
 													  reply_markup=telebot.types.ReplyKeyboardRemove())
 					logger.info(
 						f"Аккаунт пользователя {telegram_account.user.username} успешно активирован через Telegram ID {telegram_id}.")

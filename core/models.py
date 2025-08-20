@@ -7,8 +7,6 @@ from django.contrib.auth.models import User
 from django.db import models
 from django.utils import timezone
 
-from datetime import timezone
-
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -116,7 +114,7 @@ class RegistrationPersonalData(models.Model):
     telegram_account = models.OneToOneField(TelegramAccount, on_delete=models.SET_NULL, null=True, blank=True,
                                             help_text="Ссылка на связанный TelegramAccount для активации.")
 
-    phone_number = models.CharField(max_length=20, blank=True, null=True,
+    phone = models.CharField(max_length=20, blank=True, null=True,
                                     help_text="Номер телефона, введенный пользователем (если не из Telegram).")
 
     phone_verified = models.BooleanField(default=False,
@@ -151,11 +149,6 @@ class RegistrationPersonalData(models.Model):
         self.email_code_sent_at = timezone.now()
         self.email_code_expires_at = timezone.now() + timedelta(minutes=15)
         self.save()
-
-
-class UserInfo(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE, null=True, blank=True, related_name='user_info', )
-    phone_number = models.CharField(max_length=20, blank=True, null=True, )
 
 class MotivationLetter(models.Model):
     class Status(models.TextChoices):
