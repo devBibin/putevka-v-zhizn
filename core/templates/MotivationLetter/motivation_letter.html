@@ -45,8 +45,18 @@
                                            class="form-label fs-5">{{ field.label }}</label>
 
                                     {# поле уже будет disabled из формы при submitted #}
-                                    {% if field.field.widget.input_type == 'textarea' %}
-                                        {{ field|add_class:"form-control form-control-lg" }}
+                                    {#                                    {% if field.field.widget.input_type == 'textarea' %}#}
+                                    {#                                        {{ field|add_class:"form-control form-control-lg" }}#}
+                                    {% if field.name == 'letter_text' %}
+                                        {% with maxlen=field.field.max_length|default:2000 %}
+                                            {# соберём строку "maxlength:<число>" для фильтра attr #}
+                                            {% with maxlen_attr="maxlength:"|add:maxlen %}
+                                                {{ field|add_class:"form-control"|attr:"id:id_caption_upload"|attr:maxlen_attr }}
+                                            {% endwith %}
+                                            <div id="captionCharCount" class="form-text text-muted">
+                                                0 / {{ maxlen }} символов
+                                            </div>
+                                        {% endwith %}
                                     {% else %}
                                         {{ field|add_class:"form-control" }}
                                     {% endif %}
@@ -110,4 +120,77 @@
             </div>
         </div>
     </div>
+    {% block extra_js %}
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                const textarea = document.getElementById('id_caption_upload');
+                const counter = document.getElementById('captionCharCount');
+
+                if (!textarea || !counter) return;
+
+                let maxLen = parseInt(textarea.getAttribute('maxlength'), 10);
+                if (isNaN(maxLen) || maxLen <= 0) maxLen = 2000;
+
+                function setCounter(len) {
+                    counter.textContent = `${len} / ${maxLen} символов`;
+                    const near = Math.floor(maxLen * 0.9);
+                    counter.classList.toggle('text-danger', len >= near);
+                    counter.classList.toggle('text-muted', len < near);
+                }
+
+                function clampAndCount() {
+                    if (textarea.value.length > maxLen) {
+                        textarea.value = textarea.value.slice(0, maxLen);
+                    }
+                    setCounter(textarea.value.length);
+                }
+
+                textarea.addEventListener('keydown', function (e) {
+                    const allowedControl = (
+                        e.ctrlKey || e.metaKey || e.altKey ||
+                        ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'Tab', 'Enter'].includes(e.key)
+                    );
+
+                    if (allowedControl) return;
+
+                    const hasSelection = textarea.selectionStart !== textarea.selectionEnd;
+                    if (textarea.value.length >= maxLen && !hasSelection) {
+                        e.preventDefault();
+                    }
+                });
+
+                textarea.addEventListener('paste', function (e) {
+                    const paste = (e.clipboardData || window.clipboardData).getData('text');
+                    const start = textarea.selectionStart;
+                    const end = textarea.selectionEnd;
+
+                    const currentLen = textarea.value.length - (end - start);
+                    const room = Math.max(0, maxLen - currentLen);
+                    if (room <= 0) {
+                        e.preventDefault();
+                        return;
+                    }
+
+                    if (paste.length > room) {
+                        e.preventDefault();
+                        const toInsert = paste.slice(0, room);
+                        const before = textarea.value.slice(0, start);
+                        const after = textarea.value.slice(end);
+                        textarea.value = before + toInsert + after;
+
+                        const caretPos = start + toInsert.length;
+                        textarea.setSelectionRange(caretPos, caretPos);
+
+                        setCounter(textarea.value.length);
+                    }
+                });
+
+                textarea.addEventListener('input', clampAndCount);
+                textarea.addEventListener('change', clampAndCount);
+
+                clampAndCount();
+            });
+        </script>
+    {% endblock %}
+
 {% endblock %}
