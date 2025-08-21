@@ -7,6 +7,15 @@ from formtools.wizard.views import SessionWizardView
 from django.db import transaction
 
 class PersonalForm(forms.ModelForm):
+    birth_date = forms.DateField(
+        widget=forms.DateInput(
+            attrs={'type': 'date'},
+            format='%Y-%m-%d',
+        ),
+        input_formats=['%Y-%m-%d'],
+        required=True,
+    )
+
     class Meta:
         model = UserInfo
         fields = [
@@ -14,7 +23,6 @@ class PersonalForm(forms.ModelForm):
         ]
         widgets = {
             'full_name': forms.TextInput(attrs={'placeholder': 'Иванов Иван Иванович'}),
-            'birth_date': forms.DateInput(attrs={'type': 'date'}),
             'region': forms.TextInput(attrs={'placeholder': 'Московская область'}),
             'address': forms.TextInput(attrs={'placeholder': 'ул. Ленина, д. 1, кв. 2'}),
         }
@@ -185,6 +193,11 @@ class ApplicationWizard(SessionWizardView):
                 return self.render(self.get_form_step_data(form))
 
         return super().post(*args, **kwargs)
+
+    def get_context_data(self, form, **kwargs):
+        context = super().get_context_data(form=form, **kwargs)
+        context["active"] = "apply"
+        return context
 
 
 class UserInfoForm(forms.ModelForm):

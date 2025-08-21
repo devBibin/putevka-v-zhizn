@@ -47,6 +47,7 @@ from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
+@login_required()
 @ensure_registration_gate('protected')
 def index(request):
     return render(request, 'core/index.html')
@@ -382,6 +383,7 @@ def motivation_letter(request):
         'is_new_letter': is_new_letter,
         'user': user,
         'letter': letter,
+        'active': 'motivation_letter',
     })
 
 

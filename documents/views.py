@@ -108,6 +108,7 @@ def documents_dashboard(request):
         'user_documents': user_documents,
         'staff_documents': staff_documents,
         'attach_documents_form': attach_documents_form,
+        'active': 'documents_dashboard',
     }
     return render(request, 'documents/documents_dashboard.html', context)
 
