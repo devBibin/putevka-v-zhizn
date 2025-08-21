@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 @receiver(post_save, sender=MotivationLetter)
 def notify_telegram_on_motivation_letter_save(sender, instance, created, **kwargs):
-    if created and bot:
+    if not created and bot and instance.status == 'submitted':
         admin_url = f"{BASE_URL}/admin/core/motivationletter/{instance.pk}/change/"
 
         message_text = (
