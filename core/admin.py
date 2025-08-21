@@ -25,6 +25,11 @@ class UserInfoInline(admin.StackedInline):
     can_delete = False
     verbose_name_plural = 'Доп. информация о пользователе'
 
+class MotivationLetterInline(admin.StackedInline):
+    model = MotivationLetter
+    can_delete = False
+    verbose_name_plural = 'Мотивационное письмо'
+
 
 class TelegramAccountInline(admin.StackedInline):
     model = TelegramAccount
@@ -150,7 +155,7 @@ class UserNotificationAdmin(admin.ModelAdmin):
 
 
 class CustomUserAdmin(BaseUserAdmin):
-    inlines = (UserInfoInline, TelegramAccountInline, DocumentInline)
+    inlines = (UserInfoInline, TelegramAccountInline, DocumentInline, MotivationLetterInline)
 
     list_display = ('username', 'email', 'first_name', 'last_name', 'is_staff')
     search_fields = ('username', 'first_name', 'last_name', 'email')
