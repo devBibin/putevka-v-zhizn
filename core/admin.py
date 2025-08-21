@@ -91,7 +91,7 @@ class RegistrationAttemptAdmin(admin.ModelAdmin):
             return obj.telegram_account.telegram_verified
         return False
 
-    get_telegram_verified_display.short_description = "Telegram Verified"  # Заголовок столбца
+    get_telegram_verified_display.short_description = "Telegram Verified"
     get_telegram_verified_display.boolean = True
 
 logger = logging.getLogger(__name__)

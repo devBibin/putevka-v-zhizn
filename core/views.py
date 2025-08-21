@@ -41,13 +41,9 @@ from .models import UserNotification, Notification
 
 from .bot import webhook
 from .services.email_service import send_email_verification_code
-from .services.zvonok_service import initiate_zvonok_verification, _poll_zvonok_status
+from .services.zvonok_service import initiate_zvonok_verification, poll_zvonok_status
 from django.db import transaction
 from django.utils import timezone
-
-logger = logging.getLogger(__name__)
-
-_bot_messenger = None
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +63,7 @@ def register_initial(request):
             if User.objects.filter(email=email, is_active=True).exists():
                 form.add_error('email', 'Пользователь с таким email уже зарегистрирован.')
             else:
+                logger.info("Начата регистрация для нового пользователя.")
                 user = User.objects.create_user(
                     username=email,
                     email=email,
@@ -167,6 +164,7 @@ def verify_email_confirm(request, token):
         attempt.save(update_fields=['email_verified', 'current_step', 'email_verification_code'])
 
     messages.success(request, 'Email подтвержден.')
+    logger.info('Email подтвержден.')
     return redirect(reverse('connect_telegram'))
 
 @ensure_registration_gate('registration_step')
@@ -218,7 +216,6 @@ def verify_phone_if_needed(request):
     if request.method == 'POST':
         form = PhoneNumberForm(request.POST)
         if form.is_valid():
-            print("CLEANED:", form.cleaned_data)
             phone = form.cleaned_data['phone']
             pincode = f"{random.randint(1000, 9999)}"
 
@@ -230,9 +227,7 @@ def verify_phone_if_needed(request):
                 err_msg = api_resp.get('message')
             else:
                 ok = bool(api_resp)
-
             if ok:
-                print(phone)
                 attempt.phone = phone
                 attempt.user.user_info.phone = phone
                 attempt.current_step = 'wait_for_call'
@@ -245,6 +240,7 @@ def verify_phone_if_needed(request):
 
                 return redirect(reverse('wait_for_phone_call'))
 
+            logger.error(err_msg)
             form.add_error(None, err_msg or 'Не удалось инициировать проверку звонком. Попробуйте ещё раз.')
     else:
         form = PhoneNumberForm()
@@ -265,7 +261,7 @@ def check_phone_call_status(request):
     if not attempt or not attempt.phone:
         return JsonResponse({'status': 'error', 'message': 'Незавершенная регистрация не найдена.'}, status=400)
 
-    api_resp = _poll_zvonok_status(attempt.phone)
+    api_resp = poll_zvonok_status(attempt.phone)
     if api_resp is None or api_resp is False:
         return JsonResponse({'status': 'error', 'message': 'Ошибка API zvonok.com.'}, status=502)
 
@@ -292,7 +288,7 @@ def check_phone_call_status(request):
                 tg.telegram_verified = True
                 tg.activation_token = None
                 tg.save(update_fields=['telegram_verified', 'activation_token'])
-
+        logger.info('Номер телефона подтверждён.')
         return JsonResponse({'status': 'success', 'message': 'Номер телефона успешно подтвержден!'})
 
     return JsonResponse({

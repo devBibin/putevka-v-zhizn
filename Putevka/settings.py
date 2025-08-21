@@ -249,8 +249,13 @@ LOGGING = {
             'level': 'DEBUG', # В разработке может быть DEBUG, на продакшене INFO
             'propagate': False,
         },
+        'scholar_form': {
+            'handlers': ['console', 'file_info', 'file_error', 'telegram_errors'],
+            'level': 'DEBUG', # В разработке может быть DEBUG, на продакшене INFO
+            'propagate': False,
+        },
         '': {
-            'handlers': ['console'],
+            'handlers': ['console', 'file_info', 'file_error'],
             'level': 'INFO',
             'propagate': True,
         }
