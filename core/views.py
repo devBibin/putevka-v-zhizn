@@ -325,6 +325,7 @@ def finish_registration(request):
 
     return render(request, 'registration/registration_complete.html', {'user': user})
 
+@ensure_registration_gate('protected')
 @login_required
 def motivation_letter(request):
     user = request.user
@@ -387,6 +388,8 @@ def motivation_letter(request):
     })
 
 
+@ensure_registration_gate('protected')
+@login_required
 def notification_list(request):
     user_notifications = UserNotification.objects.filter(recipient=request.user).order_by('is_seen',
                                                                                           '-notification__created_at')

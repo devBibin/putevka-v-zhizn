@@ -8,6 +8,7 @@ from django.http import Http404, FileResponse
 from django.shortcuts import get_object_or_404
 from django.shortcuts import render, redirect
 
+from core.decorators import ensure_registration_gate
 from .decorators import rate_limit_uploads
 from .forms import DocumentUploadForm, AttachDocumentsForm
 from .models import Document
@@ -47,6 +48,7 @@ def serve_document(request, document_id):
         raise Http404("У вас нет доступа к этому документу.")
 
 
+@ensure_registration_gate('protected')
 @login_required
 @rate_limit_uploads(rate_limit_seconds=1, max_uploads=1)
 def documents_dashboard(request):
