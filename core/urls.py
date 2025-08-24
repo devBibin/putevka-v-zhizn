@@ -9,7 +9,7 @@ urlpatterns = [
 
     path('register/', views.register_initial, name='register_initial'),
     path('register/verify-email/', views.verify_email, name='verify_email'),
-    path('register/verify-email/confirm/<str:token>/', views.verify_email_confirm, name='verify_email_confirm'),
+    path('register/verify-email/confirm/<uuid:token>/', views.verify_email_confirm, name='verify_email_confirm'),
     path('register/resend-email-code/', views.resend_email_code, name='resend_email_code'),
     path('register/connect-telegram/', views.connect_telegram, name='connect_telegram'),
     path('register/skip-telegram/', views.skip_telegram, name='skip_telegram'),

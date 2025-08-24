@@ -93,7 +93,7 @@ class RegistrationAttemptAdmin(admin.ModelAdmin):
         'created_at',
     )
     search_fields = ('email', 'telegram_username', 'phone')
-    readonly_fields = ('created_at', 'updated_at', 'telegram_account')
+    readonly_fields = ('created_at', 'updated_at', 'telegram_account', 'email_verification_code')
     fieldsets = (
         (None, {
             'fields': ('user', 'email', 'password', 'current_step')

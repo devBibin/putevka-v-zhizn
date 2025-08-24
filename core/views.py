@@ -145,7 +145,11 @@ def resend_email_code(request):
     return redirect(reverse('verify_email'))
 
 def verify_email_confirm(request, token):
-    attempt = RegistrationPersonalData.objects.get(email_verification_code=token)
+    attempt = (
+        RegistrationPersonalData.objects
+        .filter(email_verification_code=token)
+        .first()
+    )
 
     if not attempt:
         return redirect(reverse('login'))

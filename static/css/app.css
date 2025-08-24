@@ -9,3 +9,6 @@
 body{background-color:var(--bg-muted);}
 .card{border-radius:1rem;}
 .progress{height:.6rem;border-radius:1rem;}
+.navbar.sticky-top { z-index: 1100; }
+.navbar .dropdown-menu { z-index: 1200; }
+header.navbar, .navbar { pointer-events: auto; }

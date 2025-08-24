@@ -18,10 +18,13 @@
                             Уведомления
                         </a>
                     </li>
-                    <li class="nav-item dropdown">
-                        <a class="nav-link dropdown-toggle" href="#"
-                           data-bs-toggle="dropdown">{{ request.user.username|default:'Профиль' }}</a>
-                        <ul class="dropdown-menu dropdown-menu-end">
+                    <li class="nav-item dropdown" hx-ignore="true">
+                        <button class="nav-link dropdown-toggle btn btn-link"
+                                id="userMenu" type="button" data-bs-toggle="dropdown"
+                                aria-expanded="false">
+                            {{ request.user.username|default:'Профиль' }}
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenu">
                             <li><a class="dropdown-item" href="{% url 'index' %}">Профиль</a></li>
                             <li>
                                 <hr class="dropdown-divider">
