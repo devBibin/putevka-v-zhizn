@@ -2,6 +2,8 @@ from django.contrib.auth.models import User
 from django.db import models
 
 class UserInfo(models.Model):
+    is_done = models.BooleanField(default=False, verbose_name='Анкета уже отправлена')
+
     user = models.OneToOneField(User, on_delete=models.CASCADE, null=True, related_name='user_info')
 
     # Step 1: Personal Info

@@ -20,8 +20,8 @@ def send_email_verification_code(attempt):
     recipient_list = [attempt.email]
     try:
         send_mail(subject, message, email_from, recipient_list, fail_silently=False)
-        print(f"DEBUG: Отправлен email на {attempt.email} с кодом: {attempt.email_verification_code}")
+        logger.info(f"Отправлен email на {attempt.email} с кодом: {attempt.email_verification_code} для {attempt.user}")
         return True
     except Exception as e:
-        print(f"ERROR: Не удалось отправить email на {attempt.email}: {e}")
+        logger.error(f"Не удалось отправить email на {attempt.email}: {e}, для {attempt.user}")
         return False

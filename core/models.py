@@ -99,8 +99,14 @@ class RegistrationPersonalData(models.Model):
     email = models.EmailField(unique=True, help_text="Email, введенный пользователем.")
     password = models.CharField(max_length=128, help_text="Хешированный пароль пользователя.")
 
-    email_verification_code = models.CharField(max_length=6, blank=True, null=True,
-                                               help_text="Код для подтверждения email.")
+    email_verification_code = models.UUIDField(
+        "Токен для подтверждения email",
+        default=uuid.uuid4,
+        unique=True,
+        editable=False,
+        null=True, blank=True,
+        db_index=True,
+    )
 
     email_code_sent_at = models.DateTimeField(null=True, blank=True,
                                                 help_text="Время истечения срока действия кода email.")
@@ -145,7 +151,7 @@ class RegistrationPersonalData(models.Model):
         return self.email_code_expires_at and self.email_code_expires_at < timezone.now()
 
     def generate_email_code(self):
-        self.email_verification_code = str(random.randint(100000, 999999))
+        self.email_verification_code = uuid.uuid4()
         self.email_code_sent_at = timezone.now()
         self.email_code_expires_at = timezone.now() + timedelta(minutes=15)
         self.save()
@@ -154,6 +160,8 @@ class MotivationLetter(models.Model):
     class Status(models.TextChoices):
         DRAFT = 'draft', 'Черновик'
         SUBMITTED = 'submitted', 'Отправлено'
+
+    is_done = models.BooleanField(default=False, verbose_name='Мотивационное письмо принято')
 
     user = models.OneToOneField(
         User,
@@ -200,8 +208,6 @@ class MotivationLetter(models.Model):
             if original.status == self.Status.SUBMITTED:
                 if self.letter_text != original.letter_text:
                     raise ValidationError("Нельзя изменять текст письма после отправки.")
-                if self.status != original.status:
-                    raise ValidationError("Нельзя менять статус отправленного письма.")
 
         if self.status == self.Status.SUBMITTED and not self.submitted_at:
             self.submitted_at = timezone.now()
@@ -211,6 +217,7 @@ class MotivationLetter(models.Model):
     def save(self, *args, **kwargs):
         if self.status == self.Status.SUBMITTED and self.submitted_at is None:
             self.submitted_at = timezone.now()
+            self.is_done = True
         super().save(*args, **kwargs)
 
     def __str__(self):

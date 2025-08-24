@@ -24,7 +24,7 @@ POLLING_INTERVAL = int(os.getenv("SHADOW_POLLING_INTERVAL", 60))
 
 def get_gpt_review(letter_text):
     if not openai.api_key:
-        print("Ошибка: OPENAI_API_KEY не установлен.")
+        logger.error("GPT_TOKEN не установлен.")
         return None
 
     try:
@@ -46,7 +46,7 @@ def get_gpt_review(letter_text):
         return f"Неизвестная ошибка: {e}"
 
 def review_unreviewed_letters():
-    logger.info(f"[{time.ctime()}] Проверка непроанализированных писем...")
+    logger.info(f"Проверка непроанализированных писем...")
 
     letters_to_review = MotivationLetter.objects.filter(
         models.Q(gpt_review__isnull=True) | models.Q(gpt_review__exact=''),

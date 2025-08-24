@@ -1,6 +1,7 @@
 import logging
 
 from django.contrib.auth import get_user_model
+from django.forms import BaseInlineFormSet
 from django.http import HttpResponseRedirect
 from django.urls import reverse
 
@@ -24,6 +25,32 @@ class UserInfoInline(admin.StackedInline):
     fk_name = 'user'
     can_delete = False
     verbose_name_plural = 'Доп. информация о пользователе'
+
+class MotivationLetterInlineFormSet(BaseInlineFormSet):
+    def save_new(self, form, commit=True):
+        obj = super().save_new(form, commit=False)
+        obj._skip_tg_notify = True
+        if commit:
+            obj.save()
+        return obj
+
+    def save_existing(self, form, instance, commit=True):
+        obj = super().save_existing(form, instance, commit=False)
+        obj._skip_tg_notify = True
+        if commit:
+            obj.save()
+        return obj
+
+class MotivationLetterInline(admin.StackedInline):
+    model = MotivationLetter
+    can_delete = False
+    verbose_name_plural = 'Мотивационное письмо'
+
+    formfield_overrides = {
+        models.CharField: {'widget': forms.Textarea(attrs={'rows': 10, 'cols': 80})},
+    }
+
+    formset = MotivationLetterInlineFormSet
 
 
 class TelegramAccountInline(admin.StackedInline):
@@ -66,7 +93,7 @@ class RegistrationAttemptAdmin(admin.ModelAdmin):
         'created_at',
     )
     search_fields = ('email', 'telegram_username', 'phone')
-    readonly_fields = ('created_at', 'updated_at', 'telegram_account')
+    readonly_fields = ('created_at', 'updated_at', 'telegram_account', 'email_verification_code')
     fieldsets = (
         (None, {
             'fields': ('user', 'email', 'password', 'current_step')
@@ -91,7 +118,7 @@ class RegistrationAttemptAdmin(admin.ModelAdmin):
             return obj.telegram_account.telegram_verified
         return False
 
-    get_telegram_verified_display.short_description = "Telegram Verified"  # Заголовок столбца
+    get_telegram_verified_display.short_description = "Telegram Verified"
     get_telegram_verified_display.boolean = True
 
 logger = logging.getLogger(__name__)
@@ -99,7 +126,7 @@ logger = logging.getLogger(__name__)
 
 @admin.register(MotivationLetter)
 class MotivationLetterAdmin(admin.ModelAdmin):
-    list_display = ('id', 'user', 'created_at', 'admin_rating', 'gpt_review')
+    list_display = ('is_done', 'id', 'user', 'created_at', 'admin_rating', 'gpt_review')
     list_filter = ('created_at',)
     search_fields = ('letter_text', 'user__username')
 
@@ -110,6 +137,10 @@ class MotivationLetterAdmin(admin.ModelAdmin):
     formfield_overrides = {
         models.CharField: {'widget': forms.Textarea(attrs={'rows': 10, 'cols': 80})},
     }
+
+    def save_model(self, request, obj, form, change):
+        obj._skip_tg_notify = True
+        super().save_model(request, obj, form, change)
 
 @admin.register(Notification)
 class NotificationAdmin(admin.ModelAdmin):
@@ -150,7 +181,7 @@ class UserNotificationAdmin(admin.ModelAdmin):
 
 
 class CustomUserAdmin(BaseUserAdmin):
-    inlines = (UserInfoInline, TelegramAccountInline, DocumentInline)
+    inlines = (UserInfoInline, TelegramAccountInline, DocumentInline, MotivationLetterInline)
 
     list_display = ('username', 'email', 'first_name', 'last_name', 'is_staff')
     search_fields = ('username', 'first_name', 'last_name', 'email')

@@ -15,7 +15,7 @@ def get_variable(name: str):
         return None
 
 
-CHAT_ID = get_variable('CHAT_ID')
+# CHAT_ID = get_variable('CHAT_ID')
 
 try:
     raw_dict = get_variable('TELEGRAM_STAFF_CHAT_IDS')

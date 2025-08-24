@@ -1,4 +1,5 @@
 from django import forms
+from django.forms import HiddenInput
 from django.shortcuts import redirect
 
 from .models import UserInfo
@@ -7,6 +8,16 @@ from formtools.wizard.views import SessionWizardView
 from django.db import transaction
 
 class PersonalForm(forms.ModelForm):
+    birth_date = forms.DateField(
+        widget=forms.DateInput(
+            attrs={'type': 'date'},
+            format='%Y-%m-%d',
+        ),
+        input_formats=['%Y-%m-%d'],
+        label='Дата рождения',
+        required=True,
+    )
+
     class Meta:
         model = UserInfo
         fields = [
@@ -14,7 +25,6 @@ class PersonalForm(forms.ModelForm):
         ]
         widgets = {
             'full_name': forms.TextInput(attrs={'placeholder': 'Иванов Иван Иванович'}),
-            'birth_date': forms.DateInput(attrs={'type': 'date'}),
             'region': forms.TextInput(attrs={'placeholder': 'Московская область'}),
             'address': forms.TextInput(attrs={'placeholder': 'ул. Ленина, д. 1, кв. 2'}),
         }
@@ -125,10 +135,19 @@ class ApplicationWizard(SessionWizardView):
 
     def get_form(self, step=None, data=None, files=None):
         form = super().get_form(step, data, files)
-        for f in form.fields.values():
-            f.required = True
-            if hasattr(f.widget, 'attrs'):
-                f.widget.attrs.setdefault('required', 'required')
+
+        for name, field in form.fields.items():
+            if name == 'legal_guardian':
+                field.required = False
+                if hasattr(field.widget, 'attrs'):
+                    field.widget.attrs.pop('required', None)
+                continue
+
+            field.required = True
+
+            if hasattr(field.widget, 'attrs') and not isinstance(field.widget, HiddenInput):
+                field.widget.attrs['required'] = ''
+
         return form
 
     def get_form_initial(self, step):
@@ -158,6 +177,7 @@ class ApplicationWizard(SessionWizardView):
             for field, value in form.cleaned_data.items():
                 if field in model_fields:
                     setattr(instance, field, value)
+        instance.is_done = True
         instance.save()
         return redirect('thank_you')
 
@@ -185,6 +205,11 @@ class ApplicationWizard(SessionWizardView):
                 return self.render(self.get_form_step_data(form))
 
         return super().post(*args, **kwargs)
+
+    def get_context_data(self, form, **kwargs):
+        context = super().get_context_data(form=form, **kwargs)
+        context["active"] = "apply"
+        return context
 
 
 class UserInfoForm(forms.ModelForm):
