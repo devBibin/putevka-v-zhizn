@@ -3,6 +3,7 @@ import logging
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver, Signal
 
+from core.bot import send_tg_notification_to_user
 from core.models import Notification, UserNotification
 from .models import Document
 from telebot import TeleBot
@@ -15,19 +16,11 @@ TG_TOKEN_ADMIN = config.TG_TOKEN_ADMIN
 bot_admin = TeleBot(TG_TOKEN_ADMIN)
 
 TG_TOKEN_USERS = config.TG_TOKEN_USERS
-bot_user = TeleBot(TG_TOKEN_USERS)
-
 TELEGRAM_CHAT_IDS = config.TELEGRAM_STAFF_CHAT_IDS
 
 BASE_URL = config.BASE_URL
 
 logger = logging.getLogger(__name__)
-
-def send_tg_notification_to_user(message, user):
-    if not user.telegram_account.telegram_id:
-        return
-
-    bot_user.send_message(user.telegram_account.telegram_id, message)
 
 @receiver(post_save, sender=Document)
 def notify_telegram_on_document_upload(sender, instance, created, **kwargs):
