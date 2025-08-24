@@ -21,7 +21,6 @@
         {% endif %}
 
         <main class="py-4 {% if user.is_authenticated %}col-12 col-lg-9 col-xl-10{% else %}col-12{% endif %}">
-            {% include 'core/_messages.html' %}
             {% block content %}{% endblock %}
         </main>
     </div>

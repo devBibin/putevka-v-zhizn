@@ -1,6 +1,7 @@
 import logging
 
 from django.contrib.auth import get_user_model
+from django.forms import BaseInlineFormSet
 from django.http import HttpResponseRedirect
 from django.urls import reverse
 
@@ -25,10 +26,31 @@ class UserInfoInline(admin.StackedInline):
     can_delete = False
     verbose_name_plural = 'Доп. информация о пользователе'
 
+class MotivationLetterInlineFormSet(BaseInlineFormSet):
+    def save_new(self, form, commit=True):
+        obj = super().save_new(form, commit=False)
+        obj._skip_tg_notify = True
+        if commit:
+            obj.save()
+        return obj
+
+    def save_existing(self, form, instance, commit=True):
+        obj = super().save_existing(form, instance, commit=False)
+        obj._skip_tg_notify = True
+        if commit:
+            obj.save()
+        return obj
+
 class MotivationLetterInline(admin.StackedInline):
     model = MotivationLetter
     can_delete = False
     verbose_name_plural = 'Мотивационное письмо'
+
+    formfield_overrides = {
+        models.CharField: {'widget': forms.Textarea(attrs={'rows': 10, 'cols': 80})},
+    }
+
+    formset = MotivationLetterInlineFormSet
 
 
 class TelegramAccountInline(admin.StackedInline):
@@ -115,6 +137,10 @@ class MotivationLetterAdmin(admin.ModelAdmin):
     formfield_overrides = {
         models.CharField: {'widget': forms.Textarea(attrs={'rows': 10, 'cols': 80})},
     }
+
+    def save_model(self, request, obj, form, change):
+        obj._skip_tg_notify = True
+        super().save_model(request, obj, form, change)
 
 @admin.register(Notification)
 class NotificationAdmin(admin.ModelAdmin):
