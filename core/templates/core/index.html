@@ -1,33 +1,57 @@
 {% extends "core/base.html" %}
 
 {% block content %}
-<div class="text-center mb-5">
-  <h1 class="fw-bold">Добро пожаловать!</h1>
-</div>
-
-{% if user.is_authenticated %}
-  <div class="alert alert-success text-center">
-    Здравствуйте, <strong>{{ user.username }}</strong>! Вы уже авторизованы.
-  </div>
-{% else %}
-  <div class="row">
-    <div class="col-md-6 mb-4">
-      <div class="card shadow-sm">
-        <div class="card-body">
-          <h3 class="card-title text-center mb-3">Вход</h3>
-          <form method="post" action="{% url 'login' %}">
-            {% csrf_token %}
-            <div class="mb-3">
-              <input type="text" name="username" class="form-control" placeholder="Ваш email" required>
-            </div>
-            <div class="mb-3">
-              <input type="password" name="password" class="form-control" placeholder="Пароль" required>
-            </div>
-            <button type="submit" class="btn btn-yellow w-100">Войти</button>
-          </form>
-        </div>
-      </div>
+    <div class="text-center mb-5">
+        <h1 class="fw-bold">Добро пожаловать!</h1>
     </div>
-  </div>
-{% endif %}
+
+    {% if user.is_authenticated %}
+        <div class="alert alert-success text-center">
+            Здравствуйте, <strong>{{ user.username }}</strong>! Вы уже авторизованы.
+        </div>
+
+        {% if not user.user_info.is_done %}
+            <div class="alert alert-warning">
+                Ваша <strong>анкета</strong> ещё не отправлена.
+                <a href="{% url 'apply' %}" class="alert-link">Заполнить сейчас</a>.
+            </div>
+        {% endif %}
+
+        {% if user.motivation_letter %}
+            {% if not user.motivation_letter.is_done and user.motivation_letter.status != user.motivation_letter.Status.SUBMITTED %}
+                <div class="alert alert-warning">
+                    Ваше <strong>мотивационное письмо</strong> ещё не отправлено.
+                    <a href="{% url 'motivation_letter' %}" class="alert-link">Перейти к письму</a>.
+                </div>
+            {% endif %}
+        {% else %}
+            <div class="alert alert-warning">
+                У вас ещё нет <strong>мотивационного письма</strong>.
+                <a href="{% url 'motivation_letter' %}" class="alert-link">Создать письмо</a>.
+            </div>
+        {% endif %}
+
+    {% else %}
+        <div class="row">
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm">
+                    <div class="card-body">
+                        <h3 class="card-title text-center mb-3">Вход</h3>
+                        <form method="post" action="{% url 'login' %}">
+                            {% csrf_token %}
+                            <div class="mb-3">
+                                <input type="text" name="username" class="form-control" placeholder="Ваш email"
+                                       required>
+                            </div>
+                            <div class="mb-3">
+                                <input type="password" name="password" class="form-control" placeholder="Пароль"
+                                       required>
+                            </div>
+                            <button type="submit" class="btn btn-yellow w-100">Войти</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
 {% endblock %}

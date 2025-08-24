@@ -126,7 +126,7 @@ logger = logging.getLogger(__name__)
 
 @admin.register(MotivationLetter)
 class MotivationLetterAdmin(admin.ModelAdmin):
-    list_display = ('id', 'user', 'created_at', 'admin_rating', 'gpt_review')
+    list_display = ('is_done', 'id', 'user', 'created_at', 'admin_rating', 'gpt_review')
     list_filter = ('created_at',)
     search_fields = ('letter_text', 'user__username')
 

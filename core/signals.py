@@ -41,10 +41,10 @@ def notify_telegram_on_motivation_letter_save(sender, instance, created, **kwarg
 
         for username, chat_id in TELEGRAM_CHAT_IDS.items():
             try:
-                send_tg_notification_to_user(chat_id, message_text)
+                bot.send_message(chat_id, message_text)
                 logger.info(f"Telegram уведомление о MotivationLetter отправлено {username} ({chat_id})")
             except Exception as e:
-                logger.error(f"Ошибка при отправке Telegram уведомления о MotivationLetter {username}: {e}")
+                logger.warning(f"Ошибка при отправке Telegram уведомления о MotivationLetter {username}: {e}")
 
 
 @receiver(pre_save, sender=MotivationLetter)
@@ -66,19 +66,11 @@ def notify_on_rating_change(sender, instance, created, **kwargs):
 
     message = build_motivation_rating_message(instance, user_url)
 
-    # Отправка: используй свой хелпер или прямую отправку
     try:
-        # вариант с готовым хелпером
         send_tg_notification_to_user(message, instance.user)
         logger.info(f"TG: уведомление об оценке письма {instance.pk} отправлено пользователю {instance.user}")
-    except NameError:
-        # запасной вариант через маппинг username → chat_id
-        chat_id = TELEGRAM_CHAT_IDS.get(getattr(instance.user, "username", ""))
-        if chat_id:
-            bot.send_message(chat_id, message)
-            logger.info(f"TG: уведомление об оценке письма {instance.pk} отправлено в чат {chat_id}")
-        else:
-            logger.warning(f"TG: нет chat_id для пользователя {instance.user}")
+    except Exception as e:
+        logger.warning(e)
 
 def build_motivation_rating_message(letter, user_url: str) -> str:
     admin_rating = letter.admin_rating

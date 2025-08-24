@@ -161,6 +161,8 @@ class MotivationLetter(models.Model):
         DRAFT = 'draft', 'Черновик'
         SUBMITTED = 'submitted', 'Отправлено'
 
+    is_done = models.BooleanField(default=False, verbose_name='Мотивационное письмо принято')
+
     user = models.OneToOneField(
         User,
         on_delete=models.CASCADE,
@@ -206,8 +208,6 @@ class MotivationLetter(models.Model):
             if original.status == self.Status.SUBMITTED:
                 if self.letter_text != original.letter_text:
                     raise ValidationError("Нельзя изменять текст письма после отправки.")
-                if self.status != original.status:
-                    raise ValidationError("Нельзя менять статус отправленного письма.")
 
         if self.status == self.Status.SUBMITTED and not self.submitted_at:
             self.submitted_at = timezone.now()
@@ -217,6 +217,7 @@ class MotivationLetter(models.Model):
     def save(self, *args, **kwargs):
         if self.status == self.Status.SUBMITTED and self.submitted_at is None:
             self.submitted_at = timezone.now()
+            self.is_done = True
         super().save(*args, **kwargs)
 
     def __str__(self):

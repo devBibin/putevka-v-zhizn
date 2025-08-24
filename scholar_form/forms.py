@@ -177,6 +177,7 @@ class ApplicationWizard(SessionWizardView):
             for field, value in form.cleaned_data.items():
                 if field in model_fields:
                     setattr(instance, field, value)
+        instance.is_done = True
         instance.save()
         return redirect('thank_you')
 
