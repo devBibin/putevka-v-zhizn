@@ -14,6 +14,11 @@ logger = logging.getLogger('django.request')
 
 bot_instances = {}
 
+def send_message_to_user(chat_id, message_text, token):
+    try:
+        bot_instances[token].send_message(chat_id, message_text)
+    except Exception as e:
+        logger.warning(e)
 
 def get_bot_messenger():
     global _bot_messenger
@@ -43,13 +48,13 @@ def get_bot_instance(token):
                         telegram_account = TelegramAccount.objects.get(activation_token=activation_token_str)
 
                         if telegram_account.telegram_verified:
-                            bot_instances[token].send_message(message.chat.id,
-                                                              "Ваш аккаунт Telegram уже привязан и веб-аккаунт активирован!")
+                            send_message_to_user(message.chat.id,
+                                                              "Ваш аккаунт Telegram уже привязан и веб-аккаунт активирован!", token)
                             return
 
                         if telegram_account.telegram_id and str(telegram_account.telegram_id) != str(message.chat.id):
-                            bot_instances[token].send_message(message.chat.id,
-                                                              "Этот токен активации привязан к другому Telegram-аккаунту, либо уже был использован.")
+                            send_message_to_user(message.chat.id,
+                                                              "Этот токен активации привязан к другому Telegram-аккаунту, либо уже был использован.", token)
                             logger.warning(
                                 f"Попытка активации токена {activation_token_str} с другого Telegram ID ({message.chat.id}).")
                             return
@@ -67,26 +72,29 @@ def get_bot_instance(token):
                                                                     request_contact=True)
                         markup.add(button_phone)
 
-                        bot_instances[token].send_message(message.chat.id,
-                                                          f"Привет, {telegram_account.user.username}! Для активации аккаунта на сайте, пожалуйста, поделитесь своим номером телефона.",
-                                                          reply_markup=markup)
+                        try:
+                            bot_instances[token].send_message(message.chat.id,
+                                                              f"Привет, {telegram_account.user.username}! Для активации аккаунта на сайте, пожалуйста, поделитесь своим номером телефона.",
+                                                              reply_markup=markup)
+                        except Exception as e:
+                            logger.warning(f"Ошибка при отправке сообщения с запросом номера телефона: {e}")
 
                         logger.info(
                             f"Запрошен номер телефона для активации токена {activation_token_str} для пользователя {telegram_account.user.username}")
 
                     except TelegramAccount.DoesNotExist:
-                        bot_instances[token].send_message(message.chat.id, "Неверный токен активации.")
+                        send_message_to_user(message.chat.id, "Неверный токен активации.", token)
                         logger.warning(
                             f"Неверный токен активации от Telegram ID {message.chat.id}: {activation_token_str}")
                     except Exception as e:
                         logger.error(f"Ошибка в handle_start с токеном: {e}", exc_info=True)
-                        bot_instances[token].send_message(message.chat.id,
-                                                          "Произошла ошибка при обработке вашего запроса.")
+                        send_message_to_user(message.chat.id,
+                                                          "Произошла ошибка при обработке вашего запроса.", token)
                 else:
-                    bot_instances[token].send_message(message.chat.id, "Неизвестная команда /start.")
+                    send_message_to_user(message.chat.id, "Неизвестная команда /start.", token)
             else:
-                bot_instances[token].send_message(message.chat.id,
-                                                  "Привет! Чтобы активировать аккаунт, перейдите по ссылке с сайта.")
+                send_message_to_user(message.chat.id,
+                                                  "Привет! Чтобы активировать аккаунт, перейдите по ссылке с сайта.", token)
 
         @bot_instances[token].message_handler(content_types=['contact'])
         def handle_contact(message):
@@ -130,22 +138,25 @@ def get_bot_instance(token):
                         attempt.current_step = 'finish'
                         attempt.save()
 
-                    bot_instances[token].send_message(message.chat.id,
-                                                      f"Поздравляем, {telegram_account.user.username}! Ваш Telegram-аккаунт успешно привязан! Теперь вы можете вернуться на сайт и завершить регистрацию.",
-                                                      reply_markup=telebot.types.ReplyKeyboardRemove())
+                    try:
+                        bot_instances[token].send_message(message.chat.id,
+                                                          f"Поздравляем, {telegram_account.user.username}! Ваш Telegram-аккаунт успешно привязан! Теперь вы можете вернуться на сайт и завершить регистрацию.",
+                                                          reply_markup=telebot.types.ReplyKeyboardRemove())
+                    except Exception as e:
+                        logger.warning(f"Сообщение не отправилось пользователю: {e}")
                     logger.info(
                         f"Аккаунт пользователя {telegram_account.user.username} успешно активирован через Telegram ID {telegram_id}.")
 
                 except TelegramAccount.DoesNotExist:
-                    bot_instances[token].send_message(message.chat.id,
-                                                      "Не удалось найти аккаунт, ожидающий активации для этого Telegram ID. Пожалуйста, убедитесь, что вы нажали ссылку активации на сайте и поделились своим номером с того же аккаунта Telegram.")
+                    send_message_to_user(message.chat.id,
+                                                      "Не удалось найти аккаунт, ожидающий активации для этого Telegram ID. Пожалуйста, убедитесь, что вы нажали ссылку активации на сайте и поделились своим номером с того же аккаунта Telegram.", token)
                     logger.warning(f"Не удалось найти профиль для активации от Telegram ID {telegram_id}.")
                 except Exception as e:
                     logger.error(f"Ошибка при обработке контакта: {e}", exc_info=True)
-                    bot_instances[token].send_message(message.chat.id,
-                                                      "Произошла ошибка при привязке вашего номера. Пожалуйста, попробуйте еще раз.")
+                    send_message_to_user(message.chat.id,
+                                                      "Произошла ошибка при привязке вашего номера. Пожалуйста, попробуйте еще раз.", token)
             else:
-                bot_instances[token].send_message(message.chat.id, "Вы не поделились номером телефона.")
+                send_message_to_user(message.chat.id, "Вы не поделились номером телефона.", token)
 
         @bot_instances[token].message_handler(func=lambda message: True)
         def echo_all(message):

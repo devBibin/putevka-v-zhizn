@@ -31,7 +31,8 @@ def notify_telegram_on_document_upload(sender, instance, created, **kwargs):
             f"Новый документ загружен пользователем {instance.user.username}:\n"
             f"Название: {os.path.basename(instance.file.name)}\n"
             f"Описание: {instance.caption}\n"
-            f"Доступен по ссылке: {BASE_URL}{document_url}"
+            f"Доступен по ссылке: {BASE_URL}{document_url}\n"
+            f"Загружен персоналом: {'да' if instance.uploaded_by_staff else 'нет'}"
         )
 
         for username, chat_id in TELEGRAM_CHAT_IDS.items():

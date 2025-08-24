@@ -186,119 +186,90 @@
             </div>
         </div>
     </div>
+{% endblock %}
 
-    {% block extra_js %}
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const captionInput = document.getElementById('id_caption_upload');
-            const fileInput = document.getElementById('id_file_upload');
-            const uploadButton = document.getElementById('uploadButton');
-            const captionCharCount = document.getElementById('captionCharCount');
-            let maxCaptionLength = 0;
+{# ВАЖНО: скрипт вынесен на верхний уровень, а не внутри content #}
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const captionInput = document.getElementById('id_caption_upload');
+    const fileInput = document.getElementById('id_file_upload');
+    const uploadButton = document.getElementById('uploadButton');
+    const captionCharCount = document.getElementById('captionCharCount');
+    let maxCaptionLength = 0;
 
-            if (captionInput) {
-                maxCaptionLength = parseInt(captionInput.getAttribute('maxlength'), 10);
-
-                captionInput.addEventListener('input', () => {
-                    updateCharCount();
-                    checkUploadFormValidity();
-                });
-            }
-            if (fileInput) {
-                fileInput.addEventListener('change', checkUploadFormValidity);
-            }
-
-            function updateCharCount() {
-                if (captionInput && captionCharCount && !isNaN(maxCaptionLength)) {
-                    const currentCount = captionInput.value.length;
-                    captionCharCount.textContent = `${currentCount} / ${maxCaptionLength} символов`;
-
-                    if (currentCount > maxCaptionLength) {
-                        captionCharCount.classList.remove('text-muted');
-                        captionCharCount.classList.add('text-danger');
-                    } else {
-                        captionCharCount.classList.remove('text-danger');
-                        captionCharCount.classList.add('text-muted');
-                    }
-                }
-            }
-
-            function checkUploadFormValidity() {
-                const isCaptionFilled = captionInput && captionInput.value.trim() !== '';
-                const isFileSelected = fileInput && fileInput.files.length > 0;
-                const isCaptionWithinLimit = captionInput && captionInput.value.length <= maxCaptionLength;
-
-                if (uploadButton) {
-                    uploadButton.disabled = !(isCaptionFilled && isFileSelected && isCaptionWithinLimit);
-
-                    if (uploadButton.disabled) {
-                        uploadButton.classList.remove('btn-primary');
-                        uploadButton.classList.add('btn-secondary');
-                    } else {
-                        uploadButton.classList.remove('btn-secondary');
-                        uploadButton.classList.add('btn-primary');
-                    }
-                }
-            }
-
+    if (captionInput) {
+        maxCaptionLength = parseInt(captionInput.getAttribute('maxlength'), 10) || 0;
+        captionInput.addEventListener('input', () => {
             updateCharCount();
             checkUploadFormValidity();
-
-
-            const attachButtons = document.querySelectorAll('.attach-button');
-
-            attachButtons.forEach(button => {
-                button.addEventListener('click', function() {
-                    const documentId = this.dataset.documentId;
-                    const formContainer = document.getElementById(`attach-form-${documentId}`);
-                    const attachForm = document.getElementById(`attachForm-${documentId}`);
-                    const attachSubmitButton = attachForm ? attachForm.querySelector('.attach-submit-button') : null;
-                    const checkboxes = attachForm ? attachForm.querySelectorAll('input[type="checkbox"][name="documents_to_attach"]') : [];
-
-                    if (formContainer.style.display === 'none') {
-                        formContainer.style.display = 'block';
-                        this.textContent = 'Скрыть форму прикрепления';
-                        checkAttachFormValidity(checkboxes, attachSubmitButton);
-                    } else {
-                        formContainer.style.display = 'none';
-                        this.textContent = 'Прикрепить документы';
-                    }
-                });
-            });
-
-            function checkAttachFormValidity(checkboxes, submitButton) {
-                let anyCheckboxChecked = false;
-                checkboxes.forEach(checkbox => {
-                    if (checkbox.checked) {
-                        anyCheckboxChecked = true;
-                    }
-                });
-
-                if (submitButton) {
-                    submitButton.disabled = !anyCheckboxChecked;
-                    if (submitButton.disabled) {
-                        submitButton.classList.remove('btn-success');
-                        submitButton.classList.add('btn-secondary');
-                    } else {
-                        submitButton.classList.remove('btn-secondary');
-                        submitButton.classList.add('btn-success');
-                    }
-                }
-            }
-
-            document.querySelectorAll('.attach-documents-form').forEach(form => {
-                const checkboxes = form.querySelectorAll('input[type="checkbox"][name="documents_to_attach"]');
-                const submitButton = form.querySelector('.attach-submit-button');
-
-                checkboxes.forEach(checkbox => {
-                    checkbox.addEventListener('change', () => checkAttachFormValidity(checkboxes, submitButton));
-                });
-
-                if (form.closest('.attach-form-container') && form.closest('.attach-form-container').style.display !== 'none') {
-                    checkAttachFormValidity(checkboxes, submitButton);
-                }
-            });
         });
-    </script>
-    {% endblock %}
+    }
+    if (fileInput) {
+        fileInput.addEventListener('change', checkUploadFormValidity);
+    }
+
+    function updateCharCount() {
+        if (captionInput && captionCharCount && maxCaptionLength) {
+            const currentCount = captionInput.value.length;
+            captionCharCount.textContent = `${currentCount} / ${maxCaptionLength} символов`;
+            captionCharCount.classList.toggle('text-danger', currentCount > maxCaptionLength);
+            captionCharCount.classList.toggle('text-muted', currentCount <= maxCaptionLength);
+        }
+    }
+
+    function checkUploadFormValidity() {
+        const isCaptionFilled = captionInput && captionInput.value.trim() !== '';
+        const isFileSelected = fileInput && fileInput.files.length > 0;
+        const isCaptionWithinLimit = captionInput && (maxCaptionLength ? captionInput.value.length <= maxCaptionLength : true);
+
+        if (uploadButton) {
+            uploadButton.disabled = !(isCaptionFilled && isFileSelected && isCaptionWithinLimit);
+            uploadButton.classList.toggle('btn-secondary', uploadButton.disabled);
+            uploadButton.classList.toggle('btn-primary', !uploadButton.disabled);
+        }
+    }
+
+    updateCharCount();
+    checkUploadFormValidity();
+
+    // Показ/скрытие формы прикрепления
+    document.querySelectorAll('.attach-button').forEach(button => {
+        button.addEventListener('click', function() {
+            const documentId = this.dataset.documentId;
+            const formContainer = document.getElementById(`attach-form-${documentId}`);
+            const attachForm = document.getElementById(`attachForm-${documentId}`);
+            const attachSubmitButton = attachForm ? attachForm.querySelector('.attach-submit-button') : null;
+            const checkboxes = attachForm ? attachForm.querySelectorAll('input[type="checkbox"][name="documents_to_attach"]') : [];
+
+            if (formContainer && formContainer.style.display === 'none') {
+                formContainer.style.display = 'block';
+                this.textContent = 'Скрыть форму прикрепления';
+                checkAttachFormValidity(checkboxes, attachSubmitButton);
+            } else if (formContainer) {
+                formContainer.style.display = 'none';
+                this.textContent = 'Прикрепить документы';
+            }
+        });
+    });
+
+    function checkAttachFormValidity(checkboxes, submitButton) {
+        const anyChecked = Array.from(checkboxes).some(cb => cb.checked);
+        if (submitButton) {
+            submitButton.disabled = !anyChecked;
+            submitButton.classList.toggle('btn-secondary', !anyChecked);
+            submitButton.classList.toggle('btn-success', anyChecked);
+        }
+    }
+
+    document.querySelectorAll('.attach-documents-form').forEach(form => {
+        const checkboxes = form.querySelectorAll('input[type="checkbox"][name="documents_to_attach"]');
+        const submitButton = form.querySelector('.attach-submit-button');
+        checkboxes.forEach(cb => cb.addEventListener('change', () => checkAttachFormValidity(checkboxes, submitButton)));
+        if (form.closest('.attach-form-container')?.style.display !== 'none') {
+            checkAttachFormValidity(checkboxes, submitButton);
+        }
+    });
+});
+</script>
 {% endblock %}

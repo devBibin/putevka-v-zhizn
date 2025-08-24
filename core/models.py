@@ -99,8 +99,14 @@ class RegistrationPersonalData(models.Model):
     email = models.EmailField(unique=True, help_text="Email, введенный пользователем.")
     password = models.CharField(max_length=128, help_text="Хешированный пароль пользователя.")
 
-    email_verification_code = models.CharField(max_length=6, blank=True, null=True,
-                                               help_text="Код для подтверждения email.")
+    email_verification_code = models.UUIDField(
+        "Токен для подтверждения email",
+        default=uuid.uuid4,
+        unique=True,
+        editable=False,
+        null=True, blank=True,
+        db_index=True,
+    )
 
     email_code_sent_at = models.DateTimeField(null=True, blank=True,
                                                 help_text="Время истечения срока действия кода email.")
@@ -145,7 +151,7 @@ class RegistrationPersonalData(models.Model):
         return self.email_code_expires_at and self.email_code_expires_at < timezone.now()
 
     def generate_email_code(self):
-        self.email_verification_code = str(random.randint(100000, 999999))
+        self.email_verification_code = uuid.uuid4()
         self.email_code_sent_at = timezone.now()
         self.email_code_expires_at = timezone.now() + timedelta(minutes=15)
         self.save()

@@ -1,4 +1,5 @@
 from django import forms
+from django.forms import HiddenInput
 from django.shortcuts import redirect
 
 from .models import UserInfo
@@ -13,6 +14,7 @@ class PersonalForm(forms.ModelForm):
             format='%Y-%m-%d',
         ),
         input_formats=['%Y-%m-%d'],
+        label='Дата рождения',
         required=True,
     )
 
@@ -133,10 +135,19 @@ class ApplicationWizard(SessionWizardView):
 
     def get_form(self, step=None, data=None, files=None):
         form = super().get_form(step, data, files)
-        for f in form.fields.values():
-            f.required = True
-            if hasattr(f.widget, 'attrs'):
-                f.widget.attrs.setdefault('required', 'required')
+
+        for name, field in form.fields.items():
+            if name == 'legal_guardian':
+                field.required = False
+                if hasattr(field.widget, 'attrs'):
+                    field.widget.attrs.pop('required', None)
+                continue
+
+            field.required = True
+
+            if hasattr(field.widget, 'attrs') and not isinstance(field.widget, HiddenInput):
+                field.widget.attrs['required'] = ''
+
         return form
 
     def get_form_initial(self, step):

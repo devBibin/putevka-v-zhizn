@@ -144,10 +144,11 @@ def resend_email_code(request):
 
     return redirect(reverse('verify_email'))
 
-@login_required
 def verify_email_confirm(request, token):
-    user = request.user
-    attempt = user.registrationpersonaldata
+    attempt = RegistrationPersonalData.objects.get(email_verification_code=token)
+
+    if not attempt:
+        return redirect(reverse('login'))
 
     if attempt.email_verified:
         return redirect(reverse('connect_telegram'))
@@ -164,6 +165,7 @@ def verify_email_confirm(request, token):
         attempt.email_verification_code = None
         attempt.save(update_fields=['email_verified', 'current_step', 'email_verification_code'])
 
+    login(request, attempt.user)
     messages.success(request, 'Email подтвержден.')
     logger.info('Email подтвержден.')
     return redirect(reverse('connect_telegram'))
