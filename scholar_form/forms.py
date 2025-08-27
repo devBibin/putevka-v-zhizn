@@ -1,4 +1,5 @@
 from django import forms
+from django.dispatch import Signal
 from django.forms import HiddenInput
 from django.shortcuts import redirect
 
@@ -6,6 +7,8 @@ from .models import UserInfo
 from formtools.wizard.views import SessionWizardView
 
 from django.db import transaction
+
+wizard_done = Signal()
 
 class PersonalForm(forms.ModelForm):
     birth_date = forms.DateField(
@@ -178,6 +181,7 @@ class ApplicationWizard(SessionWizardView):
                 if field in model_fields:
                     setattr(instance, field, value)
         instance.is_done = True
+        wizard_done.send(sender=self.__class__, instance=instance, forms=form_list)
         instance.save()
         return redirect('thank_you')
 
