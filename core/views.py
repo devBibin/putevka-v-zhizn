@@ -436,10 +436,10 @@ def send_notification_to_users(request):
                 new_notification = Notification.objects.create(message=message_text)
 
                 user_notification_objects = [
-                    UserNotification(notification=new_notification, recipient=user)
+                    UserNotification.objects.create(notification=new_notification, recipient=user)
                     for user in selected_users
                 ]
-                UserNotification.objects.bulk_create(user_notification_objects)
+                # UserNotification.objects.bulk_create(user_notification_objects)
 
             logger.info(f'Массовое оповещение {new_notification.pk} зарегистрировано')
             messages.success(request, f"Оповещение '{message_text[:30]}...' успешно отправлено {len(selected_user_ids)} пользователям.")
