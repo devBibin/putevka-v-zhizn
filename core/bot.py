@@ -200,6 +200,8 @@ def webhook(request, bot_token):
 
 
 def send_tg_notification_to_user(message, user):
+    if not hasattr(user, 'telegram_account'):
+        return
     if not user.telegram_account.telegram_id:
         return
     try:

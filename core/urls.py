@@ -50,6 +50,8 @@ urlpatterns = [
     ), name='password_reset_complete'),
 
     path('motivation/', views.motivation_letter, name='motivation_letter'),
+
+    path('notifications/dropdown/', views.notifications_dropdown, name='notifications_dropdown'),
     path('notifications/', views.notification_list, name='notifications'),
     path('mark-as-seen/<int:user_notification_id>', views.mark_notification_as_seen, name='mark_as_seen'),
 ]

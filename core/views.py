@@ -456,3 +456,16 @@ def send_notification_to_users(request):
         'app_label': 'auth',
     }
     return render(request, 'admin/toManyNotifications.html', context)
+
+
+@login_required
+def notifications_dropdown(request):
+    items = (
+        UserNotification.objects
+        .select_related('notification')
+        .filter(recipient=request.user, is_seen=False)
+        .order_by('-notification__created_at')[:20]
+    )
+    return render(request, 'notifications/_dropdown_items.html', {'items': items})
+
+
