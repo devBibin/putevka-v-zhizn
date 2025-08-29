@@ -31,25 +31,20 @@
                             <div class="p-3 text-muted small">Загрузка…</div>
                         </div>
                     </li>
-                    <li class="nav-item dropdown" hx-ignore="true">
-                        <button class="nav-link dropdown-toggle btn btn-link"
+                    <div class="d-flex align-items-center gap-2">
+                        <button class="nav-link btn btn-link"
                                 id="userMenu" type="button" data-bs-toggle="dropdown"
                                 aria-expanded="false">
                             {{ request.user.username|default:'Профиль' }}
                         </button>
-                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userMenu">
-                            <li><a class="dropdown-item" href="{% url 'index' %}">Профиль</a></li>
-                            <li>
-                                <hr class="dropdown-divider">
-                            </li>
-                            <li>
-                                <form action="{% url 'logout' %}" method="post" class="dropdown-item p-0 m-0">
-                                    {% csrf_token %}
-                                    <button type="submit" class="btn w-100 text-start">Выход</button>
-                                </form>
-                            </li>
-                        </ul>
-                    </li>
+
+                        <form action="{% url 'logout' %}" method="post" class="m-0 p-0">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-sm btn-outline-danger">
+                                <i class="bi bi-box-arrow-right"></i> Выход
+                            </button>
+                        </form>
+                    </div>
                 </ul>
             </div>
         {% endif %}
