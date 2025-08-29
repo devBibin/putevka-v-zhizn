@@ -1,0 +1,53 @@
+<nav class="navbar navbar-expand-lg bg-white border-bottom sticky-top">
+    <div class="container-fluid">
+        <a class="navbar-brand fw-bold" href="{% url 'index' %}">Путёвка в жизнь</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#topnav">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        {% if user.is_authenticated %}
+            <div class="collapse navbar-collapse" id="topnav">
+                <ul class="navbar-nav ms-auto align-items-center gap-4">
+                    <li class="nav-item dropdown me-3 gap-4" hx-ignore="false">
+                        <a class="nav-link position-relative dropdown-toggle d-flex align-items-center gap-2"
+                           id="notifDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-bell"></i>
+
+                            {% if unread_notifications_count %}
+                                <span id="notif-badge"
+                                      class="badge rounded-pill bg-danger">
+                                  {{ unread_notifications_count }}
+                                </span>
+                            {% endif %}
+
+                            <span>Уведомления</span>
+                        </a>
+
+                        <div class="dropdown-menu dropdown-menu-end p-0"
+                             aria-labelledby="notifDropdown"
+                             style="width:360px; max-height:420px; overflow:auto;"
+                             hx-get="{% url 'notifications_dropdown' %}"
+                             hx-trigger="revealed, every 15s"
+                             hx-swap="innerHTML">
+                            <div class="p-3 text-muted small">Загрузка…</div>
+                        </div>
+                    </li>
+                    <div class="d-flex align-items-center gap-2">
+                        <button class="nav-link btn btn-link"
+                                id="userMenu" type="button" data-bs-toggle="dropdown"
+                                aria-expanded="false">
+                            {{ request.user.username|default:'Профиль' }}
+                        </button>
+
+                        <form action="{% url 'logout' %}" method="post" class="m-0 p-0">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-sm btn-outline-danger">
+                                <i class="bi bi-box-arrow-right"></i> Выход
+                            </button>
+                        </form>
+                    </div>
+                </ul>
+            </div>
+        {% endif %}
+    </div>
+</nav>
+

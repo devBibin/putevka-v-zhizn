@@ -1,0 +1,32 @@
+{% if items %}
+  <div class="list-group list-group-flush">
+    {% for un in items %}
+      {% with n=un.notification %}
+      <div class="list-group-item d-flex gap-2 align-items-start bg-light">
+        <div class="pt-1">
+          <i class="bi bi-info-circle-fill text-primary"></i>
+        </div>
+
+        <div class="flex-grow-1">
+          <div class="fw-semibold text-break">{{ n.message|truncatechars:120 }}</div>
+          {% if n.sender %}
+            <div class="small text-muted">От: {{ n.sender.username }}</div>
+          {% endif %}
+          <div class="small text-secondary">{{ n.created_at|date:"d.m.Y H:i" }}</div>
+        </div>
+
+        <button class="btn btn-sm btn-outline-success"
+                hx-post="{% url 'mark_as_seen' un.pk %}"
+                hx-swap="outerHTML"
+                hx-target="closest .list-group-item"
+                hx-headers='{"X-CSRFToken":"{{ csrf_token }}"}'>
+          Прочитать
+        </button>
+      </div>
+      {% endwith %}
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="p-3 text-center text-muted small">Непрочитанных нет</div>
+{% endif %}
+<div class="d-flex justify-content-end p-2 border-top bg-white"> <a class="btn btn-sm btn-link" href="{% url 'notifications' %}">Все</a> </div>

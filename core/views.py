@@ -41,16 +41,13 @@ from .models import UserNotification, Notification
 
 from .bot import webhook
 from .services.email_service import send_email_verification_code
-from .services.zvonok_service import initiate_zvonok_verification, _poll_zvonok_status
+from .services.zvonok_service import initiate_zvonok_verification, poll_zvonok_status
 from django.db import transaction
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
-_bot_messenger = None
-
-logger = logging.getLogger(__name__)
-
+@login_required()
 @ensure_registration_gate('protected')
 def index(request):
     return render(request, 'core/index.html')
@@ -67,6 +64,7 @@ def register_initial(request):
             if User.objects.filter(email=email, is_active=True).exists():
                 form.add_error('email', 'Пользователь с таким email уже зарегистрирован.')
             else:
+                logger.info("Начата регистрация для нового пользователя.")
                 user = User.objects.create_user(
                     username=email,
                     email=email,
@@ -146,10 +144,15 @@ def resend_email_code(request):
 
     return redirect(reverse('verify_email'))
 
-@login_required
 def verify_email_confirm(request, token):
-    user = request.user
-    attempt = user.registrationpersonaldata
+    attempt = (
+        RegistrationPersonalData.objects
+        .filter(email_verification_code=token)
+        .first()
+    )
+
+    if not attempt:
+        return redirect(reverse('login'))
 
     if attempt.email_verified:
         return redirect(reverse('connect_telegram'))
@@ -166,7 +169,9 @@ def verify_email_confirm(request, token):
         attempt.email_verification_code = None
         attempt.save(update_fields=['email_verified', 'current_step', 'email_verification_code'])
 
+    login(request, attempt.user)
     messages.success(request, 'Email подтвержден.')
+    logger.info('Email подтвержден.')
     return redirect(reverse('connect_telegram'))
 
 @ensure_registration_gate('registration_step')
@@ -218,7 +223,6 @@ def verify_phone_if_needed(request):
     if request.method == 'POST':
         form = PhoneNumberForm(request.POST)
         if form.is_valid():
-            print("CLEANED:", form.cleaned_data)
             phone = form.cleaned_data['phone']
             pincode = f"{random.randint(1000, 9999)}"
 
@@ -230,9 +234,7 @@ def verify_phone_if_needed(request):
                 err_msg = api_resp.get('message')
             else:
                 ok = bool(api_resp)
-
             if ok:
-                print(phone)
                 attempt.phone = phone
                 attempt.user.user_info.phone = phone
                 attempt.current_step = 'wait_for_call'
@@ -245,6 +247,7 @@ def verify_phone_if_needed(request):
 
                 return redirect(reverse('wait_for_phone_call'))
 
+            logger.error(err_msg)
             form.add_error(None, err_msg or 'Не удалось инициировать проверку звонком. Попробуйте ещё раз.')
     else:
         form = PhoneNumberForm()
@@ -265,7 +268,7 @@ def check_phone_call_status(request):
     if not attempt or not attempt.phone:
         return JsonResponse({'status': 'error', 'message': 'Незавершенная регистрация не найдена.'}, status=400)
 
-    api_resp = _poll_zvonok_status(attempt.phone)
+    api_resp = poll_zvonok_status(attempt.phone)
     if api_resp is None or api_resp is False:
         return JsonResponse({'status': 'error', 'message': 'Ошибка API zvonok.com.'}, status=502)
 
@@ -292,7 +295,7 @@ def check_phone_call_status(request):
                 tg.telegram_verified = True
                 tg.activation_token = None
                 tg.save(update_fields=['telegram_verified', 'activation_token'])
-
+        logger.info('Номер телефона подтверждён.')
         return JsonResponse({'status': 'success', 'message': 'Номер телефона успешно подтвержден!'})
 
     return JsonResponse({
@@ -328,6 +331,7 @@ def finish_registration(request):
 
     return render(request, 'registration/registration_complete.html', {'user': user})
 
+@ensure_registration_gate('protected')
 @login_required
 def motivation_letter(request):
     user = request.user
@@ -386,9 +390,12 @@ def motivation_letter(request):
         'is_new_letter': is_new_letter,
         'user': user,
         'letter': letter,
+        'active': 'motivation_letter',
     })
 
 
+@ensure_registration_gate('protected')
+@login_required
 def notification_list(request):
     user_notifications = UserNotification.objects.filter(recipient=request.user).order_by('is_seen',
                                                                                           '-notification__created_at')
@@ -429,10 +436,10 @@ def send_notification_to_users(request):
                 new_notification = Notification.objects.create(message=message_text)
 
                 user_notification_objects = [
-                    UserNotification(notification=new_notification, recipient=user)
+                    UserNotification.objects.create(notification=new_notification, recipient=user)
                     for user in selected_users
                 ]
-                UserNotification.objects.bulk_create(user_notification_objects)
+                # UserNotification.objects.bulk_create(user_notification_objects)
 
             logger.info(f'Массовое оповещение {new_notification.pk} зарегистрировано')
             messages.success(request, f"Оповещение '{message_text[:30]}...' успешно отправлено {len(selected_user_ids)} пользователям.")
@@ -449,3 +456,16 @@ def send_notification_to_users(request):
         'app_label': 'auth',
     }
     return render(request, 'admin/toManyNotifications.html', context)
+
+
+@login_required
+def notifications_dropdown(request):
+    items = (
+        UserNotification.objects
+        .select_related('notification')
+        .filter(recipient=request.user, is_seen=False)
+        .order_by('-notification__created_at')[:20]
+    )
+    return render(request, 'notifications/_dropdown_items.html', {'items': items})
+
+

@@ -9,7 +9,7 @@ urlpatterns = [
 
     path('register/', views.register_initial, name='register_initial'),
     path('register/verify-email/', views.verify_email, name='verify_email'),
-    path('register/verify-email/confirm/<str:token>/', views.verify_email_confirm, name='verify_email_confirm'),
+    path('register/verify-email/confirm/<uuid:token>/', views.verify_email_confirm, name='verify_email_confirm'),
     path('register/resend-email-code/', views.resend_email_code, name='resend_email_code'),
     path('register/connect-telegram/', views.connect_telegram, name='connect_telegram'),
     path('register/skip-telegram/', views.skip_telegram, name='skip_telegram'),
@@ -23,33 +23,35 @@ urlpatterns = [
     path('change_phone_number/', views.change_phone_number, name='change_phone_number'),
     path('return_telegram_connection/', views.return_to_telegram_connection, name='return_telegram_connection'),
 
-    path('login/', auth_views.LoginView.as_view(
+    path('accounts/login/', auth_views.LoginView.as_view(
         template_name='registration/login.html'
     ), name='login'),
 
-    path('logout/', auth_views.LogoutView.as_view(
+    path('accounts/logout/', auth_views.LogoutView.as_view(
         template_name='registration/logout.html'
     ), name='logout'),
 
-    path('password_reset/', auth_views.PasswordResetView.as_view(
+    path('accounts/password_reset/', auth_views.PasswordResetView.as_view(
         template_name='registration/password_reset.html',
         email_template_name='registration/password_reset_email.html',
         subject_template_name='registration/password_reset_subject.txt',
     ), name='password_reset'),
 
-    path('password_reset/done/', auth_views.PasswordResetDoneView.as_view(
+    path('accounts/password_reset/done/', auth_views.PasswordResetDoneView.as_view(
         template_name='registration/password_reset_done.html'
     ), name='password_reset_done'),
 
-    path('reset/<uidb64>/<token>/', auth_views.PasswordResetConfirmView.as_view(
+    path('accounts/reset/<uidb64>/<token>/', auth_views.PasswordResetConfirmView.as_view(
         template_name='registration/password_reset_confirm.html'
     ), name='password_reset_confirm'),
 
-    path('reset/done/', auth_views.PasswordResetCompleteView.as_view(
+    path('accounts/reset/done/', auth_views.PasswordResetCompleteView.as_view(
         template_name='registration/password_reset_complete.html'
     ), name='password_reset_complete'),
 
     path('motivation/', views.motivation_letter, name='motivation_letter'),
+
+    path('notifications/dropdown/', views.notifications_dropdown, name='notifications_dropdown'),
     path('notifications/', views.notification_list, name='notifications'),
     path('mark-as-seen/<int:user_notification_id>', views.mark_notification_as_seen, name='mark_as_seen'),
 ]

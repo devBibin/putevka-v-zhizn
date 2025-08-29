@@ -4,8 +4,8 @@
 {% block title %}Вход{% endblock %}
 
 {% block content %}
-    <div class="container d-flex align-items-center justify-content-center" style="min-height: 80vh;">
-        <div class="card shadow-sm p-4" style="max-width: 400px; width: 100%;">
+    <div class="col-12 container d-flex align-items-center justify-content-center" style="min-height: 80vh;">
+        <div class="card shadow-sm p-5" style="max-width: 400px; width: 100%;">
             <h2 class="text-center mb-4">Войти</h2>
 
             {% if form.non_field_errors %}
@@ -49,6 +49,11 @@
             <div class="text-center mt-3">
                 <a href="{% url 'password_reset' %}">Забыли пароль?</a>
             </div>
+
+            <div class="text-center mt-3">
+                <a href="{% url 'register_initial' %}">Нет аккаунта?</a>
+            </div>
+
         </div>
     </div>
 {% endblock %}

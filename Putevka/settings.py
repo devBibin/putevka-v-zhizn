@@ -68,6 +68,7 @@ TEMPLATES = [
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         'DIRS': [
             BASE_DIR / 'templates',
+            BASE_DIR / 'core' / 'templates',
             BASE_DIR / 'scholar_form' / 'templates',
             BASE_DIR / 'documents' / 'templates'
         ],
@@ -136,7 +137,9 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
+STATICFILES_DIRS = [BASE_DIR / 'static']   # папка выше
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
@@ -249,8 +252,13 @@ LOGGING = {
             'level': 'DEBUG', # В разработке может быть DEBUG, на продакшене INFO
             'propagate': False,
         },
+        'scholar_form': {
+            'handlers': ['console', 'file_info', 'file_error', 'telegram_errors'],
+            'level': 'DEBUG', # В разработке может быть DEBUG, на продакшене INFO
+            'propagate': False,
+        },
         '': {
-            'handlers': ['console'],
+            'handlers': ['console', 'file_info', 'file_error'],
             'level': 'INFO',
             'propagate': True,
         }
