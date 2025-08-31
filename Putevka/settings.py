@@ -16,6 +16,7 @@ import os
 from dotenv import load_dotenv
 
 import config
+import dj_database_url, os
 
 load_dotenv()
 
@@ -91,14 +92,11 @@ WSGI_APPLICATION = 'Putevka.wsgi.application'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv("POSTGRES_DB"),
-        'USER': os.getenv("POSTGRES_USER"),
-        'PASSWORD': os.getenv("POSTGRES_PASSWORD"),
-        'HOST': 'db',
-        'PORT': 5432,
-    }
+    "default": dj_database_url.config(
+        default=os.getenv("DATABASE_URL"),
+        conn_max_age=60,
+        ssl_require=True
+    )
 }
 
 
