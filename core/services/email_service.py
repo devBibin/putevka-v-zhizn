@@ -8,10 +8,14 @@ from Putevka import settings
 
 logger = logging.getLogger(__name__)
 
-
-def send_email_verification_code(attempt):
+def get_email_verification_link(attempt):
     confirm_path = reverse('verify_email_confirm', kwargs={'token': attempt.email_verification_code})
     confirm_url = f"{config.BASE_URL}{confirm_path}"
+
+    return confirm_url
+
+def send_email_verification_code(attempt):
+    confirm_url = get_email_verification_link(attempt)
 
     subject = 'Ваш код подтверждения регистрации'
     message = f'Привет!\n\nВаша ссылка для подтверждения регистрации: {confirm_url}\n\n' \

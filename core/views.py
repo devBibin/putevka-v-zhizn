@@ -40,7 +40,7 @@ from .forms import SendNotificationForm
 from .models import UserNotification, Notification
 
 from .bot import webhook
-from .services.email_service import send_email_verification_code
+from .services.email_service import send_email_verification_code, get_email_verification_link
 from .services.zvonok_service import initiate_zvonok_verification, poll_zvonok_status
 from django.db import transaction
 from django.utils import timezone
@@ -118,6 +118,7 @@ def verify_email(request):
 
     return render(request, 'registration/verify_email.html', {
         'email': attempt.email,
+        'verification_link': get_email_verification_link(attempt),
         'can_resend_now': can_resend_now,
         'can_resend_at': can_resend_at,
         'cooldown_seconds': COOLDOWN_SECONDS,
