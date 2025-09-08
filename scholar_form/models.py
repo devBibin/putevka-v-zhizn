@@ -2,6 +2,8 @@ from django.contrib.auth.models import User
 from django.db import models
 
 class UserInfo(models.Model):
+    avatar = models.ImageField(upload_to="avatars/", null=True, blank=True, verbose_name="Аватар")
+
     is_done = models.BooleanField(default=False, verbose_name='Анкета уже отправлена')
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, null=True, related_name='user_info')

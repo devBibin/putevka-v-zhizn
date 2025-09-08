@@ -1,0 +1,21 @@
+{% extends "core/base.html" %}
+{% block content %}
+<div class="container py-5">
+    <h2 class="mb-4">Личная информация</h2>
+
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="mb-3">
+            {% if form.instance.avatar %}
+                <img src="{{ form.instance.avatar.url }}"
+                     alt="Аватар"
+                     class="rounded-circle mb-3"
+                     style="width: 120px; height: 120px; object-fit: cover;">
+            {% endif %}
+        </div>
+        {{ form.as_p }}
+        {{ user.user_info.full_name }}
+        <button type="submit" class="btn btn-primary">Сохранить</button>
+    </form>
+</div>
+{% endblock %}

@@ -249,3 +249,10 @@ class UserInfoForm(forms.ModelForm):
             'preparation_plan': forms.Textarea(attrs={'rows': 4, 'cols': 80}),
             'foundation_help': forms.Textarea(attrs={'rows': 3, 'cols': 80}),
         }
+
+
+class UserProfileForm(forms.ModelForm):
+    avatar = forms.ImageField(required=False, widget=forms.FileInput(attrs={"accept": "image/*"}))
+    class Meta:
+        model = UserInfo
+        fields = ["avatar"]
