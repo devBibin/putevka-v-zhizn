@@ -1,21 +1,140 @@
 {% extends "core/base.html" %}
+{% load widget_tweaks %}
 {% block content %}
 <div class="container py-5">
-    <h2 class="mb-4">Личная информация</h2>
+  <!-- Заголовок + хлебные крошки -->
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h2 class="mb-1">Личная информация</h2>
+      <div class="text-muted small">Управление профилем и контактными данными</div>
+    </div>
+  </div>
 
-    <form method="post" enctype="multipart/form-data">
-        {% csrf_token %}
-        <div class="mb-3">
-            {% if form.instance.avatar %}
-                <img src="{{ form.instance.avatar.url }}"
-                     alt="Аватар"
-                     class="rounded-circle mb-3"
-                     style="width: 120px; height: 120px; object-fit: cover;">
-            {% endif %}
+  <div class="row g-4">
+    <!-- Левая колонка: карточка профиля -->
+    <div class="col-lg-4">
+      <div class="card shadow-sm border-0">
+        <div class="card-body text-center p-4">
+          <div class="position-relative d-inline-block">
+            <img
+              id="avatarPreview"
+              src="{% if form.instance.avatar %}{{ form.instance.avatar.url }}{% else %}https://ui-avatars.com/api/?name={{ user.get_full_name|default:user.username|urlencode }}&size=256&background=0D6EFD&color=fff{% endif %}"
+              alt="Аватар"
+              class="rounded-circle border"
+              style="width: 140px; height: 140px; object-fit: cover;"
+            >
+            <!-- Кнопка-иконка поверх аватарки -->
+            <label for="id_avatar"
+                   class="btn btn-light btn-sm border position-absolute bottom-0 end-0 rounded-circle shadow-sm"
+                   title="Загрузить новый аватар"
+                   style="width: 40px; height: 40px;">
+              <i class="bi bi-camera"></i>
+            </label>
+          </div>
+
+          <h5 class="mt-3 mb-0">
+            {{ user.user_info.last_name|default:user.last_name }} {{ user.user_info.first_name|default:user.first_name }} {{ user.user_info.middle_name|default:"" }}
+          </h5>
+          <div class="text-muted small">{{ user.username }}</div>
+
+          <hr class="my-4">
+
+          <div class="d-flex flex-column gap-2 text-start small">
+            <div class="d-flex align-items-center gap-2">
+              <i class="bi bi-envelope text-primary"></i>
+              <span>{{ user.user_info.email|default:user.email }}</span>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+              <i class="bi bi-telephone text-primary"></i>
+              <span>{{ user.user_info.phone|default:"—" }}</span>
+            </div>
+          </div>
         </div>
-        {{ form.as_p }}
-        {{ user.user_info.full_name }}
-        <button type="submit" class="btn btn-primary">Сохранить</button>
-    </form>
+      </div>
+
+      <!-- Подсказка -->
+      <div class="alert alert-info mt-3 small mb-0">
+        <i class="bi bi-info-circle"></i>
+        Поддерживаются JPG/PNG до 5 МБ. Квадратные фото смотрятся лучше.
+      </div>
+    </div>
+
+    <!-- Правая колонка: форма -->
+    <div class="col-lg-8">
+      <form method="post" enctype="multipart/form-data" class="needs-validation" novalidate>
+        {% csrf_token %}
+
+        <!-- Ошибки формы -->
+        {% if form.non_field_errors %}
+          <div class="alert alert-danger">
+            {% for e in form.non_field_errors %}<div>{{ e }}</div>{% endfor %}
+          </div>
+        {% endif %}
+
+        <div class="card shadow-sm border-0 mb-4">
+          <div class="card-header bg-white py-3">
+            <strong>Основные данные</strong>
+          </div>
+          <div class="card-body">
+            <div class="row g-3">
+              {# Поле аватара рендерим скрыто, управляем через кнопку-метку на карточке #}
+              {% if form.avatar %}
+                <div class="col-12 d-none">
+                  {% render_field form.avatar class+="form-control" %}
+                </div>
+              {% endif %}
+
+              {# Остальные видимые поля — равномерно по сетке #}
+              {% for field in form.visible_fields %}
+                {% if field.name != "avatar" %}
+                  <div class="col-md-6">
+                    <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {% render_field field class+="form-control" %}
+                    {% if field.help_text %}
+                      <div class="form-text">{{ field.help_text }}</div>
+                    {% endif %}
+                    {% for error in field.errors %}
+                      <div class="invalid-feedback d-block">{{ error }}</div>
+                    {% endfor %}
+                  </div>
+                {% endif %}
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+
+        <div class="d-flex justify-content-end gap-2">
+          <a href="{% url 'index' %}" class="btn btn-light">Отмена</a>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-check2-circle"></i> Сохранить
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
 </div>
+
+<!-- Небольшие правки стилей -->
+<style>
+  .card { border-radius: 1rem; }
+  .btn, .form-control { border-radius: .75rem; }
+</style>
+
+<!-- Превью аватара + клик по ярлыку -->
+<script>
+  (function () {
+    const input = document.getElementById('id_avatar');
+    const preview = document.getElementById('avatarPreview');
+    if (input && preview) {
+      input.addEventListener('change', (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (!file.type.startsWith('image/')) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => { preview.src = ev.target.result; };
+        reader.readAsDataURL(file);
+      });
+    }
+  })();
+</script>
 {% endblock %}

@@ -133,6 +133,7 @@ def get_bot_instance(token):
                     if attempt:
                         attempt.phone = phone
                         attempt.user.user_info.phone = phone
+                        attempt.user.user_info.email = user.email
                         attempt.user.user_info.save()
                         attempt.phone_verified = True
                         attempt.current_step = 'finish'

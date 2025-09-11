@@ -44,7 +44,11 @@
                         <button class="nav-link btn btn-link"
                                 id="userMenu" type="button" data-bs-toggle="dropdown"
                                 aria-expanded="false">
-                            {{ request.user.username|default:'Профиль' }}
+                            {% if request.user.user_info.first_name and request.user.user_info.first_name %}
+                                {{ request.user.user_info.first_name }} {{ request.user.user_info.last_name }}
+                            {% else %}
+                                {{ request.user.username|default:'Профиль' }}
+                            {% endif %}
                         </button>
 
                         <form action="{% url 'logout' %}" method="post" class="m-0 p-0">

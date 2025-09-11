@@ -9,7 +9,9 @@ class UserInfo(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, null=True, related_name='user_info')
 
     # Step 1: Personal Info
-    full_name = models.CharField(max_length=255, verbose_name="ФИО", blank=True)
+    last_name = models.CharField(max_length=255, verbose_name="Фамилия", blank=True)
+    first_name = models.CharField(max_length=255, verbose_name="Имя", blank=True)
+    middle_name = models.CharField(max_length=255, verbose_name="Отчество", blank=True)
     birth_date = models.DateField(verbose_name="Дата рождения", null=True)
     phone = models.CharField(max_length=20, verbose_name="Телефон", blank=True)
     email = models.EmailField(verbose_name="Email", blank=True)
