@@ -19,4 +19,8 @@
        href="{% url 'documents_dashboard' %}">
         <i class="bi bi-folder2-open me-2"></i> Документы
     </a>
+    <a class="list-group-item list-group-item-action d-flex align-items-center {% if active == 'documents_dashboard' %} active{% endif %}"
+       href="{% url 'study:schools' %}">
+        <i class="bi bi-folder2-open me-2"></i> Моя учёба
+    </a>
 </div>

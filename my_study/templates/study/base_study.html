@@ -1,0 +1,14 @@
+{% extends "core/base.html" %}
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h2 class="mb-0">Моя учёба</h2>
+    <div class="btn-group">
+      <a class="btn btn-outline-primary {% if request.resolver_match.url_name == 'schools' %}active{% endif %}" href="{% url 'study:schools' %}">Онлайн-школы</a>
+      <a class="btn btn-outline-primary {% if request.resolver_match.url_name == 'universities' %}active{% endif %}" href="{% url 'study:universities' %}">Приоритетные ВУЗы</a>
+      <a class="btn btn-outline-primary {% if request.resolver_match.url_name == 'assessments' %}active{% endif %}" href="{% url 'study:assessments' %}">Результаты</a>
+    </div>
+  </div>
+  {% block study_content %}{% endblock %}
+</div>
+{% endblock %}
