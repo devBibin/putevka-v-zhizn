@@ -15,8 +15,6 @@ def get_variable(name: str):
         return None
 
 
-# CHAT_ID = get_variable('CHAT_ID')
-
 try:
     raw_dict = get_variable('TELEGRAM_STAFF_CHAT_IDS')
     TELEGRAM_STAFF_CHAT_IDS = json.loads(raw_dict)
@@ -37,3 +35,5 @@ ZVONOK_API_INITIATE_URL = get_variable('ZVONOK_API_INITIATE_URL')
 ZVONOK_API_POLLING_URL = get_variable('ZVONOK_API_POLLING_URL')
 
 BASE_URL = get_variable('BASE_URL')
+
+MAX_VIDEO_MB = 2000

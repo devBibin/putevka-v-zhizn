@@ -33,7 +33,6 @@ for i in range(60):
 print("DB did not become ready in time"); sys.exit(3)
 PY
 
-
 # Create migrations
 python manage.py makemigrations
 

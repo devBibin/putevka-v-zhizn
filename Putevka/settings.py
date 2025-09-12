@@ -10,9 +10,9 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import os
 from pathlib import Path
 
-import os
 from dotenv import load_dotenv
 
 import config
@@ -22,7 +22,6 @@ load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
@@ -39,7 +38,6 @@ CSRF_TRUSTED_ORIGINS = [
     "https://putevka-v-zhizn.onrender.com",
 ]
 
-
 # Application definition
 
 INSTALLED_APPS = [
@@ -52,7 +50,8 @@ INSTALLED_APPS = [
     'scholar_form',
     'core',
     'documents',
-    'widget_tweaks'
+    'widget_tweaks',
+    'my_study'
 ]
 
 MIDDLEWARE = [
@@ -75,7 +74,8 @@ TEMPLATES = [
             BASE_DIR / 'templates',
             BASE_DIR / 'core' / 'templates',
             BASE_DIR / 'scholar_form' / 'templates',
-            BASE_DIR / 'documents' / 'templates'
+            BASE_DIR / 'documents' / 'templates',
+            BASE_DIR / 'my_study' / 'templates'
         ],
         'APP_DIRS': True,
         'OPTIONS': {
@@ -91,7 +91,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'Putevka.wsgi.application'
 
-
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
@@ -102,8 +101,6 @@ DATABASES = {
         ssl_require=True
     )
 }
-
-
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
@@ -123,7 +120,6 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
@@ -135,12 +131,11 @@ USE_I18N = True
 
 USE_TZ = True
 
-
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = '/static/'
-STATICFILES_DIRS = [BASE_DIR / 'static']   # папка выше
+STATICFILES_DIRS = [BASE_DIR / 'static']  # папка выше
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # Default primary key field type
@@ -209,7 +204,7 @@ LOGGING = {
             'level': 'INFO',
             'class': 'logging.handlers.RotatingFileHandler',
             'filename': os.path.join(BASE_DIR, 'logs', 'output_to_file_level_info.log'),
-            'maxBytes': 1024*1024*5,
+            'maxBytes': 1024 * 1024 * 5,
             'backupCount': 5,
             'formatter': 'standard',
             'filters': ['user_info_filter'],
@@ -218,7 +213,7 @@ LOGGING = {
             'level': 'ERROR',
             'class': 'logging.handlers.RotatingFileHandler',
             'filename': os.path.join(BASE_DIR, 'logs', 'output_to_file_level_error.log'),
-            'maxBytes': 1024*1024*10,
+            'maxBytes': 1024 * 1024 * 10,
             'backupCount': 10,
             'formatter': 'standard',
             'filters': ['user_info_filter'],
@@ -230,12 +225,15 @@ LOGGING = {
             'chat_id': config.TELEGRAM_LOG_CHAT_ID,
             'formatter': 'standard',
             'filters': ['user_info_filter'],
+        } if config.TG_TOKEN_ADMIN and config.TELEGRAM_STAFF_CHAT_IDS else {
+            "class": "logging.NullHandler",
+            "level": "ERROR",
         },
     },
 
     'loggers': {
         'django': {
-            'handlers': ['console', 'file_info',],
+            'handlers': ['console', 'file_info', ],
             'level': 'INFO',
             'propagate': False,
         },
@@ -246,17 +244,17 @@ LOGGING = {
         },
         'core': {
             'handlers': ['console', 'file_info', 'file_error', 'telegram_errors'],
-            'level': 'DEBUG', # В разработке может быть DEBUG, на продакшене INFO
+            'level': 'DEBUG',  # В разработке может быть DEBUG, на продакшене INFO
             'propagate': False,
         },
         'documents': {
             'handlers': ['console', 'file_info', 'file_error', 'telegram_errors'],
-            'level': 'DEBUG', # В разработке может быть DEBUG, на продакшене INFO
+            'level': 'DEBUG',  # В разработке может быть DEBUG, на продакшене INFO
             'propagate': False,
         },
         'scholar_form': {
             'handlers': ['console', 'file_info', 'file_error', 'telegram_errors'],
-            'level': 'DEBUG', # В разработке может быть DEBUG, на продакшене INFO
+            'level': 'DEBUG',  # В разработке может быть DEBUG, на продакшене INFO
             'propagate': False,
         },
         '': {
@@ -270,3 +268,7 @@ LOGGING = {
 LOG_DIR = os.path.join(BASE_DIR, 'logs')
 if not os.path.exists(LOG_DIR):
     os.makedirs(LOG_DIR)
+
+ALLOWED_VIDEO_MIME = {
+    "video/mp4", "video/quicktime", "video/x-matroska", "video/webm", "application/octet-stream"
+}

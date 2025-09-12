@@ -11,3 +11,5 @@ openai
 python-magic
 dj_database_url
 psycopg
+Pillow
+requests

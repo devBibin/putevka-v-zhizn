@@ -13,7 +13,11 @@ import os
 import config
 
 TG_TOKEN_ADMIN = config.TG_TOKEN_ADMIN
-bot_admin = TeleBot(TG_TOKEN_ADMIN)
+
+try:
+    bot_admin = TeleBot(TG_TOKEN_ADMIN)
+except:
+    bot_admin = None
 
 TG_TOKEN_USERS = config.TG_TOKEN_USERS
 TELEGRAM_CHAT_IDS = config.TELEGRAM_STAFF_CHAT_IDS

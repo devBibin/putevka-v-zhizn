@@ -11,7 +11,11 @@ from core.models import MotivationLetter
 
 TELEGRAM_STAFF_CHAT_IDS = config.TELEGRAM_STAFF_CHAT_IDS
 TG_TOKEN = config.TG_TOKEN_ADMIN
-bot = TeleBot(TG_TOKEN)
+
+try:
+    bot = TeleBot(TG_TOKEN)
+except:
+    bot = None
 
 import config as app_config
 

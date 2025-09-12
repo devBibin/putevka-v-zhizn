@@ -8,7 +8,10 @@ from core.bot import send_tg_notification_to_user
 from core.signals import TELEGRAM_CHAT_IDS
 from scholar_form.forms import wizard_done
 
-bot_admin = TeleBot(config.TG_TOKEN_ADMIN)
+try:
+    bot_admin = TeleBot(config.TG_TOKEN_ADMIN)
+except:
+    bot_admin = None
 
 logger = logging.getLogger(__name__)
 

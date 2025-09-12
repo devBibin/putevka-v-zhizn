@@ -24,10 +24,12 @@ class PersonalForm(forms.ModelForm):
     class Meta:
         model = UserInfo
         fields = [
-            'full_name', 'birth_date', 'region', 'address'
+            'last_name', 'first_name', 'middle_name', 'birth_date', 'region', 'address'
         ]
         widgets = {
-            'full_name': forms.TextInput(attrs={'placeholder': 'Иванов Иван Иванович'}),
+            'last_name': forms.TextInput(attrs={'placeholder': 'Иванов'}),
+            'first_name': forms.TextInput(attrs={'placeholder': 'Иван'}),
+            'middle_name': forms.TextInput(attrs={'placeholder': 'Иванович'}),
             'region': forms.TextInput(attrs={'placeholder': 'Московская область'}),
             'address': forms.TextInput(attrs={'placeholder': 'ул. Ленина, д. 1, кв. 2'}),
         }
@@ -249,3 +251,10 @@ class UserInfoForm(forms.ModelForm):
             'preparation_plan': forms.Textarea(attrs={'rows': 4, 'cols': 80}),
             'foundation_help': forms.Textarea(attrs={'rows': 3, 'cols': 80}),
         }
+
+
+class UserProfileForm(forms.ModelForm):
+    avatar = forms.ImageField(required=False, widget=forms.FileInput(attrs={"accept": "image/*"}))
+    class Meta:
+        model = UserInfo
+        fields = ["avatar"]
