@@ -1,14 +1,18 @@
 import json
 import logging
+from pathlib import Path
 
 import telebot
+import requests
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from telebot import TeleBot
 
 import config
 from core.models import TelegramAccount, RegistrationPersonalData
-from scholar_form.models import UserInfo
+from scholar_form.models import UserInfo, VideoSubmission
 
 logger = logging.getLogger('django.request')
 
@@ -159,6 +163,83 @@ def get_bot_instance(token):
             else:
                 send_message_to_user(message.chat.id, "Вы не поделились номером телефона.", token)
 
+        @bot_instances[token].message_handler(content_types=['video', 'document'])
+        def handle_video(message):
+            tg_id = str(message.from_user.id)
+
+            tg_acc = TelegramAccount.objects.get(telegram_id=tg_id)
+            try:
+                user = tg_acc.user
+            except TelegramAccount.DoesNotExist:
+                user = None
+            if not user:
+                bot_instances[token].reply_to(message, "Сначала свяжите ваш Telegram на сайте (в профиле есть кнопка привязки).")
+                return
+
+            file_id = None
+            original_name = ""
+            mime_type = ""
+            duration = 0
+            size_bytes = 0
+
+            if message.video:
+                file_id = message.video.file_id
+                duration = message.video.duration or 0
+                mime_type = getattr(message.video, "mime_type", "") or ""
+                size_bytes = getattr(message.video, "file_size", 0) or 0
+                original_name = "video.mp4"
+            elif message.document:
+                file_id = message.document.file_id
+                mime_type = getattr(message.document, "mime_type", "") or ""
+                size_bytes = getattr(message.document, "file_size", 0) or 0
+                original_name = message.document.file_name or "video.bin"
+            else:
+                bot_instances[token].reply_to(message, "Отправьте, пожалуйста, видео или документ с видео.")
+                return
+
+            bot_instances[token].reply_to(message, "Подождите, видео загружается...")
+
+            if config.MAX_VIDEO_MB and size_bytes and size_bytes > config.MAX_VIDEO_MB * 1024 * 1024:
+                bot_instances[token].reply_to(message, f"Файл слишком большой. Разрешено до {config.MAX_VIDEO_MB} МБ.")
+                return
+
+            try:
+                f = bot_instances[token].get_file(file_id)
+            except Exception as e:
+                bot_instances[token].reply_to(message, "Не удалось получить файл из Telegram. Попробуйте ещё раз.")
+                return
+
+            try:
+                data = _download_from_tg(f.file_path)
+            except Exception:
+                bot_instances[token].reply_to(message, "Ошибка скачивания файла. Попробуйте ещё раз.")
+                return
+
+            ext = Path(original_name).suffix.lower() or ".mp4"
+            if ext not in [".mp4", ".mov", ".mkv", ".webm"]:
+                ext = ".mp4"
+
+            vs = VideoSubmission.objects.create(
+                user=user,
+                tg_user_id=tg_id,
+                tg_file_id=file_id,
+                tg_file_path=f.file_path,
+                original_filename=original_name,
+                mime_type=mime_type,
+                size_bytes=len(data) or size_bytes,
+                duration_sec=duration,
+                status=VideoSubmission.Status.RECEIVED,
+            )
+
+            rel_path = f"videos/{user.id}/{vs.id}{ext}"
+            saved_path = default_storage.save(rel_path, ContentFile(data))
+
+            vs.file.name = saved_path
+            vs.status = VideoSubmission.Status.SAVED
+            vs.save(update_fields=["file", "status"])
+
+            bot_instances[token].reply_to(message, "Видео получено! ✅ Зайдите на сайт — оно уже прикреплено к анкете.")
+
         @bot_instances[token].message_handler(func=lambda message: True)
         def echo_all(message):
             try:
@@ -210,3 +291,9 @@ def send_tg_notification_to_user(message, user):
         bot_user.send_message(user.telegram_account.telegram_id, message)
     except Exception as e:
         logger.info(f"Не получилось отправить сообщение в telegram: {e}")
+
+def _download_from_tg(file_path: str) -> bytes:
+    url = f"https://api.telegram.org/file/bot{config.TG_TOKEN_USERS}/{file_path}"
+    r = requests.get(url, stream=True, timeout=120)
+    r.raise_for_status()
+    return r.content

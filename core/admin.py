@@ -10,13 +10,21 @@ from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 
 from core.models import TelegramAccount, RegistrationPersonalData
 from scholar_form.forms import UserInfoForm
-from scholar_form.models import UserInfo
+from scholar_form.models import UserInfo, VideoSubmission
 from django.db import models
 from django import forms
 
 from core.models import Notification, UserNotification
 from core.models import MotivationLetter
 from documents.admin import DocumentInline
+
+
+class VideoSubmissionInline(admin.TabularInline):
+    model = VideoSubmission
+    extra = 0
+    readonly_fields = ("created_at", "status", "file", "mime_type", "size_bytes", "duration_sec")
+    fields = ("file", "status", "mime_type", "size_bytes", "duration_sec", "created_at", "review")
+    show_change_link = True
 
 
 class UserInfoInline(admin.StackedInline):
@@ -181,7 +189,7 @@ class UserNotificationAdmin(admin.ModelAdmin):
 
 
 class CustomUserAdmin(BaseUserAdmin):
-    inlines = (UserInfoInline, TelegramAccountInline, DocumentInline, MotivationLetterInline)
+    inlines = (UserInfoInline, TelegramAccountInline, DocumentInline, MotivationLetterInline, VideoSubmissionInline,)
 
     list_display = ('username', 'email', 'first_name', 'last_name', 'is_staff')
     search_fields = ('username', 'first_name', 'last_name', 'email')

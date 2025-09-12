@@ -228,6 +228,9 @@ LOGGING = {
             'chat_id': config.TELEGRAM_LOG_CHAT_ID,
             'formatter': 'standard',
             'filters': ['user_info_filter'],
+        } if config.TG_TOKEN_ADMIN and config.TELEGRAM_STAFF_CHAT_IDS else {
+            "class": "logging.NullHandler",
+            "level": "ERROR",
         },
     },
 
@@ -268,3 +271,8 @@ LOGGING = {
 LOG_DIR = os.path.join(BASE_DIR, 'logs')
 if not os.path.exists(LOG_DIR):
     os.makedirs(LOG_DIR)
+
+
+ALLOWED_VIDEO_MIME = {
+    "video/mp4", "video/quicktime", "video/x-matroska", "video/webm", "application/octet-stream"
+}

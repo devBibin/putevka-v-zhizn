@@ -1,0 +1,49 @@
+{% extends "core/base.html" %}
+{% block content %}
+<div class="container py-5">
+  <div class="row g-4">
+    <div class="col-lg-7">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h3 class="card-title mb-3">Видео-презентация</h3>
+          <ol class="mb-4">
+            <li>Запишите ролик до 2 минут (кто вы, зачем подаётесь, что вас заряжает).</li>
+            <li>Откройте бота в Телеграм и отправьте видео как <strong>файл</strong> (Document), чтобы не было сжатия.</li>
+            <li>Дождитесь ответа «Видео получено!»</li>
+          </ol>
+          <a class="btn btn-primary" href="{{ bot_link }}" target="_blank">Открыть бота в Telegram</a>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-5">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h5 class="card-title">Статус загрузки</h5>
+          {% if last_submission %}
+            <div class="mb-2">
+              <span class="badge bg-{% if last_submission.status == 'saved' %}success{% elif last_submission.status == 'rejected' %}danger{% else %}secondary{% endif %}">
+                {{ last_submission.get_status_display }}
+              </span>
+              <div class="text-muted small">Отправлено: {{ last_submission.created_at|date:"d.m.Y H:i" }}</div>
+            </div>
+            {% if last_submission.file %}
+              <video controls style="width:100%; border-radius: 0.75rem;">
+                <source src="{{ last_submission.file.url }}" type="{{ last_submission.mime_type|default:'video/mp4' }}">
+                Ваш браузер не поддерживает видео.
+              </video>
+              <div class="mt-2 small text-muted">
+                {{ last_submission.original_filename }} • ~{{ last_submission.size_bytes|filesizeformat }}
+              </div>
+            {% else %}
+              <p class="text-muted mb-0">Файл ещё обрабатывается…</p>
+            {% endif %}
+          {% else %}
+            <p class="text-muted">Пока загруженных видео нет.</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

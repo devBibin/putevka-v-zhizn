@@ -26,7 +26,7 @@ bot = telebot.TeleBot(token)
 
 bot.remove_webhook()
 
-@bot.message_handler(func=lambda message: True, content_types=['text', 'contact'])
+@bot.message_handler(func=lambda message: True, content_types=['text', 'contact', 'video', 'document'])
 def handle_message(message):
     try:
         update_object = {
