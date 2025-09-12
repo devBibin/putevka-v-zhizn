@@ -1,0 +1,10 @@
+[
+  {"model":"my_study.subject","pk":1,"fields":{"name":"Математика","slug":"matematika","is_top":true}},
+  {"model":"my_study.subject","pk":2,"fields":{"name":"Физика","slug":"fizika","is_top":true}},
+  {"model":"my_study.subject","pk":3,"fields":{"name":"Информатика","slug":"informatika","is_top":true}},
+  {"model":"my_study.subject","pk":4,"fields":{"name":"Русский язык","slug":"russkiy-yazyk","is_top":true}},
+  {"model":"my_study.subject","pk":5,"fields":{"name":"Химия","slug":"khimiya","is_top":false}},
+  {"model":"my_study.subject","pk":6,"fields":{"name":"Биология","slug":"biologiya","is_top":false}},
+  {"model":"my_study.subject","pk":7,"fields":{"name":"История","slug":"istoriya","is_top":false}},
+  {"model":"my_study.subject","pk":8,"fields":{"name":"Английский язык","slug":"angliyskiy","is_top":false}}
+]
