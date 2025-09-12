@@ -134,21 +134,57 @@ logger = logging.getLogger(__name__)
 
 @admin.register(MotivationLetter)
 class MotivationLetterAdmin(admin.ModelAdmin):
-    list_display = ('is_done', 'id', 'user', 'created_at', 'admin_rating', 'gpt_review')
-    list_filter = ('created_at',)
-    search_fields = ('letter_text', 'user__username')
+    list_display = (
+        "id",
+        "user",
+        "status",
+        "is_done",
+        "gpt_score",
+        "submitted_at",
+        "updated_at",
+    )
+    list_filter = ("status", "is_done", ("submitted_at", admin.DateFieldListFilter))
+    search_fields = ("user__username", "user__first_name", "user__last_name", "letter_text")
+    ordering = ("-created_at",)
+    autocomplete_fields = ("user",)
 
-    fields = ('user', 'letter_text', 'admin_rating', 'gpt_review', 'created_at', 'updated_at')
-    readonly_fields = ('created_at', 'updated_at')
+    fieldsets = (
+        ("Основное", {
+            "fields": ("user", "status", "is_done", "submitted_at")
+        }),
+        ("Текст и оценка администратора", {
+            "fields": ("letter_text", "admin_rating")
+        }),
+        ("Автооценка GPT (только для просмотра)", {
+            "fields": (
+                "gpt_review",
+                "gpt_score",
+                "gpt_word_count",
+                "gpt_json",
+                "gpt_flags",
+                "gpt_model",
+                "gpt_version",
+                "gpt_scored_at",
+            )
+        }),
+        ("Служебное", {
+            "fields": ("created_at", "updated_at")
+        }),
+    )
 
-
-    formfield_overrides = {
-        models.CharField: {'widget': forms.Textarea(attrs={'rows': 10, 'cols': 80})},
-    }
-
-    def save_model(self, request, obj, form, change):
-        obj._skip_tg_notify = True
-        super().save_model(request, obj, form, change)
+    readonly_fields = (
+        "created_at",
+        "updated_at",
+        "submitted_at",
+        "gpt_review",
+        "gpt_score",
+        "gpt_word_count",
+        "gpt_json",
+        "gpt_flags",
+        "gpt_model",
+        "gpt_version",
+        "gpt_scored_at",
+    )
 
 @admin.register(Notification)
 class NotificationAdmin(admin.ModelAdmin):

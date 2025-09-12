@@ -170,8 +170,11 @@ class MotivationLetter(models.Model):
         verbose_name="Стипендиат"
     )
 
-    letter_text = models.CharField(max_length=20000, blank=True, help_text='Вставьте своё мотивационное письмо сюда',
-                                   verbose_name='Текст мотивационного письма')  # сколько-то символов ограничение?
+    letter_text = models.TextField(
+        blank=True,
+        help_text='Вставьте своё мотивационное письмо сюда',
+        verbose_name='Текст мотивационного письма'
+    )
 
     admin_rating = models.TextField(
         verbose_name="Оценка администратора",
@@ -183,35 +186,77 @@ class MotivationLetter(models.Model):
         verbose_name="Обзор от ChatGPT",
         null=True,
         blank=True,
-        help_text="Обзор мотивационного письма, сгенерированный ChatGPT."
+        help_text="Краткая сводка оценки (для интерфейса)."
+    )
+    gpt_score = models.IntegerField(
+        null=True,
+        blank=True,
+        verbose_name="Итоговый балл GPT (0–60)"
+    )
+    gpt_word_count = models.IntegerField(
+        null=True,
+        blank=True,
+        verbose_name="Количество слов по версии GPT"
+    )
+    gpt_json = models.JSONField(
+        null=True,
+        blank=True,
+        verbose_name="Структурированный разбор GPT"
+    )
+    gpt_flags = models.JSONField(
+        null=True,
+        blank=True,
+        verbose_name="Флаги автооценки"
+    )
+    gpt_model = models.CharField(
+        max_length=64,
+        null=True,
+        blank=True,
+        verbose_name="Модель GPT"
+    )
+    gpt_version = models.CharField(
+        max_length=32,
+        null=True,
+        blank=True,
+        verbose_name="Версия рубрики/скрипта"
+    )
+    gpt_scored_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Время автооценки"
     )
 
     status = models.CharField(
         max_length=10,
         choices=Status.choices,
         default=Status.DRAFT,
-        verbose_name="Статус"
+        verbose_name="Статус",
+        db_index=True
     )
-    submitted_at = models.DateTimeField(null=True, blank=True, verbose_name="Отправлено в")
+    submitted_at = models.DateTimeField(null=True, blank=True, verbose_name="Отправлено в", db_index=True)
 
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         verbose_name = "Мотивационное письмо"
         verbose_name_plural = "Мотивационные письма"
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['status', 'submitted_at']),
+            models.Index(fields=['created_at']),
+        ]
 
     def clean(self):
         if self.pk:
             original = MotivationLetter.objects.get(pk=self.pk)
-            if original.status == self.Status.SUBMITTED:
-                if self.letter_text != original.letter_text:
-                    raise ValidationError("Нельзя изменять текст письма после отправки.")
+            if original.status == self.Status.SUBMITTED and self.letter_text != original.letter_text:
+                raise ValidationError("Нельзя изменять текст письма после отправки.")
 
         if self.status == self.Status.SUBMITTED and not self.submitted_at:
             self.submitted_at = timezone.now()
-        if self.status == self.Status.SUBMITTED and not self.letter_text.strip():
+
+        if self.status == self.Status.SUBMITTED and not (self.letter_text or "").strip():
             raise ValidationError("Нельзя отправить пустое письмо.")
 
     def save(self, *args, **kwargs):
@@ -219,6 +264,30 @@ class MotivationLetter(models.Model):
             self.submitted_at = timezone.now()
             self.is_done = True
         super().save(*args, **kwargs)
+
+    def word_count(self) -> int:
+        txt = (self.letter_text or "").strip()
+        return len([w for w in txt.split() if w])
+
+    def apply_gpt_result(self, *, score: int | None, word_count: int | None,
+                         payload_json: dict | None, summary: str | None,
+                         flags: dict | None = None, model_name: str | None = None,
+                         rubric_version: str | None = None):
+        if summary is not None:
+            self.gpt_review = summary
+        if score is not None:
+            self.gpt_score = int(score)
+        if word_count is not None:
+            self.gpt_word_count = int(word_count)
+        if payload_json is not None:
+            self.gpt_json = payload_json
+        if flags is not None:
+            self.gpt_flags = flags
+        if model_name is not None:
+            self.gpt_model = model_name
+        if rubric_version is not None:
+            self.gpt_version = rubric_version
+        self.gpt_scored_at = timezone.now()
 
     def __str__(self):
         return f"Письмо от {self.user.username} - {self.created_at.strftime('%Y-%m-%d')}"

@@ -5,10 +5,11 @@ from django.shortcuts import render, redirect
 
 import config
 from Putevka import settings
+from core.decorators import ensure_registration_gate
 from scholar_form.forms import UserProfileForm
 from scholar_form.models import UserInfo
 
-
+@ensure_registration_gate('protected')
 @login_required
 def personal_info(request):
     profile, _ = UserInfo.objects.get_or_create(user=request.user)
@@ -24,6 +25,7 @@ def personal_info(request):
     return render(request, "personal_info.html", {"form": form, "active": "personal_info"})
 
 
+@ensure_registration_gate('protected')
 @login_required
 def video_task(request):
     last = request.user.video_submissions.order_by("-created_at").first()
