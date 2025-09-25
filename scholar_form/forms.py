@@ -3,7 +3,7 @@ from django.dispatch import Signal
 from django.forms import HiddenInput
 from django.shortcuts import redirect
 
-from .models import UserInfo
+from .models import UserInfo, ScholarVideo
 from formtools.wizard.views import SessionWizardView
 
 from django.db import transaction
@@ -258,3 +258,8 @@ class UserProfileForm(forms.ModelForm):
     class Meta:
         model = UserInfo
         fields = ["avatar"]
+
+class ScholarVideoForm(forms.ModelForm):
+    class Meta:
+        model = ScholarVideo
+        fields = ["file"]

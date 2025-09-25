@@ -10,5 +10,5 @@ urlpatterns = [
     path('apply/', ensure_registration_gate('protected')(login_required(ApplicationWizard.as_view(FORMS))), name='apply'),
     path('thank-you/', lambda request: render(request, 'thank_you.html'), name='thank_you'),
     path('personal-info/', views.personal_info, name='personal_info'),
-    path("video/", views.video_task, name="video_task"),
+    path("video/", views.my_video_page, name="my_video_page"),
 ]

@@ -1,4 +1,6 @@
 from django.contrib import admin
+
+from scholar_form.models import ScholarVideo
 from .models import Subject, School, Course, CourseSelection, UniversityPriority, AssessmentResult
 
 
@@ -39,3 +41,4 @@ class AssessmentResultAdmin(admin.ModelAdmin):
     list_display = ("user", "kind", "subject", "title", "date", "score", "max_score")
     list_filter = ("kind", "subject", "date")
     search_fields = ("title", "notes", "place")
+
