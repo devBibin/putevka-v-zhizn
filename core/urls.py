@@ -4,6 +4,8 @@ from .views_helper import redirect_to_current_step
 
 from django.contrib.auth import views as auth_views
 
+from .views_staff import StaffScholarDossierView, staff_scholar_action
+
 urlpatterns = [
     path('', views.index, name='index'),
 
@@ -54,4 +56,7 @@ urlpatterns = [
     path('notifications/dropdown/', views.notifications_dropdown, name='notifications_dropdown'),
     path('notifications/', views.notification_list, name='notifications'),
     path('mark-as-seen/<int:user_notification_id>', views.mark_notification_as_seen, name='mark_as_seen'),
+
+    path("staff/scholars/<int:user_id>/", StaffScholarDossierView.as_view(), name="staff_scholar_dossier"),
+    path("staff/scholars/<int:user_id>/action/", staff_scholar_action, name="staff_scholar_action"),
 ]
