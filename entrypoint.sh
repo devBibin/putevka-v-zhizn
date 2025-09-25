@@ -42,6 +42,10 @@ python manage.py migrate
 # Collect static files
 python manage.py collectstatic --noinput
 
+#тестовые данные
+python manage.py loaddata my_study/fixtures/subjects.json
+python manage.py loaddata my_study/fixtures/schools_courses.json
+
 # Create superuser if it doesn't exist
 echo "
 from django.contrib.auth import get_user_model

@@ -1,7 +1,12 @@
+import mimetypes
 import os
 import uuid
+from pathlib import Path
+
+from importlib.resources._common import _
 
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 from django.db import models
 
 
@@ -69,32 +74,37 @@ class UserInfo(models.Model):
 
 
 def video_upload_to(instance, filename):
-    ext = os.path.splitext(filename)[1] or ".mp4"
-    return f"videos/{instance.user_id}/{uuid.uuid4().hex}{ext}"
+    return f"videos/visits/{instance.user_id}/{filename}"
 
+def validate_video_size(f):
+    max_mb = 200
+    if f.size > max_mb * 1024 * 1024:
+        raise ValidationError(f"Файл больше {max_mb} МБ.")
 
-class VideoSubmission(models.Model):
-    class Status(models.TextChoices):
-        RECEIVED = "received", "Получено"
-        SAVED = "saved", "Сохранено"
-        REJECTED = "rejected", "Отклонено"
+def validate_video_ext(f):
+    allowed_ext = {".mp4", ".webm"}
+    name = getattr(f, "name", "") or ""
+    ext = Path(name).suffix.lower()
+    ctype = getattr(f, "content_type", "") or mimetypes.guess_type(name)[0] or ""
+    if ext not in allowed_ext and ctype not in {"video/mp4", "video/webm"}:
+        raise ValidationError("Допустимы только MP4 или WebM.")
 
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="video_submissions")
-    tg_user_id = models.CharField(max_length=32, blank=True, default="")
-    tg_file_id = models.CharField(max_length=256, blank=True, default="")
-    tg_file_path = models.CharField(max_length=256, blank=True, default="")
-
-    file = models.FileField(upload_to=video_upload_to, blank=True, null=True)
-    original_filename = models.CharField(max_length=255, blank=True, default="")
-    mime_type = models.CharField(max_length=64, blank=True, default="")
-    size_bytes = models.BigIntegerField(default=0)
-
-    duration_sec = models.IntegerField(default=0)
-    status = models.CharField(max_length=16, choices=Status.choices, default=Status.RECEIVED)
-
+class ScholarVideo(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="scholar_video")
+    review = models.TextField(verbose_name="Отзыв", blank=True, null=True)
+    score = models.PositiveIntegerField(verbose_name="Оценка в баллах", blank=True, null=True)
+    file = models.FileField(
+        "Видео",
+        upload_to=video_upload_to,
+        validators=[validate_video_size, validate_video_ext],
+        help_text="MP4/WebM, до 200 МБ"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
-    review = models.TextField(blank=True, null=True)
+    class Meta:
+        verbose_name = "Видеовизитка"
+        verbose_name_plural = "Видеовизитки"
 
     def __str__(self):
-        return f"VideoSubmission(user={self.user_id}, id={self.id}, {self.status})"
+        return f"Видеовизитка {self.user.get_full_name() or self.user.username}"
