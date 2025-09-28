@@ -1,0 +1,43 @@
+<div class="list-group list-group-flush py-3 d-none d-md-block">
+{#    <a class="list-group-item list-group-item-action d-flex align-items-center {% if active == 'personal_info' %} active{% endif %}"#}
+{#       href="{% url 'personal_info' %}">Личная информация#}
+{#    </a>#}
+    <a class="list-group-item list-group-item-action d-flex align-items-center {% if active == 'apply' %} active{% endif %}"
+       href="{% url 'staff_profile_detail' user_obj.id %}">Анкета
+    </a>
+    <a class="list-group-item list-group-item-action d-flex align-items-center {% if active == 'motivation_letter' %} active{% endif %}"
+       href="{% url 'staff_letter_detail' user_obj.id %}">Мотивационное письмо
+    </a>
+    <a class="list-group-item list-group-item-action d-flex align-items-center {% if active == 'my_video_page' %} active{% endif %}"
+       href="{% url 'staff_video_detail' user_obj.id %}">Видеовизитка
+    </a>
+    <a class="list-group-item list-group-item-action d-flex align-items-center {% if active == 'documents_dashboard' %} active{% endif %}"
+       href="{% url 'staff_documents_detail' user_obj.id %}">Документы
+    </a>
+    <a class="list-group-item list-group-item-action d-flex align-items-center {% if active == 'study' %} active{% endif %}"
+       href="{% url 'staff_study_detail' user_obj.id %}">Моя учёба
+    </a>
+</div>
+
+<nav class="d-md-none mobile-tabs sticky-top bg-white border-top shadow-sm">
+    <div class="d-flex justify-content-around py-2">
+        <a href="{% url 'personal_info' %}" class="text-center {% if active == 'personal_info' %}text-primary{% else %}text-secondary{% endif %}">
+            <div class="small">Профиль</div>
+        </a>
+        <a href="{% url 'apply' %}" class="text-center {% if active == 'apply' %}text-primary{% else %}text-secondary{% endif %}">
+            <div class="small">Анкета</div>
+        </a>
+        <a href="{% url 'motivation_letter' %}" class="text-center {% if active == 'motivation_letter' %}text-primary{% else %}text-secondary{% endif %}">
+            <div class="small">Письмо</div>
+        </a>
+        <a href="{% url 'my_video_page' %}" class="text-center {% if active == 'my_video_page' %}text-primary{% else %}text-secondary{% endif %}">
+            <div class="small">Видео</div>
+        </a>
+        <a href="{% url 'documents_dashboard' %}" class="text-center {% if active == 'documents_dashboard' %}text-primary{% else %}text-secondary{% endif %}">
+            <div class="small">Документы</div>
+        </a>
+        <a href="{% url 'study:schools' %}" class="text-center {% if active == 'study' %}text-primary{% else %}text-secondary{% endif %}">
+            <div class="small">Учёба</div>
+        </a>
+    </div>
+</nav>

@@ -68,6 +68,8 @@ class UserInfo(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата заполнения анкеты")
 
+    tutor_summary = models.TextField(verbose_name="Заметки куратора", blank=True, null=True)
+
     class Meta:
         verbose_name = "Анкета участника"
         verbose_name_plural = "Анкеты участников"

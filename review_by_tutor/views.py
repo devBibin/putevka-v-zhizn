@@ -1,0 +1,228 @@
+import logging
+import mimetypes
+
+from django.contrib.auth import get_user_model
+from django.contrib.auth.decorators import login_required, user_passes_test
+from django.db.models import Prefetch
+
+from django.shortcuts import render, get_object_or_404, redirect
+from django.db import transaction
+
+from core.models import MotivationLetter
+from documents.models import Document
+from my_study.models import CourseSelection, UniversityPriority, AssessmentResult
+from review_by_tutor.forms import MotivationLetterStaffForm, UserInfoStaffForm, ScholarVideoStaffForm, \
+    DocumentModerationForm, DocumentAttachForm, DocumentStaffUploadForm, DocumentCommentForm, DocumentLockForm, \
+    DocumentStatusForm
+from django.contrib import messages
+
+from scholar_form.models import UserInfo, ScholarVideo
+
+logger = logging.getLogger(__name__)
+User = get_user_model()
+
+def _staff_check(user):
+    return user.is_staff
+
+
+@login_required
+@user_passes_test(_staff_check)
+@transaction.atomic
+def staff_letter_detail(request, user_id: int):
+    user = get_object_or_404(User, pk=user_id)
+    letter = get_object_or_404(MotivationLetter.objects.select_related("user"), user_id=user_id)
+
+    if request.method == "POST":
+        form = MotivationLetterStaffForm(request.POST, instance=letter)
+        if form.is_valid():
+            updated = form.save(commit=False)
+
+            updated.save()
+
+            messages.success(request, "Оценка/фидбэк сохранены.")
+            logger.info("Staff %s updated admin fields for letter user_id=%s", request.user.pk, user_id)
+            return redirect("staff_letter_detail", user_id=user_id)
+        else:
+            messages.error(request, "Исправьте ошибки в форме.")
+    else:
+        form = MotivationLetterStaffForm(instance=letter)
+
+    readonly_ctx = {
+        "status": letter.status,
+        "submitted_at": letter.submitted_at,
+        "gpt_review": letter.gpt_review,
+        "gpt_score": letter.gpt_score,
+        "gpt_word_count": letter.gpt_word_count or letter.word_count(),
+        "gpt_model": letter.gpt_model,
+        "gpt_version": letter.gpt_version,
+        "gpt_scored_at": letter.gpt_scored_at,
+        "gpt_json": letter.gpt_json,
+    }
+
+    return render(request, "staff_templates/letter_detail.html", {
+        "letter": letter,
+        "user_obj": user,
+        "form": form,
+        "readonly": readonly_ctx,
+        "active": "motivation_letter",
+    })
+
+
+@login_required
+@user_passes_test(_staff_check)
+@transaction.atomic
+def staff_profile_detail(request, user_id: int):
+    user_obj = get_object_or_404(User, pk=user_id)
+    profile = get_object_or_404(UserInfo.objects.select_related("user"), user_id=user_id)
+
+    if request.method == "POST":
+        form = UserInfoStaffForm(request.POST, instance=profile)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Фидбэк/статус анкеты сохранены.")
+            logger.info("Staff %s updated user_info for user_id=%s", request.user.pk, user_id)
+            return redirect("staff_profile_detail", user_id=user_id)
+        messages.error(request, "Исправьте ошибки в форме.")
+    else:
+        form = UserInfoStaffForm(instance=profile)
+
+    return render(request, "staff_templates/profile_details.html", {
+        "profile": profile,
+        "user_obj": user_obj,
+        "form": form,
+        "active": "apply",
+    })
+
+
+@login_required
+@user_passes_test(_staff_check)
+@transaction.atomic
+def staff_video_detail(request, user_id: int):
+    user_obj = get_object_or_404(User, pk=user_id)
+    video = get_object_or_404(ScholarVideo.objects.select_related("user"), user_id=user_id)
+
+    if request.method == "POST":
+        form = ScholarVideoStaffForm(request.POST, instance=video)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Отзыв/оценка по видео сохранены.")
+            logger.info("Staff %s updated ScholarVideo for user_id=%s", request.user.pk, user_id)
+            return redirect("staff_video_detail", user_id=user_id)
+        messages.error(request, "Исправьте ошибки в форме.")
+    else:
+        form = ScholarVideoStaffForm(instance=video)
+
+    mime, _ = mimetypes.guess_type(video.file.name or "")
+
+    return render(request, "staff_templates/video_detail.html", {
+        "user_obj": user_obj,
+        "video": video,
+        "video_mime": mime,
+        "form": form,
+        "active": "my_video_page",
+    })
+
+
+@login_required
+@user_passes_test(_staff_check)
+@transaction.atomic
+def staff_documents_detail(request, user_id: int):
+    user_obj = get_object_or_404(User, pk=user_id)
+    docs = (Document.objects
+            .filter(user_id=user_id, is_deleted=False)
+            .prefetch_related("related_documents")
+            .order_by("-uploaded_at", "-id"))
+
+    if request.method == "POST":
+        form_type = request.POST.get("form_type")
+        if form_type in {"update_status", "update_lock", "update_comment"}:
+            doc_id = request.POST.get("document_id")
+            doc = get_object_or_404(Document, pk=doc_id, user_id=user_id)
+
+            if form_type == "update_status":
+                prefix = f"st-{doc.pk}"
+                form = DocumentStatusForm(request.POST, instance=doc, prefix=prefix)
+            elif form_type == "update_lock":
+                prefix = f"lk-{doc.pk}"
+                form = DocumentLockForm(request.POST, instance=doc, prefix=prefix)
+            else:  # update_comment
+                prefix = f"cm-{doc.pk}"
+                form = DocumentCommentForm(request.POST, instance=doc, prefix=prefix)
+
+            if form.is_valid():
+                obj = form.save(commit=False)
+                # обходим ваш clean() при is_locked=True
+                obj._ignore_lock_validation = True
+                obj.save()
+                messages.success(request, "Изменения сохранены.")
+            else:
+                logger.warning("Doc form errors for #%s: %s", doc.pk, form.errors)
+                messages.error(request, "Исправьте ошибки в форме.")
+            return redirect("staff_documents_detail", user_id=user_id)
+
+        elif form_type == "upload_staff_document":
+            upload_form = DocumentStaffUploadForm(request.POST, request.FILES)
+            if upload_form.is_valid():
+                new_doc = upload_form.save(commit=False)
+                new_doc.user = user_obj
+                new_doc.uploaded_by_staff = True
+                new_doc._ignore_lock_validation = True
+                new_doc.save()
+                messages.success(request, "Документ загружен.")
+            else:
+                messages.error(request, "Не удалось загрузить документ. Проверьте форму.")
+        else:
+            messages.error(request, "Неизвестный тип формы.")
+            return redirect("staff_documents_detail", user_id=user_id)
+
+    # Рендер
+    rows = []
+    for d in docs:
+        rows.append((
+            d,
+            DocumentStatusForm(instance=d, prefix=f"st-{d.pk}"),
+            DocumentLockForm(instance=d, prefix=f"lk-{d.pk}"),
+            DocumentCommentForm(instance=d, prefix=f"cm-{d.pk}"),
+        ))
+    upload_form = locals().get("upload_form", DocumentStaffUploadForm())
+
+    return render(request, "staff_templates/documents_detail.html", {
+        "user_obj": user_obj,
+        "rows": rows,
+        "upload_form": upload_form,
+        "active": "documents_dashboard",
+    })
+
+
+@login_required
+@user_passes_test(_staff_check)
+def staff_study_detail(request, user_id: int):
+    user_obj = get_object_or_404(User, pk=user_id)
+
+    selections = (
+        CourseSelection.objects
+        .select_related("course__school", "course__subject")
+        .filter(user_id=user_id)
+        .order_by("-created_at", "-id")
+    )
+
+    priorities = (
+        UniversityPriority.objects
+        .filter(user_id=user_id)
+        .order_by("priority", "id")
+    )
+
+    assessments = (
+        AssessmentResult.objects
+        .select_related("subject")
+        .filter(user_id=user_id)
+        .order_by("-date", "-id")
+    )
+
+    return render(request, "staff_templates/study_detail.html", {
+        "user_obj": user_obj,
+        "selections": selections,
+        "priorities": priorities,
+        "assessments": assessments,
+        "active": "study",
+    })

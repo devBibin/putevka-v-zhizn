@@ -19,7 +19,7 @@ try:
     raw_dict = get_variable('TELEGRAM_STAFF_CHAT_IDS')
     TELEGRAM_STAFF_CHAT_IDS = json.loads(raw_dict)
 except Exception as e:
-    TELEGRAM_STAFF_CHAT_IDS = None
+    TELEGRAM_STAFF_CHAT_IDS = ""
     logger.error(f'TELEGRAM_STAFF_CHAT_IDS не используется {e}')
 
 TELEGRAM_LOG_CHAT_ID = get_variable('TELEGRAM_LOG_CHAT_ID')
