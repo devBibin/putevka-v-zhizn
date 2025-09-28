@@ -1,0 +1,182 @@
+{% extends "staff_templates/base.html" %}
+{% load widget_tweaks %}
+
+{% block title %}Документы участника — модерация{% endblock %}
+
+{% block content %}
+    <div class="container py-4">
+        <h1 class="mb-4">Документы: {{ user_obj.get_full_name|default:user_obj.username }}</h1>
+
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+
+        <!-- Загрузка документа сотрудником (лаконично) -->
+        <div class="card mb-4">
+            <div class="card-header">Загрузить документ (сотрудник)</div>
+            <div class="card-body">
+                <form method="post" enctype="multipart/form-data" class="row g-3">
+                    {% csrf_token %}
+                    <input type="hidden" name="form_type" value="upload_staff_document">
+
+                    <div class="col-lg-4">
+                        <label class="form-label">{{ upload_form.file.label }}</label>
+                        {{ upload_form.file }}
+                        {% if upload_form.file.errors %}
+                            <div class="text-danger small">{{ upload_form.file.errors }}</div>{% endif %}
+                    </div>
+
+                    <div class="col-lg-3">
+                        <label class="form-label">{{ upload_form.caption.label }}</label>
+                        {{ upload_form.caption }}
+                        {% if upload_form.caption.errors %}
+                            <div class="text-danger small">{{ upload_form.caption.errors }}</div>{% endif %}
+                    </div>
+
+                    <div class="col-lg-3">
+                        <label class="form-label">{{ upload_form.status.label }}</label>
+                        {{ upload_form.status }}
+                        {% if upload_form.status.errors %}
+                            <div class="text-danger small">{{ upload_form.status.errors }}</div>{% endif %}
+                    </div>
+
+                    <div class="col-lg-2 d-flex align-items-end">
+                        <div class="form-check">
+                            {{ upload_form.is_locked|add_class:"form-check-input" }}
+                            <label class="form-check-label"
+                                   for="{{ upload_form.is_locked.id_for_label }}">{{ upload_form.is_locked.label }}</label>
+                        </div>
+                    </div>
+
+                    <div class="col-12">
+                        <label class="form-label">{{ upload_form.only_staff_comment.label }}</label>
+                        {{ upload_form.only_staff_comment }}
+                    </div>
+
+                    <div class="col-12">
+                        <button class="btn btn-primary" type="submit">Загрузить</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        {% if rows %}
+            <div class="table-responsive">
+                <table class="table align-middle">
+                    <thead>
+                    <tr>
+                        <th style="min-width: 280px;">Документ</th>
+                        <th>Статус</th>
+                        <th>Блокировка</th>
+                        <th style="min-width: 260px;">Комментарий (staff)</th>
+                        <th class="text-end">Действия</th>
+                    </tr>
+                    </thead>
+                    <tbody>
+                    {% for doc, status_form, lock_form, comment_form in rows %}
+                        <tr>
+                            <td>
+                                <a href="{% url 'serve_document' doc.pk %}" target="_blank" class="text-break">
+                                    {{ doc.caption|default:doc.user_file_name }}
+                                </a>
+                                {% if doc.caption %}
+                                    <div class="small text-muted text-break">{{ doc.user_file_name }}</div>{% endif %}
+                                <div class="small text-muted">
+                                    Загружено: {{ doc.uploaded_at|date:"d.m.Y H:i" }}
+                                    {% if doc.uploaded_by_staff %} ·
+                                        <span class="badge text-bg-dark">сотрудник</span>{% endif %}
+                                </div>
+                                <div class="mt-1">
+                <span class="badge
+                  {% if doc.status == 'APPROVED' or doc.status == 'SIGNED' %}text-bg-success
+                  {% elif doc.status == 'PENDING' or doc.status == 'PENDING_SIGNATURE' %}text-bg-warning
+                  {% elif doc.status == 'QUESTION' or doc.status == 'REJECTED_SIGNATURE' %}text-bg-danger
+                  {% else %}text-bg-secondary{% endif %}">
+                  {{ doc.get_status_display }}
+                </span>
+                                    {% if doc.is_locked %}
+                                        <span class="badge text-bg-secondary ms-1">заблокирован</span>{% endif %}
+                                </div>
+
+                                {# --- Прикреплённые документы (ТОЛЬКО отображение) --- #}
+                                {% if doc.related_documents.all %}
+                                    <div class="mt-2 small">
+                                        <strong>Прикреплено:</strong>
+                                        <ul class="list-unstyled mb-0">
+                                            {% for r in doc.related_documents.all %}
+                                                <li class="mb-1">
+                                                    <a href="{% url 'serve_document' r.pk %}" target="_blank"
+                                                       class="text-break">
+                                                        {{ r.caption|default:r.user_file_name }}
+                                                    </a>
+                                                </li>
+                                            {% endfor %}
+                                        </ul>
+                                    </div>
+                                {% endif %}
+                            </td>
+
+                            <td>
+                                <form method="post" class="m-0">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="form_type" value="update_status">
+                                    <input type="hidden" name="document_id" value="{{ doc.pk }}">
+                                    {{ status_form.status }}
+                                </form>
+                            </td>
+
+                            <td>
+                                <form method="post" class="m-0">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="form_type" value="update_lock">
+                                    <input type="hidden" name="document_id" value="{{ doc.pk }}">
+                                    <div class="form-check">
+                                        {{ lock_form.is_locked }}
+                                        <label class="form-check-label" for="{{ lock_form.is_locked.id_for_label }}">Заблокирован</label>
+                                    </div>
+                                </form>
+                            </td>
+
+                            <td>
+                                <form method="post" class="m-0">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="form_type" value="update_comment">
+                                    <input type="hidden" name="document_id" value="{{ doc.pk }}">
+                                    {{ comment_form.only_staff_comment }}
+                                    <div class="text-end mt-2">
+                                        <button class="btn btn-outline-primary btn-sm" type="submit">Сохранить</button>
+                                    </div>
+                                </form>
+                            </td>
+
+                            <td class="text-end">
+                                <a class="btn btn-sm btn-outline-secondary" href="{% url 'serve_document' doc.pk %}"
+                                   target="_blank">Открыть</a>
+                                <a class="btn btn-sm btn-outline-secondary" href="{% url 'serve_document' doc.pk %}"
+                                   download>Скачать</a>
+                            </td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="alert alert-info">У пользователя нет документов.</div>
+        {% endif %}
+    </div>
+{% endblock %}
+
+{% block extra_js %}
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('.auto-submit').forEach(el => {
+                el.addEventListener('change', () => {
+                    const form = el.closest('form.doc-row-form');
+                    if (form) form.submit();
+                });
+            });
+        });
+    </script>
+{% endblock %}

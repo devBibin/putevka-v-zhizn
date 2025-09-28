@@ -1,0 +1,149 @@
+from django import forms
+
+from core.models import MotivationLetter
+from documents.models import Document
+from scholar_form.models import UserInfo, ScholarVideo
+
+
+class MotivationLetterStaffForm(forms.ModelForm):
+    class Meta:
+        model = MotivationLetter
+        fields = ["admin_rating", "is_done"]
+        widgets = {
+            "admin_rating": forms.Textarea(attrs={
+                "rows": 6,
+                "class": "form-control",
+                "placeholder": "Ваши комментарии/оценка для соискателя"
+            }),
+        }
+        labels = {
+            "admin_rating": "Оценка/фидбэк администратора",
+            "is_done": "Письмо принято (галочка)",
+        }
+
+
+class UserInfoStaffForm(forms.ModelForm):
+    class Meta:
+        model = UserInfo
+        fields = ["tutor_summary", "is_done"]
+        widgets = {
+            "tutor_summary": forms.Textarea(attrs={
+                "rows": 8,
+                "class": "form-control",
+                "placeholder": "Заметки/фидбэк куратора для участника."
+            }),
+        }
+        labels = {
+            "tutor_summary": "Заметки куратора (фидбэк)",
+            "is_done": "Анкета принята (галочка)",
+        }
+
+
+class ScholarVideoStaffForm(forms.ModelForm):
+    class Meta:
+        model = ScholarVideo
+        fields = ["review", "score"]
+        widgets = {
+            "review": forms.Textarea(attrs={
+                "rows": 8,
+                "class": "form-control",
+                "placeholder": "Фидбэк/отзыв куратора по видеовизитке"
+            }),
+            "score": forms.NumberInput(attrs={
+                "class": "form-control",
+                "min": 0,
+                "step": 1,
+                "placeholder": "Баллы (целое число)"
+            }),
+        }
+        labels = {
+            "review": "Отзыв",
+            "score": "Оценка в баллах",
+        }
+
+class DocumentModerationForm(forms.ModelForm):
+    class Meta:
+        model = Document
+        fields = ["status", "only_staff_comment", "is_locked"]
+        widgets = {
+            "status": forms.Select(attrs={"class": "form-select"}),
+            "only_staff_comment": forms.Textarea(attrs={"rows": 4, "class": "form-control"}),
+        }
+        labels = {
+            "status": "Статус",
+            "only_staff_comment": "Комментарий только для сотрудников",
+            "is_locked": "Заблокирован",
+        }
+
+
+class DocumentAttachForm(forms.Form):
+    MODE_CHOICES = (("set", "Заменить список"), ("add", "Добавить к списку"))
+    documents_to_attach = forms.ModelMultipleChoiceField(
+        queryset=Document.objects.none(),
+        required=False,
+        widget=forms.CheckboxSelectMultiple,
+        label="Прикрепить к этому документу",
+    )
+    mode = forms.ChoiceField(choices=MODE_CHOICES, initial="set", widget=forms.RadioSelect, label="Режим")
+    mirror = forms.BooleanField(required=False, initial=True, label="Синхронизировать в обе стороны")
+
+    def __init__(self, *args, user=None, exclude_document=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        qs = Document.objects.filter(user=user, is_deleted=False)
+        if exclude_document:
+            qs = qs.exclude(pk=exclude_document.pk)
+        self.fields["documents_to_attach"].queryset = qs.order_by("-uploaded_at")
+
+
+class DocumentStaffUploadForm(forms.ModelForm):
+    class Meta:
+        model = Document
+        fields = ["file", "caption", "status", "is_locked", "only_staff_comment"]
+        widgets = {
+            "caption": forms.TextInput(attrs={"class": "form-control", "placeholder": "Название/подпись документа"}),
+            "status": forms.Select(attrs={"class": "form-select"}),
+            "is_locked": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "only_staff_comment": forms.Textarea(attrs={"rows": 3, "class": "form-control"}),
+        }
+        labels = {
+            "file": "Файл",
+            "caption": "Подпись",
+            "status": "Статус",
+            "is_locked": "Заблокирован",
+            "only_staff_comment": "Комментарий только для сотрудников",
+        }
+
+    file = forms.FileField(widget=forms.ClearableFileInput(attrs={"class": "form-control"}))
+
+
+class DocumentStatusForm(forms.ModelForm):
+    class Meta:
+        model = Document
+        fields = ["status"]
+        widgets = {
+            "status": forms.Select(attrs={"class": "form-select form-select-sm auto-submit"}),
+        }
+        labels = {"status": "Статус"}
+
+class DocumentLockForm(forms.ModelForm):
+    class Meta:
+        model = Document
+        fields = ["is_locked"]
+        widgets = {
+            "is_locked": forms.CheckboxInput(attrs={"class": "form-check-input auto-submit"}),
+        }
+        labels = {"is_locked": "Заблокирован"}
+
+class DocumentCommentForm(forms.ModelForm):
+    class Meta:
+        model = Document
+        fields = ["only_staff_comment"]
+        widgets = {
+            "only_staff_comment": forms.Textarea(attrs={
+                "rows": 2,
+                "class": "form-control form-control-sm",
+                "placeholder": "Внутренний комментарий",
+            }),
+        }
+        labels = {"only_staff_comment": "Комментарий (только для сотрудников)"}
+

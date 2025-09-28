@@ -1,0 +1,84 @@
+{% extends 'staff_templates/base.html' %}
+{% load widget_tweaks %}
+
+{% block title %}Видеовизитка — модерация{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <h1 class="mb-3">
+    Видеовизитка: {{ user_obj.get_full_name|default:user_obj.username }}
+  </h1>
+
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+    {% endfor %}
+  {% endif %}
+
+  <div class="row g-4">
+    <!-- Левая колонка: видео и метаданные -->
+    <div class="col-lg-7">
+      <div class="card shadow-sm mb-4">
+        <div class="card-header">Видео</div>
+        <div class="card-body">
+          {% if video.file %}
+            <video controls preload="metadata" style="width: 100%; max-height: 480px;">
+              <source src="{{ video.file.url }}"{% if video_mime %} type="{{ video_mime }}"{% endif %}>
+              Ваш браузер не поддерживает воспроизведение видео-тега.
+            </video>
+            <div class="mt-2">
+              <a class="btn btn-outline-secondary btn-sm" href="{{ video.file.url }}" download>Скачать файл</a>
+            </div>
+          {% else %}
+            <div class="alert alert-warning mb-0">Файл видео отсутствует.</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="card shadow-sm">
+        <div class="card-body small">
+          <div><strong>Создано:</strong> {{ video.created_at|date:"d.m.Y H:i" }}</div>
+          <div><strong>Обновлено:</strong> {{ video.updated_at|date:"d.m.Y H:i" }}</div>
+          {% if video.score %}
+            <div class="mt-2"><strong>Текущая оценка:</strong> {{ video.score }}</div>
+          {% endif %}
+          {% if video.review %}
+            <div class="mt-2"><strong>Текущий отзыв:</strong>
+              <div class="border rounded p-2 bg-body-tertiary">{{ video.review }}</div>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- Правая колонка: редактирование отзыва/оценки -->
+    <div class="col-lg-5">
+      <div class="card shadow-sm">
+        <div class="card-header">Модерация</div>
+        <div class="card-body">
+          <form method="post">
+            {% csrf_token %}
+
+            <div class="mb-3">
+              <label class="form-label">{{ form.review.label }}</label>
+              {{ form.review|add_class:"form-control" }}
+              {% if form.review.errors %}
+                <div class="text-danger small mt-1">{{ form.review.errors }}</div>
+              {% endif %}
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label">{{ form.score.label }}</label>
+              {{ form.score|add_class:"form-control" }}
+              <div class="form-text">Целое число (например, 0–100). Настройте диапазон под вашу шкалу.</div>
+              {% if form.score.errors %}
+                <div class="text-danger small mt-1">{{ form.score.errors }}</div>
+              {% endif %}
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
