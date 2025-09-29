@@ -1,0 +1,146 @@
+{% extends 'staff_templates/base.html' %}
+{% load widget_tweaks %}
+
+{% block title %}Анкета участника — модерация{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <h1 class="mb-3">Анкета: {{ user_obj.get_full_name|default:user_obj.username }}</h1>
+
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+    {% endfor %}
+  {% endif %}
+
+  <div class="row g-4">
+    <!-- Левая колонка: вся анкета read-only -->
+    <div class="col-lg-7">
+      <div class="card shadow-sm mb-4">
+        <div class="card-header">Личная информация</div>
+        <div class="card-body">
+          <dl class="row mb-0">
+            <dt class="col-sm-5">Фамилия</dt><dd class="col-sm-7">{{ profile.last_name|default:"—" }}</dd>
+            <dt class="col-sm-5">Имя</dt><dd class="col-sm-7">{{ profile.first_name|default:"—" }}</dd>
+            <dt class="col-sm-5">Отчество</dt><dd class="col-sm-7">{{ profile.middle_name|default:"—" }}</dd>
+            <dt class="col-sm-5">Дата рождения</dt><dd class="col-sm-7">{% if profile.birth_date %}{{ profile.birth_date|date:"d.m.Y" }}{% else %}—{% endif %}</dd>
+            <dt class="col-sm-5">Телефон</dt><dd class="col-sm-7">{{ profile.phone|default:"—" }}</dd>
+            <dt class="col-sm-5">Email</dt><dd class="col-sm-7">{{ profile.email|default:user_obj.email|default:"—" }}</dd>
+            <dt class="col-sm-5">Регион</dt><dd class="col-sm-7">{{ profile.region|default:"—" }}</dd>
+            <dt class="col-sm-5">Адрес</dt><dd class="col-sm-7">{{ profile.address|default:"—" }}</dd>
+          </dl>
+        </div>
+      </div>
+
+      <div class="card shadow-sm mb-4">
+        <div class="card-header">Образование</div>
+        <div class="card-body">
+          <dl class="row mb-0">
+            <dt class="col-sm-5">Школа</dt><dd class="col-sm-7">{{ profile.school_name|default:"—" }}</dd>
+            <dt class="col-sm-5">Адрес школы</dt><dd class="col-sm-7">{{ profile.school_address|default:"—" }}</dd>
+            <dt class="col-sm-5">Классный руководитель</dt><dd class="col-sm-7">{{ profile.class_teacher|default:"—" }}</dd>
+            <dt class="col-sm-5">Класс в след. году</dt><dd class="col-sm-7">{{ profile.next_year_class|default:"—" }}</dd>
+            <dt class="col-sm-5">Профиль класса</dt><dd class="col-sm-7">{{ profile.class_profile|default:"—" }}</dd>
+            <dt class="col-sm-5">Планируемые экзамены</dt><dd class="col-sm-7">{{ profile.planned_exams|default:"—" }}</dd>
+            <dt class="col-sm-5">Оценки по предметам</dt><dd class="col-sm-7">{{ profile.subject_grades|default:"—" }}</dd>
+          </dl>
+        </div>
+      </div>
+
+      <div class="card shadow-sm mb-4">
+        <div class="card-header">Планы поступления</div>
+        <div class="card-body">
+          <dl class="row mb-0">
+            <dt class="col-sm-5">Олимпиады</dt><dd class="col-sm-7">{{ profile.olympiad_plans|default:"—" }}</dd>
+            <dt class="col-sm-5">Путь поступления</dt><dd class="col-sm-7">{{ profile.admission_path|default:"—" }}</dd>
+            <dt class="col-sm-5">Целевые вузы</dt><dd class="col-sm-7">{{ profile.target_universities|default:"—" }}</dd>
+            <dt class="col-sm-5">Направления</dt><dd class="col-sm-7">{{ profile.specializations|default:"—" }}</dd>
+          </dl>
+        </div>
+      </div>
+
+      <div class="card shadow-sm mb-4">
+        <div class="card-header">Семья</div>
+        <div class="card-body">
+          <dl class="row mb-0">
+            <dt class="col-sm-5">Мама</dt><dd class="col-sm-7">{{ profile.mother|default:"—" }}</dd>
+            <dt class="col-sm-5">Папа</dt><dd class="col-sm-7">{{ profile.father|default:"—" }}</dd>
+            <dt class="col-sm-5">Опекун</dt><dd class="col-sm-7">{{ profile.legal_guardian|default:"—" }}</dd>
+            <dt class="col-sm-5">Братьев/сестёр</dt><dd class="col-sm-7">{{ profile.siblings_count|default:"—" }}</dd>
+            <dt class="col-sm-5">Инфо о сиблингах</dt><dd class="col-sm-7">{{ profile.siblings_info|default:"—" }}</dd>
+            <dt class="col-sm-5">Состав семьи</dt><dd class="col-sm-7">{{ profile.family_size|default:"—" }}</dd>
+            <dt class="col-sm-5">Доход на члена</dt><dd class="col-sm-7">{{ profile.income_per_member|default:"—" }}</dd>
+            <dt class="col-sm-5">Малообеспеченная семья</dt><dd class="col-sm-7">{{ profile.is_low_income|default:"—" }}</dd>
+            <dt class="col-sm-5">Пособия</dt><dd class="col-sm-7">{{ profile.receives_subsidy|default:"—" }}</dd>
+            <dt class="col-sm-5">Другие факторы</dt><dd class="col-sm-7">{{ profile.other_factors|default:"—" }}</dd>
+            <dt class="col-sm-5">Компьютер с интернетом</dt><dd class="col-sm-7">{{ profile.has_pc_with_internet|default:"—" }}</dd>
+          </dl>
+        </div>
+      </div>
+
+      <div class="card shadow-sm mb-4">
+        <div class="card-header">Дополнительно</div>
+        <div class="card-body">
+          <dl class="row mb-0">
+            <dt class="col-sm-5">Достижения</dt><dd class="col-sm-7">{{ profile.achievements|default:"—" }}</dd>
+            <dt class="col-sm-5">План подготовки</dt><dd class="col-sm-7">{{ profile.preparation_plan|default:"—" }}</dd>
+            <dt class="col-sm-5">Помощь от фонда</dt><dd class="col-sm-7">{{ profile.foundation_help|default:"—" }}</dd>
+            <dt class="col-sm-5">Как узнали</dt><dd class="col-sm-7">{{ profile.heard_about_program|default:"—" }}</dd>
+            <dt class="col-sm-5">Готов участвовать</dt><dd class="col-sm-7">{{ profile.willing_to_participate|default:"—" }}</dd>
+            <dt class="col-sm-5">Согласие на обработку</dt><dd class="col-sm-7">
+              {% if profile.agree_processing == True %}Да{% elif profile.agree_processing == False %}Нет{% else %}—{% endif %}
+            </dd>
+            <dt class="col-sm-5">Согласие на документы</dt><dd class="col-sm-7">
+              {% if profile.agree_documents == True %}Да{% elif profile.agree_documents == False %}Нет{% else %}—{% endif %}
+            </dd>
+          </dl>
+        </div>
+      </div>
+
+      <div class="small text-muted">Создано: {{ profile.created_at|date:"d.m.Y H:i" }}</div>
+    </div>
+
+    <!-- Правая колонка: управление (редактируемые поля) -->
+    <div class="col-lg-5">
+      <div class="card shadow-sm mb-4">
+        <div class="card-header">Аватар</div>
+        <div class="card-body text-center">
+          {% if profile.avatar %}
+            <img src="{{ profile.avatar.url }}" alt="avatar" class="img-fluid rounded" style="max-height: 220px;">
+          {% else %}
+            <em class="text-muted">Нет аватара</em>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="card shadow-sm">
+        <div class="card-header">Фидбэк куратора</div>
+        <div class="card-body">
+          <form method="post">
+            {% csrf_token %}
+
+            <div class="mb-3">
+              <label class="form-label">{{ form.tutor_summary.label }}</label>
+              {{ form.tutor_summary|add_class:"form-control" }}
+              {% if form.tutor_summary.errors %}
+                <div class="text-danger small mt-1">{{ form.tutor_summary.errors }}</div>
+              {% endif %}
+              <div class="form-text">Эти заметки не может видеть участник.</div>
+            </div>
+
+            <div class="form-check mb-3">
+              {{ form.is_done|add_class:"form-check-input" }}
+              <label class="form-check-label" for="{{ form.is_done.id_for_label }}">{{ form.is_done.label }}</label>
+            </div>
+
+            <div class="d-flex gap-2">
+              <button class="btn btn-primary" type="submit">Сохранить</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+{% endblock %}

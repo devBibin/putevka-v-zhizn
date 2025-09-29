@@ -1,0 +1,138 @@
+{% extends "staff_templates/base_without_sidebar.html" %}
+
+{% block title %}Пользователи — модерация{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <h1 class="mb-4">Пользователи</h1>
+
+  <form class="row g-2 mb-3" method="get">
+    <div class="col-md-5">
+      <input type="search" name="q" value="{{ q }}" class="form-control"
+             placeholder="Поиск: имя, логин, email, телефон, регион">
+    </div>
+    <div class="col-md-3">
+      <select name="role" class="form-select">
+        <option value="">Все роли</option>
+        <option value="user" {% if role == 'user' %}selected{% endif %}>Пользователи</option>
+        <option value="staff" {% if role == 'staff' %}selected{% endif %}>Сотрудники</option>
+        <option value="superuser" {% if role == 'superuser' %}selected{% endif %}>Суперпользователи</option>
+      </select>
+    </div>
+    <div class="col-md-2">
+      <select name="active" class="form-select">
+        <option value="">Все статусы</option>
+        <option value="1" {% if active == '1' %}selected{% endif %}>Активные</option>
+        <option value="0" {% if active == '0' %}selected{% endif %}>Заблокированные</option>
+      </select>
+    </div>
+    <div class="col-md-2 d-grid">
+      <button class="btn btn-primary">Фильтр</button>
+    </div>
+  </form>
+
+  {% if page_obj.object_list %}
+    <div class="table-responsive">
+      <table class="table align-middle">
+        <thead>
+          <tr>
+            <th style="min-width:260px;">Пользователь</th>
+            <th>Email / Телефон</th>
+            <th>Документы</th>
+            <th>Письмо</th>
+            <th>Анкета</th>
+            <th>Видео</th>
+            <th class="text-end" style="min-width:300px;">Действия</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for u in page_obj.object_list %}
+          <tr>
+            <td class="text-break">
+              <div class="fw-semibold">
+                {{ u.get_full_name|default:u.username }}
+                {% if u.username %}<span class="text-muted"> · {{ u.username }}</span>{% endif %}
+              </div>
+              <div class="mt-1">
+                {% if u.is_active %}
+                  <span class="badge text-bg-success">активен</span>
+                {% else %}
+                  <span class="badge text-bg-secondary">заблокирован</span>
+                {% endif %}
+                {% if u.is_staff %}<span class="badge text-bg-primary ms-1">staff</span>{% endif %}
+                {% if u.is_superuser %}<span class="badge text-bg-dark ms-1">superuser</span>{% endif %}
+              </div>
+            </td>
+            <td>
+              <div class="text-break">{{ u.email|default:"—" }}</div>
+              <div class="small text-muted">{{ u.user_info.phone|default:"" }}</div>
+            </td>
+            <td>
+              <div class="small">
+                всего: <span class="badge text-bg-secondary">{{ u.docs_total }}</span>
+                {% if u.docs_pending %} · на проверке: <span class="badge text-bg-warning">{{ u.docs_pending }}</span>{% endif %}
+                {% if u.docs_question %} · уточнить: <span class="badge text-bg-danger">{{ u.docs_question }}</span>{% endif %}
+                {% if u.docs_signed %} · подписаны: <span class="badge text-bg-success">{{ u.docs_signed }}</span>{% endif %}
+              </div>
+            </td>
+            <td>
+              {% if u.letter_status %}
+                <span class="badge
+                  {% if u.letter_status == 'submitted' %}text-bg-success
+                  {% elif u.letter_status == 'draft' %}text-bg-secondary
+                  {% else %}text-bg-secondary{% endif %}">
+                  {% if u.letter_status == 'submitted' %}Отправлено{% elif u.letter_status == 'draft' %}Черновик{% else %}—{% endif %}
+                </span>
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if u.has_profile %}
+                <span class="badge text-bg-success">есть</span>
+              {% else %}
+                <span class="badge text-bg-secondary">нет</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if u.has_video %}
+                <span class="badge text-bg-success">есть</span>
+              {% else %}
+                <span class="badge text-bg-secondary">нет</span>
+              {% endif %}
+            </td>
+            <td class="text-end">
+              <div class="btn-group btn-group-sm" role="group">
+                <a class="btn btn-outline-secondary" href="{% url 'staff_documents_detail' u.id %}">Документы</a>
+                <a class="btn btn-outline-secondary" href="{% url 'staff_study_detail' u.id %}">Учёба</a>
+                <a class="btn btn-outline-secondary" href="{% url 'staff_letter_detail' u.id %}">Письмо</a>
+                <a class="btn btn-outline-secondary" href="{% url 'staff_profile_detail' u.id %}">Анкета</a>
+                <a class="btn btn-outline-secondary" href="{% url 'staff_video_detail' u.id %}">Видео</a>
+              </div>
+            </td>
+          </tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <nav class="mt-3">
+      <ul class="pagination">
+        {% if page_obj.has_previous %}
+          <li class="page-item">
+            <a class="page-link" href="?page={{ page_obj.previous_page_number }}&q={{ q }}&role={{ role }}&active={{ active }}">Назад</a>
+          </li>
+        {% endif %}
+        <li class="page-item disabled"><span class="page-link">Стр. {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span></li>
+        {% if page_obj.has_next %}
+          <li class="page-item">
+            <a class="page-link" href="?page={{ page_obj.next_page_number }}&q={{ q }}&role={{ role }}&active={{ active }}">Вперёд</a>
+          </li>
+        {% endif %}
+      </ul>
+    </nav>
+  {% else %}
+    <div class="alert alert-info">Пользователи не найдены.</div>
+  {% endif %}
+</div>
+{% endblock %}
