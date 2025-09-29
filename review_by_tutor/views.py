@@ -3,7 +3,8 @@ import mimetypes
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required, user_passes_test
-from django.db.models import Prefetch
+from django.core.paginator import Paginator
+from django.db.models import Prefetch, Q, Subquery, OuterRef, Count, Exists
 
 from django.shortcuts import render, get_object_or_404, redirect
 from django.db import transaction
@@ -225,4 +226,60 @@ def staff_study_detail(request, user_id: int):
         "priorities": priorities,
         "assessments": assessments,
         "active": "study",
+    })
+
+
+@login_required
+@user_passes_test(_staff_check)
+def staff_users_list(request):
+    q = (request.GET.get("q") or "").strip()
+    role = (request.GET.get("role") or "").strip()
+    active = (request.GET.get("active") or "").strip()
+
+    qs = User.objects.all()
+
+    if q:
+        qs = qs.filter(
+            Q(username__icontains=q) |
+            Q(email__icontains=q) |
+            Q(first_name__icontains=q) |
+            Q(last_name__icontains=q) |
+            Q(user_info__phone__icontains=q) |
+            Q(user_info__region__icontains=q)
+        )
+
+    if role == "user":
+        qs = qs.filter(is_staff=False, is_superuser=False)
+    elif role == "staff":
+        qs = qs.filter(is_staff=True)
+    elif role == "superuser":
+        qs = qs.filter(is_superuser=True)
+
+    if active == "1":
+        qs = qs.filter(is_active=True)
+    elif active == "0":
+        qs = qs.filter(is_active=False)
+
+    letter_status_sq = Subquery(
+        MotivationLetter.objects.filter(user_id=OuterRef("pk"))
+        .values("status")[:1]
+    )
+    qs = qs.annotate(
+        docs_total=Count("documents", filter=Q(documents__is_deleted=False)),
+        docs_pending=Count("documents", filter=Q(documents__is_deleted=False, documents__status="PENDING")),
+        docs_question=Count("documents", filter=Q(documents__is_deleted=False, documents__status="QUESTION")),
+        docs_signed=Count("documents", filter=Q(documents__is_deleted=False, documents__status="SIGNED")),
+        has_profile=Exists(UserInfo.objects.filter(user_id=OuterRef("pk"))),
+        has_video=Exists(ScholarVideo.objects.filter(user_id=OuterRef("pk"))),
+        letter_status=letter_status_sq,
+    ).order_by("last_name", "first_name", "username")
+
+    paginator = Paginator(qs, 20)
+    page_obj = paginator.get_page(request.GET.get("page"))
+
+    return render(request, "staff_templates/users_list.html", {
+        "page_obj": page_obj,
+        "q": q,
+        "role": role,
+        "active": active,
     })
