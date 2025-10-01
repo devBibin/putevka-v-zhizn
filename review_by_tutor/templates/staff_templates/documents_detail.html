@@ -119,7 +119,7 @@
                             </td>
 
                             <td>
-                                <form method="post" class="m-0">
+                                <form method="post" class="m-0 doc-row-form">
                                     {% csrf_token %}
                                     <input type="hidden" name="form_type" value="update_status">
                                     <input type="hidden" name="document_id" value="{{ doc.pk }}">
@@ -128,19 +128,21 @@
                             </td>
 
                             <td>
-                                <form method="post" class="m-0">
+                                <form method="post" class="m-0 doc-row-form">
                                     {% csrf_token %}
                                     <input type="hidden" name="form_type" value="update_lock">
                                     <input type="hidden" name="document_id" value="{{ doc.pk }}">
                                     <div class="form-check">
                                         {{ lock_form.is_locked }}
-                                        <label class="form-check-label" for="{{ lock_form.is_locked.id_for_label }}">Заблокирован</label>
+                                        <label class="form-check-label" for="{{ lock_form.is_locked.id_for_label }}">
+                                            Блокировать (запретить редактирование)
+                                        </label>
                                     </div>
                                 </form>
                             </td>
 
                             <td>
-                                <form method="post" class="m-0">
+                                <form method="post" class="m-0 doc-row-form">
                                     {% csrf_token %}
                                     <input type="hidden" name="form_type" value="update_comment">
                                     <input type="hidden" name="document_id" value="{{ doc.pk }}">
@@ -152,8 +154,6 @@
                             </td>
 
                             <td class="text-end">
-                                <a class="btn btn-sm btn-outline-secondary" href="{% url 'serve_document' doc.pk %}"
-                                   target="_blank">Открыть</a>
                                 <a class="btn btn-sm btn-outline-secondary" href="{% url 'serve_document' doc.pk %}"
                                    download>Скачать</a>
                             </td>

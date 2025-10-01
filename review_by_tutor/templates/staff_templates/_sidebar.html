@@ -1,7 +1,7 @@
 <div class="list-group list-group-flush py-3 d-none d-md-block">
-{#    <a class="list-group-item list-group-item-action d-flex align-items-center {% if active == 'personal_info' %} active{% endif %}"#}
-{#       href="{% url 'personal_info' %}">Личная информация#}
-{#    </a>#}
+    <a class="list-group-item list-group-item-action d-flex align-items-center {% if active == 'dossier' %} active{% endif %}"
+       href="{% url 'staff_scholar_dossier' user_obj.id %}">Сводка
+    </a>
     <a class="list-group-item list-group-item-action d-flex align-items-center {% if active == 'apply' %} active{% endif %}"
        href="{% url 'staff_profile_detail' user_obj.id %}">Анкета
     </a>

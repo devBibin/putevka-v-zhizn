@@ -72,7 +72,7 @@ class DocumentModerationForm(forms.ModelForm):
         labels = {
             "status": "Статус",
             "only_staff_comment": "Комментарий только для сотрудников",
-            "is_locked": "Заблокирован",
+            "is_locked": "Блокировать (запретить редактирование)",
         }
 
 
@@ -109,7 +109,7 @@ class DocumentStaffUploadForm(forms.ModelForm):
             "file": "Файл",
             "caption": "Подпись",
             "status": "Статус",
-            "is_locked": "Заблокирован",
+            "is_locked": "Блокировать (запретить редактирование)",
             "only_staff_comment": "Комментарий только для сотрудников",
         }
 
@@ -132,7 +132,12 @@ class DocumentLockForm(forms.ModelForm):
         widgets = {
             "is_locked": forms.CheckboxInput(attrs={"class": "form-check-input auto-submit"}),
         }
-        labels = {"is_locked": "Заблокирован"}
+        labels = {"is_locked": "Блокировать (запретить редактирование)"}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance is not None:
+            self.instance._ignore_lock_validation = True
 
 class DocumentCommentForm(forms.ModelForm):
     class Meta:
