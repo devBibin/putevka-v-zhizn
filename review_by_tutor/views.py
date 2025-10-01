@@ -31,42 +31,45 @@ def _staff_check(user):
 @transaction.atomic
 def staff_letter_detail(request, user_id: int):
     user = get_object_or_404(User, pk=user_id)
-    letter = get_object_or_404(MotivationLetter.objects.select_related("user"), user_id=user_id)
+
+    letter = (
+        MotivationLetter.objects.select_related("user")
+        .filter(user_id=user_id)
+        .first()
+    )
 
     if request.method == "POST":
+        if letter is None:
+            messages.error(request, "У пользователя ещё нет мотивационного письма — сохранять нечего.")
+            return redirect("staff_letter_detail", user_id=user_id)
+
         form = MotivationLetterStaffForm(request.POST, instance=letter)
         if form.is_valid():
             updated = form.save(commit=False)
-
             updated.save()
-
             messages.success(request, "Оценка/фидбэк сохранены.")
-            logger.info("Staff %s updated admin fields for letter user_id=%s", request.user.pk, user_id)
             return redirect("staff_letter_detail", user_id=user_id)
         else:
             messages.error(request, "Исправьте ошибки в форме.")
     else:
-        form = MotivationLetterStaffForm(instance=letter)
+        form = MotivationLetterStaffForm(instance=letter) if letter else None
 
     readonly_ctx = {
-        "status": letter.status,
-        "submitted_at": letter.submitted_at,
-        "gpt_review": letter.gpt_review,
-        "gpt_score": letter.gpt_score,
-        "gpt_word_count": letter.gpt_word_count or letter.word_count(),
-        "gpt_model": letter.gpt_model,
-        "gpt_version": letter.gpt_version,
-        "gpt_scored_at": letter.gpt_scored_at,
-        "gpt_json": letter.gpt_json,
+        "status": getattr(letter, "status", None),
+        "submitted_at": getattr(letter, "submitted_at", None),
+        "gpt_review": getattr(letter, "gpt_review", None),
+        "gpt_score": getattr(letter, "gpt_score", None),
+        "gpt_word_count": getattr(letter, "gpt_word_count", None) or (letter.word_count() if letter else None),
     }
 
-    return render(request, "staff_templates/letter_detail.html", {
-        "letter": letter,
+    ctx = {
         "user_obj": user,
+        "letter": letter,
         "form": form,
-        "readonly": readonly_ctx,
-        "active": "motivation_letter",
-    })
+        'active': 'motivation_letter',
+        'readonly': readonly_ctx,
+    }
+    return render(request, "staff_templates/letter_detail.html", ctx)
 
 
 @login_required
@@ -100,20 +103,36 @@ def staff_profile_detail(request, user_id: int):
 @transaction.atomic
 def staff_video_detail(request, user_id: int):
     user_obj = get_object_or_404(User, pk=user_id)
-    video = get_object_or_404(ScholarVideo.objects.select_related("user"), user_id=user_id)
+
+    video = (ScholarVideo.objects
+             .select_related("user")
+             .filter(user_id=user_id)
+             .first())
 
     if request.method == "POST":
+        if not video:
+            messages.error(request, "У пользователя ещё нет загруженного видео — нечего оценивать.")
+            return redirect("staff_video_detail", user_id=user_id)
+
         form = ScholarVideoStaffForm(request.POST, instance=video)
         if form.is_valid():
             form.save()
             messages.success(request, "Отзыв/оценка по видео сохранены.")
             logger.info("Staff %s updated ScholarVideo for user_id=%s", request.user.pk, user_id)
             return redirect("staff_video_detail", user_id=user_id)
-        messages.error(request, "Исправьте ошибки в форме.")
+        else:
+            messages.error(request, "Исправьте ошибки в форме.")
     else:
-        form = ScholarVideoStaffForm(instance=video)
+        form = ScholarVideoStaffForm(instance=video) if video else None
 
-    mime, _ = mimetypes.guess_type(video.file.name or "")
+    mime = None
+    if video:
+        try:
+            file_name = getattr(getattr(video, "file", None), "name", "") or ""
+            if file_name:
+                mime, _ = mimetypes.guess_type(file_name)
+        except Exception:
+            mime = None
 
     return render(request, "staff_templates/video_detail.html", {
         "user_obj": user_obj,
@@ -130,7 +149,7 @@ def staff_video_detail(request, user_id: int):
 def staff_documents_detail(request, user_id: int):
     user_obj = get_object_or_404(User, pk=user_id)
     docs = (Document.objects
-            .filter(user_id=user_id, is_deleted=False)
+            .filter(user_id=user_id)
             .prefetch_related("related_documents")
             .order_by("-uploaded_at", "-id"))
 
@@ -146,13 +165,12 @@ def staff_documents_detail(request, user_id: int):
             elif form_type == "update_lock":
                 prefix = f"lk-{doc.pk}"
                 form = DocumentLockForm(request.POST, instance=doc, prefix=prefix)
-            else:  # update_comment
+            else:
                 prefix = f"cm-{doc.pk}"
                 form = DocumentCommentForm(request.POST, instance=doc, prefix=prefix)
 
             if form.is_valid():
                 obj = form.save(commit=False)
-                # обходим ваш clean() при is_locked=True
                 obj._ignore_lock_validation = True
                 obj.save()
                 messages.success(request, "Изменения сохранены.")
@@ -176,7 +194,6 @@ def staff_documents_detail(request, user_id: int):
             messages.error(request, "Неизвестный тип формы.")
             return redirect("staff_documents_detail", user_id=user_id)
 
-    # Рендер
     rows = []
     for d in docs:
         rows.append((

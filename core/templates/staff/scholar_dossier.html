@@ -1,319 +1,166 @@
-{% load static %}
-<!doctype html>
-<html lang="ru">
-<head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>{{ scholar.get_full_name|default:scholar.username }}</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <style>
-    .break-anywhere { overflow-wrap: anywhere; word-break: break-word; }
-    .card-section + .card-section { margin-top: .75rem; }
-    @media (min-width: 1200px) {
-      .sticky-xl { position: sticky; top: 1rem; }
-    }
-  </style>
-</head>
-<body class="bg-light">
-<div class="container py-4">
+{% extends "staff_templates/base.html" %}
+{% load widget_tweaks %}
 
-  <!-- Хедер -->
-  <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
-    <h2 class="mb-0">{{ scholar.get_full_name|default:scholar.username }}</h2>
-    <span class="badge text-bg-secondary">ID {{ scholar.id }}</span>
-    {% if uinfo and uinfo.is_done %}
-      <span class="badge text-bg-success">Анкета отправлена</span>
-    {% else %}
-      <span class="badge text-bg-warning text-dark">Анкета не отправлена</span>
-    {% endif %}
+{% block title %}Сводка по участнику{% endblock %}
 
-    <!-- Быстрые ссылки в админку -->
-    <div class="ms-auto d-flex flex-wrap gap-2">
-      <!-- Профиль пользователя в админке -->
-      <a class="btn btn-sm btn-outline-secondary"
-         href="{% url 'admin:auth_user_change' scholar.id %}" target="_blank" rel="noopener">
-        Админка: пользователь
-      </a>
-      <!-- Чейнджлист документов, отфильтрованный по пользователю -->
-      <a class="btn btn-sm btn-outline-secondary"
-         href="{% url 'admin:documents_document_changelist' %}?user__id__exact={{ scholar.id }}"
-         target="_blank" rel="noopener">
-        Админка: документы
-      </a>
-    </div>
-  </div>
-
-  {% if messages %}
-    <div class="mb-3">
-      {% for m in messages %}
-        <div class="alert alert-{{ m.tags }} mb-2">{{ m }}</div>
-      {% endfor %}
-    </div>
-  {% endif %}
-
-  <div class="row g-3">
-    <!-- Левая колонка: Профиль -->
-    <div class="col-12 col-xl-4">
-      <div class="card h-100 sticky-xl">
-        <div class="card-body">
-          <h5 class="card-title">Профиль</h5>
-
-          <div class="d-flex gap-3 align-items-start">
-            {% if uinfo and uinfo.avatar %}
-              <img src="{{ uinfo.avatar.url }}" alt="avatar" class="rounded" style="width:84px;height:84px;object-fit:cover;">
-            {% else %}
-              <div class="bg-secondary-subtle rounded d-flex align-items-center justify-content-center"
-                   style="width:84px;height:84px;">No avatar</div>
-            {% endif %}
-
-            <div class="flex-grow-1">
-              <div class="fw-semibold">{{ scholar.first_name }} {{ scholar.last_name }}</div>
-              <div class="text-muted small break-anywhere">{{ scholar.email }}</div>
-              {% if uinfo and uinfo.phone %}
-                <div class="text-muted small break-anywhere">{{ uinfo.phone }}</div>
-              {% endif %}
-
-              <!-- Telegram -->
-              <div class="mt-2">
-                <h6 class="mb-1 small text-uppercase text-muted">Telegram</h6>
-                {% if tg %}
-                  <div class="small">
-                    <div>ID: {{ tg.telegram_id|default:"—" }}</div>
-                    {% if tg.username %}
-                      <div>
-                        @{{ tg.username }}
-                        • <a href="https://t.me/{{ tg.username }}" target="_blank" rel="noopener">Открыть в Telegram</a>
-                      </div>
-                    {% else %}
-                      <div class="text-muted">Юзернейм: —</div>
-                    {% endif %}
-                    <div>Имя: {{ tg.first_name|default:"" }} {{ tg.last_name|default:"" }}</div>
-                    <div>Проверен: {{ tg.telegram_verified|yesno:"Да,Нет" }}</div>
-                  </div>
-                {% else %}
-                  <div class="text-muted small">Аккаунт Telegram не привязан.</div>
-                {% endif %}
-              </div>
+{% block content %}
+    <div class="container py-4">
+        <div class="d-flex align-items-center gap-2 mb-3">
+            <h4 class="mb-0">{{ user_obj.get_full_name|default:user_obj.username }}</h4>
+            <span class="badge text-bg-secondary">ID {{ user_obj.id }}</span>
+            <div class="ms-auto">
+                <a class="btn btn-sm btn-outline-secondary"
+                   href="{% url 'admin:auth_user_change' user_obj.id %}" target="_blank" rel="noopener">Открыть в
+                    админке</a>
             </div>
-          </div>
-
-          <hr>
-
-          <dl class="row mb-0 small">
-            {% if uinfo %}
-              <dt class="col-5">Регион</dt><dd class="col-7 break-anywhere">{{ uinfo.region|default:"—" }}</dd>
-              <dt class="col-5">Адрес</dt><dd class="col-7 break-anywhere">{{ uinfo.address|default:"—" }}</dd>
-              <dt class="col-5">Школа</dt><dd class="col-7 break-anywhere">{{ uinfo.school_name|default:"—" }}</dd>
-              <dt class="col-5">Класс</dt><dd class="col-7">{{ uinfo.next_year_class|default:"—" }}</dd>
-              <dt class="col-5">Профиль</dt><dd class="col-7 break-anywhere">{{ uinfo.class_profile|default:"—" }}</dd>
-              <dt class="col-5">Доход/чел</dt><dd class="col-7">{{ uinfo.income_per_member|default:"—" }}</dd>
-              <dt class="col-5">Малообеспеч.</dt><dd class="col-7">{{ uinfo.is_low_income|default:"—" }}</dd>
-              <dt class="col-5">Пособия</dt><dd class="col-7">{{ uinfo.receives_subsidy|default:"—" }}</dd>
-            {% endif %}
-          </dl>
-        </div>
-      </div>
-    </div>
-
-    <!-- Правая колонка: Контент -->
-    <div class="col-12 col-xl-8">
-
-      <!-- Видеовизитка -->
-<div class="card mb-3">
-  <div class="card-body">
-    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
-      <h5 class="card-title mb-0">Видеовизитка</h5>
-      {% if video %}<span class="text-muted small">Обновлено: {{ video.updated_at|date:"d.m.Y H:i" }}</span>{% endif %}
-    </div>
-
-    {% if video %}
-      <div class="row g-3 align-items-start">
-        <!-- Видео слева -->
-        <div class="col-12 col-md-8">
-          <div class="ratio ratio-16x9">
-            <video controls class="w-100 h-100">
-              <source src="{{ video.file.url }}" type="video/mp4">
-              <source src="{{ video.file.url }}" type="video/webm">
-              Ваш браузер не поддерживает видео.
-            </video>
-          </div>
-
-          <!-- Текст под видео (только в левой колонке) -->
-          <div class="mt-2">
-            {% if video.review %}
-              <div class="small text-muted">Отзыв: {{ video.review }}</div>
-            {% endif %}
-            {% if video.score %}
-              <span class="badge text-bg-primary mt-1">Оценка: {{ video.score }}</span>
-            {% endif %}
-          </div>
         </div>
 
-        <!-- Форма справа -->
-        <div class="col-12 col-md-4">
-          <form method="post" action="{% url 'staff_scholar_action' scholar.id %}" class="row g-2">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="set_video_score">
-            <div class="col-12">
-              {{ video_form.score }}
+        {% if messages %}
+            <div class="mb-3">
+                {% for m in messages %}
+                    <div class="alert alert-{{ m.tags }} mb-2">{{ m }}</div>
+                {% endfor %}
             </div>
-            <div class="col-12">
-              {{ video_form.review }}
-            </div>
-            <div class="col-12 d-grid">
-              <button class="btn btn-sm btn-primary">Сохранить</button>
-            </div>
-          </form>
-        </div>
-      </div>
-    {% else %}
-      <p class="text-muted mb-0">Нет видеовизитки.</p>
-    {% endif %}
-  </div>
-</div>
+        {% endif %}
 
-      <!-- Мотивационное письмо -->
-      <div class="card card-section">
-        <div class="card-body">
-          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
-            <h5 class="card-title mb-0">Мотивационное письмо</h5>
-            {% if ml and ml.submitted_at %}
-              <span class="text-muted small">Отправлено: {{ ml.submitted_at|date:"d.m.Y H:i" }}</span>
-            {% endif %}
-          </div>
-
-          {% if ml %}
-            <div class="small text-muted mb-2">
-              Статус: {{ ml.get_status_display }}
-            </div>
-            <div class="mb-3 break-anywhere" style="white-space:pre-wrap">{{ ml.letter_text|default:"(пусто)" }}</div>
-
-            <div class="row g-2 small">
-              {% if ml.admin_rating %}
-                <div class="col-12"><strong>Оценка администратора:</strong> {{ ml.admin_rating }}</div>
-              {% endif %}
-              {% if ml.gpt_review or ml.gpt_score %}
-                <div class="col-12">
-                  <strong>GPT:</strong> <span class="break-anywhere">{{ ml.gpt_review|default:"—" }}</span>
-                  {% if ml.gpt_score %} • Балл: {{ ml.gpt_score }}{% endif %}
+        <div class="row g-3">
+            <div class="col-12 col-xl-4">
+                <div class="card sticky-xl">
+                    <div class="card-body">
+                        <h6 class="text-uppercase text-muted mb-3">Контакты</h6>
+                        <div class="fw-semibold">{{ user_obj.first_name }} {{ user_obj.last_name }}</div>
+                        <div class="text-muted small break-anywhere">{{ user_obj.email|default:"—" }}</div>
+                        {% with uinfo=user_obj.user_info %}
+                            {% if uinfo and uinfo.phone %}
+                                <div class="text-muted small break-anywhere">{{ uinfo.phone }}</div>
+                            {% endif %}
+                        {% endwith %}
+                        <hr>
+                        <div class="small text-muted">Последнее действие:</div>
+                        <div class="fw-semibold">
+                            {% if summary.last_action %}
+                                {{ summary.last_action|date:"d.m.Y H:i" }}
+                            {% else %}
+                                —
+                            {% endif %}
+                        </div>
+                    </div>
                 </div>
-              {% endif %}
             </div>
-          {% else %}
-            <p class="text-muted mb-0">Письмо отсутствует.</p>
-          {% endif %}
-        </div>
-      </div>
 
-      <!-- Документы -->
-      <div class="card card-section">
-        <div class="card-body">
-          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-            <h5 class="card-title mb-0">Документы</h5>
-            <div class="d-flex flex-wrap gap-2">
-              <a class="btn btn-sm btn-outline-secondary"
-                 href="{% url 'admin:documents_document_changelist' %}?user__id__exact={{ scholar.id }}"
-                 target="_blank" rel="noopener">
-                Открыть в админке (фильтр по пользователю)
-              </a>
-            </div>
-          </div>
+            <div class="col-12 col-xl-8">
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <h6 class="text-uppercase text-muted mb-3">Статусы для отбора</h6>
 
-          <form class="row g-2 my-2" method="post" enctype="multipart/form-data"
-                action="{% url 'staff_scholar_action' scholar.id %}">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="upload_staff_doc">
-            <div class="col-12 col-md-5">
-              {{ upload_form.file }}
-            </div>
-            <div class="col-12 col-md-4">
-              {{ upload_form.caption }}
-            </div>
-            <div class="col-12 col-md-2">
-              {{ upload_form.status }}
-            </div>
-            <div class="col-12 col-md-1 d-grid">
-              <button class="btn btn-outline-secondary">OK</button>
-            </div>
-          </form>
+                        <div class="row g-2">
+                            <div class="col-12 col-md-6">
+                                <div class="p-3 border rounded">
+                                    <div class="small text-muted">Анкета</div>
+                                    {% if summary.questionnaire_done %}
+                                        <div class="fw-semibold text-success">Отправлена</div>
+                                    {% else %}
+                                        <div class="fw-semibold text-warning">Не отправлена</div>
+                                    {% endif %}
+                                </div>
+                            </div>
 
-          <ul class="list-group list-group-flush">
-            {% for d in documents %}
-              <li class="list-group-item d-flex justify-content-between align-items-start gap-2">
-                <div class="me-2">
-                  <div class="small text-muted">{{ d.uploaded_at|date:"d.m.Y H:i" }}</div>
-                  <div class="break-anywhere">
-                    <a href="{{ d.file.url }}" target="_blank" rel="noopener">{{ d.caption }}</a>
-                  </div>
-                  {% if d.user_file_name %}
-                    <div class="small text-muted break-anywhere">Исходное имя: {{ d.user_file_name }}</div>
-                  {% endif %}
-                  {% if d.only_staff_comment %}
-                    <div class="small text-muted break-anywhere">Комментарий: {{ d.only_staff_comment }}</div>
-                  {% endif %}
-                  <!-- Ссылка на объект документа в админке -->
-                  <div class="mt-1">
-                    <a class="link-secondary small" target="_blank" rel="noopener"
-                       href="{% url 'admin:documents_document_change' d.id %}">Открыть в админке</a>
-                  </div>
+                            <div class="col-12 col-md-6">
+                                <div class="p-3 border rounded">
+                                    <div class="small text-muted">Видеовизитка</div>
+                                    {% if summary.video_exists %}
+                                        {% if summary.video_needs_review %}
+                                            <div class="fw-semibold text-warning">Ждёт оценки</div>
+                                        {% else %}
+                                            <div class="fw-semibold text-success">Есть (оценена/просмотрена)</div>
+                                        {% endif %}
+                                    {% else %}
+                                        <div class="fw-semibold text-muted">Нет</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <div class="col-12 col-md-6">
+                                <div class="p-3 border rounded">
+                                    <div class="small text-muted">Мотивационное письмо</div>
+                                    {% if summary.ml_exists %}
+                                        {% if summary.ml_needs_review %}
+                                            <div class="fw-semibold text-warning">Ждёт оценки</div>
+                                        {% else %}
+                                            <div class="fw-semibold text-success">Есть (обработано)</div>
+                                        {% endif %}
+                                    {% else %}
+                                        <div class="fw-semibold text-muted">Нет</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <div class="col-12 col-md-6">
+                                <div class="p-3 border rounded">
+                                    <div class="small text-muted">Оповещения</div>
+                                    {% if summary.unseen_notifs_count %}
+                                        <div class="fw-semibold">Непрочитанных: {{ summary.unseen_notifs_count }}</div>
+                                    {% else %}
+                                        <div class="fw-semibold text-success">Нет непрочитанных</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <div class="col-12 col-md-6">
+                                <div class="p-3 border rounded">
+                                    <div class="small text-muted">Документы</div>
+                                    {% if documents %}
+                                        <div class="fw-semibold">Последние загрузки:</div>
+                                        <ul class="small text-muted mb-0">
+                                            {% for d in documents %}
+                                                <li>{{ d.uploaded_at|date:"d.m.Y H:i" }}
+                                                    — {{ d.caption|default:"без названия" }}</li>
+                                            {% endfor %}
+                                        </ul>
+                                    {% else %}
+                                        <div class="fw-semibold text-muted">Нет документов</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
                 </div>
-                <div class="text-end">
-                  <span class="badge text-bg-light">{{ d.get_status_display }}</span><br>
-                  {% if d.is_locked %}
-                    <span class="badge text-bg-warning text-dark mt-1">Заблокирован</span><br>
-                  {% endif %}
-                  {% if d.uploaded_by_staff %}
-                    <div class="small text-muted mt-1">Загружено фондом</div>
-                  {% endif %}
+
+                {# Форма быстрого сообщения — оставить обязательно #}
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="text-uppercase text-muted mb-3">Быстрое сообщение</h6>
+                        <form method="post" action="{% url 'staff_scholar_action' user_obj.id %}" class="row g-2">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="send_notification">
+                            <div class="col-12">
+                                {{ notif_form.message }}
+                            </div>
+                            <div class="col-12 col-sm-5 col-md-4 col-lg-3 d-grid">
+                                <button class="btn btn-success">Отправить</button>
+                            </div>
+                        </form>
+
+                        {% if recent_notifs %}
+                            <hr>
+                            <div class="small text-muted mb-2">Последние оповещения:</div>
+                            <ul class="list-group list-group-flush">
+                                {% for un in recent_notifs %}
+                                    <li class="list-group-item">
+                                        <div class="small text-muted">
+                                            {{ un.notification.created_at|date:"d.m.Y H:i" }}
+                                            • {{ un.is_seen|yesno:"просмотрено,не просмотрено" }}
+                                        </div>
+                                        <div class="break-anywhere">{{ un.notification.message|linebreaksbr }}</div>
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        {% endif %}
+                    </div>
                 </div>
-              </li>
-            {% empty %}
-              <li class="list-group-item text-muted">Документы отсутствуют.</li>
-            {% endfor %}
-          </ul>
-        </div>
-      </div>
 
-      <!-- Уведомления -->
-      <div class="card card-section">
-        <div class="card-body">
-          <h5 class="card-title">Быстрое оповещение</h5>
-          <form method="post" action="{% url 'staff_scholar_action' scholar.id %}" class="row g-2 mb-3">
-            {% csrf_token %}
-            <input type="hidden" name="action" value="send_notification">
-            <div class="col-12">
-              {{ notif_form.message }}
             </div>
-            <div class="col-12 col-sm-6 col-md-4 col-lg-3 d-grid">
-              <button class="btn btn-success">Отправить</button>
-            </div>
-          </form>
-
-          <div class="small text-muted mb-2">Последние оповещения:</div>
-          <ul class="list-group list-group-flush">
-            {% for un in user_notifs %}
-              <li class="list-group-item">
-                <div class="small text-muted">
-                  {{ un.notification.created_at|date:"d.m.Y H:i" }}
-                  • {{ un.is_seen|yesno:"Просмотрено,Не просмотрено" }}
-                </div>
-                <div class="break-anywhere">{{ un.notification.message|linebreaksbr }}</div>
-              </li>
-            {% empty %}
-              <li class="list-group-item text-muted">Оповещений пока нет.</li>
-            {% endfor %}
-          </ul>
         </div>
-      </div>
-
     </div>
-  </div>
-</div>
-<style>
-  @media (min-width: 768px) {
-    .video-side-form { min-width: 280px; }
-  }
-  .card-title { white-space: nowrap; }
-</style>
-</body>
-</html>
+{% endblock %}

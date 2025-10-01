@@ -36,7 +36,7 @@ class Document(models.Model):
 
     related_documents = models.ManyToManyField('self', blank=True, symmetrical=False, related_name='document_relations')
 
-    is_locked = models.BooleanField(default=False, verbose_name="Заблокирован")
+    is_locked = models.BooleanField(default=False, verbose_name="Блокировать (запретить редактирование)")
 
     def clean(self):
         super().clean()
