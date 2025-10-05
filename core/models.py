@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
 from django.utils import timezone
 
@@ -174,6 +175,14 @@ class MotivationLetter(models.Model):
         blank=True,
         help_text='Вставьте своё мотивационное письмо сюда',
         verbose_name='Текст мотивационного письма'
+    )
+
+    admin_score = models.PositiveSmallIntegerField(
+        verbose_name='Итоговый балл',
+        validators=[MinValueValidator(0), MaxValueValidator(60)],
+        help_text="Введите значение от 0 до 60",
+        blank=True,
+        null=True
     )
 
     admin_rating = models.TextField(

@@ -1,5 +1,6 @@
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.db import IntegrityError
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.core.paginator import Paginator
@@ -94,20 +95,36 @@ def unselect_course(request, course_id: int):
 @ensure_registration_gate('protected')
 @login_required
 def universities(request):
-    priorities = UniversityPriority.objects.filter(user=request.user).order_by("priority")
-    form = UniversityPriorityForm(request.POST or None)
-    if request.method == "POST" and form.is_valid():
-        obj, _ = UniversityPriority.objects.update_or_create(
-            user=request.user, university=form.cleaned_data["university"],
-            defaults={
-                "priority": form.cleaned_data["priority"],
-                "notes": form.cleaned_data.get("notes", "")
-            }
-        )
-        messages.success(request, "Запись сохранена.")
-        return redirect("study:universities")
-    return render(request, "study/universities.html", {"form": form, "priorities": priorities, "active": "study"
-})
+    priorities = (UniversityPriority.objects
+                  .filter(user=request.user)
+                  .order_by("priority"))
+
+    if request.method == "POST":
+        form = UniversityPriorityForm(request.POST, user=request.user)
+        if form.is_valid():
+            try:
+                obj, _ = UniversityPriority.objects.update_or_create(
+                    user=request.user,
+                    university=form.cleaned_data["university"],
+                    defaults={
+                        "priority": form.cleaned_data["priority"],
+                        "notes": form.cleaned_data.get("notes", "")
+                    }
+                )
+                messages.success(request, "Запись сохранена.")
+                return redirect("study:universities")
+            except IntegrityError:
+                messages.warning(request, "Такой приоритет уже занят другим вузом. Выберите другой номер.")
+        else:
+            messages.warning(request, "Исправьте ошибки в форме.")
+    else:
+        form = UniversityPriorityForm(user=request.user)
+
+    return render(
+        request,
+        "study/universities.html",
+        {"form": form, "priorities": priorities, "active": "study"}
+    )
 
 
 @login_required

@@ -1,16 +1,14 @@
 import logging
-
-from django.db.models.signals import post_save, pre_save
-from django.dispatch import receiver, Signal
-
-from core.bot import send_tg_notification_to_user
-from core.models import Notification, UserNotification
-from .models import Document
-from telebot import TeleBot
-from django.conf import settings
 import os
 
+from django.db.models.signals import post_save, pre_save
+from django.dispatch import receiver
+from telebot import TeleBot
+
 import config
+from core.bot import send_tg_notification_to_user
+from core.models import UserNotification
+from .models import Document
 
 TG_TOKEN_ADMIN = config.TG_TOKEN_ADMIN
 
@@ -25,6 +23,7 @@ TELEGRAM_CHAT_IDS = config.TELEGRAM_STAFF_CHAT_IDS
 BASE_URL = config.BASE_URL
 
 logger = logging.getLogger(__name__)
+
 
 @receiver(post_save, sender=Document)
 def notify_telegram_on_document_upload(sender, instance, created, **kwargs):
@@ -58,7 +57,7 @@ def notify_telegram_on_documents_attached(sender, instance, created, **kwargs):
         attached_docs_list = "\n- ".join(attached_docs_names) if attached_docs_names else "нет"
 
         message_text = (
-            f"Пользователь { instance.user.username} прикрепил документы:\n"
+            f"Пользователь {instance.user.username} прикрепил документы:\n"
             f"К документу: '{instance.caption or os.path.basename(instance.file.name)}' (ID: {instance.pk})\n"
             f"Новый статус документа: {instance.get_status_display()}\n"
             f"Прикрепленные документы:\n- {attached_docs_list}\n"
@@ -71,6 +70,7 @@ def notify_telegram_on_documents_attached(sender, instance, created, **kwargs):
                 logger.info(f"Telegram уведомление о прикреплении документов отправлено {username} ({chat_id})")
             except Exception as e:
                 logger.error(f"Ошибка при отправке Telegram уведомления о прикреплении документов {username}: {e}")
+
 
 @receiver(pre_save, sender=Document)
 def notify_telegram_on_status_change(sender, instance: Document, **kwargs):
@@ -102,11 +102,13 @@ def notify_telegram_on_status_change(sender, instance: Document, **kwargs):
         f"Ссылка: {BASE_URL}{document_url}"
     )
 
-    send_tg_notification_to_user(message_text, instance.user)
+    send_tg_notification_to_user(message_text, instance.user, url=f"{BASE_URL}{document_url}",
+                                 button_text="Открыть документ")
 
     logger.info(
         f"Статус документа ID={instance.pk} изменён: {old.status} -> {instance.status}"
     )
+
 
 @receiver(post_save, sender=UserNotification)
 def notify_telegram_on_notification(sender, instance, created, **kwargs):
@@ -117,13 +119,19 @@ def notify_telegram_on_notification(sender, instance, created, **kwargs):
     user = instance.recipient
 
     msg = (
-        f"Вам пришло новое уведомление!\n\n"
+        f"📬 <b>Новое уведомление!</b>\n\n"
         f"{notif.message}\n\n"
-        f"от {notif.sender} в {notif.created_at:%Y-%m-%d %H:%M}"
+        f"👤 <b>Отправитель:</b> {notif.sender}\n"
+        f"🕒 <b>Время:</b> {notif.created_at:%d.%m.%Y %H:%M}"
     )
 
     def _send():
-        send_tg_notification_to_user(msg, user)
+        send_tg_notification_to_user(
+            user,
+            msg,
+            url=f"{BASE_URL}",
+            button_text="🌐 Открыть сайт"
+        )
         logger.debug(f"TG уведомление (through) отправлено {user.username} по Notification(id={notif.pk})")
 
     from django.db import transaction

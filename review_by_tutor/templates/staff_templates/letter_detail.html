@@ -19,8 +19,8 @@
             </div>
         {% endif %}
 
-        <div class="row g-4">
-            <div class="col-lg-7">
+        <div class="col g-4">
+            <div class="col-lg-12 mb-4">
                 <div class="card shadow-sm">
                     <div class="card-header">Текст письма (read-only)</div>
                     <div class="card-body">
@@ -34,7 +34,51 @@
                 </div>
             </div>
 
-            <div class="col-lg-5">
+            {# --- Оценка администратора (без изменений) --- #}
+            <div class="card shadow-sm mb-4">
+                <div class="card-header">Оценка администратора</div>
+                <div class="card-body">
+                    {% if form %}{% if letter %}
+                        <form method="post">
+                            {% csrf_token %}
+                            <div class="mb-3">
+                                <label class="form-label">{{ form.admin_score.label }}</label>
+                                {{ form.admin_score|add_class:"form-control" }}
+                                {% if form.admin_score.errors %}
+                                    <div class="text-danger small mt-1">{{ form.admin_score.errors }}</div>
+                                {% endif %}
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">{{ form.admin_rating.label }}</label>
+                                {{ form.admin_rating|add_class:"form-control" }}
+                                {% if form.admin_rating.errors %}
+                                    <div class="text-danger small mt-1">{{ form.admin_rating.errors }}</div>
+                                {% endif %}
+                                <div class="form-text">Это увидит соискатель.</div>
+                            </div>
+
+                            <div class="form-check mb-3">
+                                {{ form.is_done|add_class:"form-check-input" }}
+                                <label class="form-check-label"
+                                       for="{{ form.is_done.id_for_label }}">{{ form.is_done.label }}</label>
+                            </div>
+
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-primary" type="submit">Сохранить</button>
+                            </div>
+                        </form>
+                    {% else %}
+                        <div class="alert alert-info mb-0">Форма оценки недоступна: нет мотивационного письма.
+                        </div>
+                    {% endif %}{% else %}
+                        <div class="alert alert-info mb-0">Форма оценки недоступна: данные формы не переданы.
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="col-lg-12">
                 <div class="card shadow-sm mb-4">
                     <div class="card-header">Системные поля</div>
                     <div class="card-body small">
@@ -63,16 +107,6 @@
                             </div>
                         {% endif %}
 
-                        {% if readonly and readonly.gpt_json %}
-                            <div class="mt-2">
-                                <strong>Расширенный обзор:</strong>
-                                <div class="border rounded p-2 mt-1 bg-body-tertiary"
-                                     style="max-height: 280px; overflow:auto;">
-                                    {{ readonly.gpt_json }}
-                                </div>
-                            </div>
-                        {% endif %}
-
                         {% if readonly %}
                             {% if readonly.gpt_model or readonly.gpt_version or readonly.gpt_scored_at %}
                                 <div class="text-muted mt-2">
@@ -89,41 +123,120 @@
                     </div>
                 </div>
 
-                <div class="card shadow-sm">
-                    <div class="card-header">Оценка администратора</div>
-                    <div class="card-body">
-                        {% if form and letter %}
-                            <form method="post">
-                                {% csrf_token %}
-                                <div class="mb-3">
-                                    <label class="form-label">{{ form.admin_rating.label }}</label>
-                                    {{ form.admin_rating|add_class:"form-control" }}
-                                    {% if form.admin_rating.errors %}
-                                        <div class="text-danger small mt-1">{{ form.admin_rating.errors }}</div>
+                {# --- GPT: Детали рубрики --- #}
+                {% if readonly %}
+                    {% if readonly.gpt_json %}
+                        {% with j=readonly.gpt_json c=readonly.gpt_json.content r=readonly.gpt_json.rhetoric l=readonly.gpt_json.literacy e=readonly.gpt_json.extractions %}
+                            <div class="card shadow-sm mb-4 h-100">
+                                <div class="card-header">Детали рубрики</div>
+                                <div class="card-body">
+                                    <div class="row g-3 row-cols-1 row-cols-lg-3 align-items-start">
+                                        <div class="col">
+                                            <div class="fw-semibold mb-2">Содержание (6 пунктов)</div>
+                                            <ul class="list-unstyled mb-0 small">
+                                                <li class="mb-1">Специальность:
+                                                    <span class="text-wrap-anywhere">{{ c.specialty_choice|default:"—" }}</span>
+                                                </li>
+                                                <li class="mb-1">ВУЗ:
+                                                    <span class="text-wrap-anywhere">{{ c.university_choice|default:"—" }}</span>
+                                                </li>
+                                                <li class="mb-1">Подготовка сейчас:
+                                                    <span class="text-wrap-anywhere">{{ c.current_preparation|default:"—" }}</span>
+                                                </li>
+                                                <li class="mb-1">Планы на год:
+                                                    <span class="text-wrap-anywhere">{{ c.next_year_plan|default:"—" }}</span>
+                                                </li>
+                                                <li class="mb-1">Ценность высшего:
+                                                    <span class="text-wrap-anywhere">{{ c.higher_ed_value|default:"—" }}</span>
+                                                </li>
+                                                <li class="mb-0">Критичность поддержки:
+                                                    <span class="text-wrap-anywhere">{{ c.support_criticality|default:"—" }}</span>
+                                                </li>
+                                            </ul>
+                                        </div>
+
+                                        <div class="col">
+                                            <div class="fw-semibold mb-2">Речь</div>
+                                            <ul class="list-unstyled mb-3 small">
+                                                <li class="mb-1">Композиция:
+                                                    <span class="text-wrap-anywhere">{{ r.composition|default:"—" }}</span>
+                                                </li>
+                                                <li class="mb-0">Точность стиля:
+                                                    <span class="text-wrap-anywhere">{{ r.style_precision|default:"—" }}</span>
+                                                </li>
+                                            </ul>
+
+                                            <div class="fw-semibold mb-2">Грамотность</div>
+                                            <ul class="list-unstyled mb-0 small">
+                                                <li class="mb-1">Орфография:
+                                                    <span class="text-wrap-anywhere">{{ l.orthography|default:"—" }}</span>
+                                                </li>
+                                                <li class="mb-0">Синтаксис:
+                                                    <span class="text-wrap-anywhere">{{ l.syntax|default:"—" }}</span>
+                                                </li>
+                                            </ul>
+                                        </div>
+
+                                        <div class="col">
+                                            <div class="fw-semibold mb-2">Сжатые сведения</div>
+                                            <div class="small text-muted mb-2">для профиля/анкеты</div>
+                                            <ul class="list-unstyled mb-0 small">
+                                                <li class="mb-1">Семья: <span
+                                                        class="text-wrap-anywhere">{{ e.family|default:"—" }}</span>
+                                                </li>
+                                                <li class="mb-1">Хобби: <span
+                                                        class="text-wrap-anywhere">{{ e.hobbies|default:"—" }}</span>
+                                                </li>
+                                                <li class="mb-1">Достижения: <span
+                                                        class="text-wrap-anywhere">{{ e.achievements|default:"—" }}</span>
+                                                </li>
+                                                <li class="mb-1">Черты: <span
+                                                        class="text-wrap-anywhere">{{ e.traits|default:"—" }}</span>
+                                                </li>
+                                                <li class="mb-1">Учителя: <span
+                                                        class="text-wrap-anywhere">{{ e.school_teachers|default:"—" }}</span>
+                                                </li>
+                                                <li class="mb-1">Предметы: <span
+                                                        class="text-wrap-anywhere">{{ e.prep_subjects|default:"—" }}</span>
+                                                </li>
+                                                <li class="mb-1">Специальность: <span
+                                                        class="text-wrap-anywhere">{{ e.specialty|default:"—" }}</span>
+                                                </li>
+                                                <li class="mb-1">ВУЗы: <span
+                                                        class="text-wrap-anywhere">{{ e.preferred_universities|default:"—" }}</span>
+                                                </li>
+                                                <li class="mb-1">Переезд: <span
+                                                        class="text-wrap-anywhere">{{ e.relocation|default:"—" }}</span>
+                                                </li>
+                                                <li class="mb-1">Олимпиады: <span
+                                                        class="text-wrap-anywhere">{{ e.olympiads|default:"—" }}</span>
+                                                </li>
+                                                <li class="mb-1">Мотивация: <span
+                                                        class="text-wrap-anywhere">{{ e.motivation|default:"—" }}</span>
+                                                </li>
+                                                <li class="mb-1">Критичность помощи: <span
+                                                        class="text-wrap-anywhere">{{ e.help_criticality|default:"—" }}</span>
+                                                </li>
+                                                <li class="mb-0">Дополнительно: <span
+                                                        class="text-wrap-anywhere">{{ e.extra|default:"—" }}</span></li>
+                                            </ul>
+                                        </div>
+                                    </div>
+
+                                    {% if j.justification %}
+                                        <hr class="my-3">
+                                        <div class="fw-semibold mb-2">Пояснение</div>
+                                        <pre class="mb-0 json-pre overflow-auto">{{ j.justification }}</pre>
                                     {% endif %}
-                                    <div class="form-text">Это увидит соискатель.</div>
                                 </div>
-
-                                <div class="form-check mb-3">
-                                    {{ form.is_done|add_class:"form-check-input" }}
-                                    <label class="form-check-label"
-                                           for="{{ form.is_done.id_for_label }}">{{ form.is_done.label }}</label>
-                                </div>
-
-                                <div class="d-flex gap-2">
-                                    <button class="btn btn-primary" type="submit">Сохранить</button>
-                                </div>
-                            </form>
-                        {% else %}
-                            <div class="alert alert-info mb-0">
-                                Форма оценки недоступна: {% if not letter %}нет мотивационного письма.{% else %}данные
-                                формы не переданы.{% endif %}
                             </div>
-                        {% endif %}
-                    </div>
-                </div>
+                        {% endwith %}
+                    {% endif %}
+                {% endif %}
+
 
             </div>
         </div>
+    </div>
     </div>
 {% endblock %}

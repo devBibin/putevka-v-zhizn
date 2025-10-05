@@ -7,6 +7,8 @@ WORKDIR /app
 
 RUN apt-get update && apt-get install -y netcat-openbsd postgresql-client libmagic1 gettext && apt-get clean
 
+RUN pip install --upgrade pip
+
 COPY requirements.txt .
 RUN pip install --no-cache-dir \
     --timeout 30 \

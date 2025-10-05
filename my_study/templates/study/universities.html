@@ -1,52 +1,104 @@
 {% extends "study/base_study.html" %}
 {% load widget_tweaks %}
 {% block study_content %}
-<div class="row g-4">
-  <div class="col-lg-5">
-    <div class="card">
-      <div class="card-body">
-        <h5 class="card-title mb-3">Добавить/обновить приоритет</h5>
-        <form method="post">
-          {% csrf_token %}
-          <div class="mb-3">
-            <label class="form-label">ВУЗ</label>
-            {{ form.university|add_class:"form-control" }}
-          </div>
-          <div class="mb-3">
-            <label class="form-label">Приоритет</label>
-            {{ form.priority|add_class:"form-control" }}
-          </div>
-          <div class="mb-3">
-            <label class="form-label">Заметка</label>
-            {{ form.notes|add_class:"form-control" }}
-          </div>
-          <button class="btn btn-primary">Сохранить</button>
-        </form>
-      </div>
+    <div class="row g-4">
+        <div class="col-lg-5">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title mb-3">Добавить/обновить приоритет</h5>
+
+                    {% if form.non_field_errors %}
+                        <div class="alert alert-danger mb-3">
+                            {{ form.non_field_errors|striptags }}
+                        </div>
+                    {% elif form.errors %}
+                        <div class="alert alert-danger mb-3">
+                            Проверьте поля ниже — есть ошибки.
+                        </div>
+                    {% endif %}
+
+                    <form method="post" novalidate>
+                        {% csrf_token %}
+
+                        <div class="mb-3">
+                            <label class="form-label" for="{{ form.university.id_for_label }}">ВУЗ</label>
+                            {% with field=form.university %}
+                                {% if field.errors %}
+                                    {{ field|add_class:"form-select is-invalid" }}
+                                    <div class="invalid-feedback">
+                                        {{ field.errors|striptags }}
+                                    </div>
+                                {% else %}
+                                    {{ field|add_class:"form-control" }}
+                                {% endif %}
+                            {% endwith %}
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label" for="{{ form.priority.id_for_label }}">Приоритет</label>
+                            {% with field=form.priority %}
+                                {% if field.errors %}
+                                    {{ field|add_class:"form-select is-invalid" }}
+                                    <div class="invalid-feedback">
+                                        {{ field.errors|striptags }}
+                                    </div>
+                                {% else %}
+                                    {{ field|add_class:"form-select" }}
+                                {% endif %}
+                            {% endwith %}
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label" for="{{ form.notes.id_for_label }}">Заметка</label>
+                            {% with field=form.notes %}
+                                {% if field.errors %}
+                                    {{ field|add_class:"form-control is-invalid" }}
+                                    <div class="invalid-feedback">
+                                        {{ field.errors|striptags }}
+                                    </div>
+                                {% else %}
+                                    {{ field|add_class:"form-control" }}
+                                {% endif %}
+                            {% endwith %}
+                            <div class="form-text">Коротко: почему именно этот ВУЗ.</div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary">Сохранить</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-lg-7">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title mb-3">Текущий список приоритетов</h5>
+
+                    <ol class="list-group list-group-numbered">
+                        {% for p in priorities %}
+                            <li class="list-group-item d-flex justify-content-between align-items-start">
+                                <div class="ms-2 me-auto">
+                                    <div class="fw-semibold">{{ p.university }}</div>
+                                    {% if p.notes %}
+                                        <div class="small mt-1 text-body-secondary notes">
+                                            {{ p.notes|linebreaks }}
+                                        </div>
+                                    {% endif %}
+                                </div>
+
+                                <div class="d-flex align-items-center gap-2 text-nowrap">
+                                    <span class="badge bg-primary rounded-pill">#{{ p.priority }}</span>
+                                    <a class="btn btn-sm btn-outline-danger"
+                                       href="{% url 'study:delete_university_priority' p.id %}"
+                                       onclick="return confirm('Удалить запись?');">Удалить</a>
+                                </div>
+                            </li>
+                        {% empty %}
+                            <li class="list-group-item text-muted">Пока нет записей.</li>
+                        {% endfor %}
+                    </ol>
+                </div>
+            </div>
+        </div>
     </div>
-  </div>
-  <div class="col-lg-7">
-    <div class="card">
-      <div class="card-body">
-        <h5 class="card-title mb-3">Текущий список приоритетов</h5>
-        <ol class="list-group list-group-numbered">
-          {% for p in priorities %}
-            <li class="list-group-item d-flex justify-content-between align-items-center">
-              <div>
-                <div class="fw-semibold">{{ p.university }}</div>
-                {% if p.notes %}<div class="small mt-1">{{ p.notes }}</div>{% endif %}
-              </div>
-              <div>
-                <span class="badge bg-primary rounded-pill me-2">#{{ p.priority }}</span>
-                <a class="btn btn-sm btn-outline-danger" href="{% url 'study:delete_university_priority' p.id %}">Удалить</a>
-              </div>
-            </li>
-          {% empty %}
-            <p class="text-muted">Пока нет записей.</p>
-          {% endfor %}
-        </ol>
-      </div>
-    </div>
-  </div>
-</div>
 {% endblock %}

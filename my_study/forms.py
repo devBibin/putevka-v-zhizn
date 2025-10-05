@@ -25,6 +25,29 @@ class UniversityPriorityForm(forms.ModelForm):
     class Meta:
         model = UniversityPriority
         fields = ["university", "priority", "notes"]
+        widgets = {
+            "priority": forms.Select(choices=[(i, str(i)) for i in range(1, 6)]),
+            "notes": forms.Textarea(attrs={"rows": 6, "placeholder": "Почему вы выбрали этот вуз?"}),
+        }
+
+    def __init__(self, *args, user=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.user = user
+
+    def clean(self):
+        cleaned = super().clean()
+        user = self.user
+        pr = cleaned.get("priority")
+        uni = cleaned.get("university")
+
+        if user is not None and pr is not None:
+            qs = UniversityPriority.objects.filter(user=user, priority=pr)
+            if self.instance and self.instance.pk:
+                qs = qs.exclude(pk=self.instance.pk)
+            if qs.exists() and not qs.filter(university=uni).exists():
+                self.add_error("priority", "Этот приоритет уже занят другим вузом.")
+
+        return cleaned
 
 
 class AssessmentResultForm(forms.ModelForm):

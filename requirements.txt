@@ -6,8 +6,7 @@ pyTelegramBotAPI
 requests
 django-formtools
 django-widget-tweaks
-psycopg2-binary
 openai>=1.52.0
 python-magic
 Pillow
-requests
+pydantic

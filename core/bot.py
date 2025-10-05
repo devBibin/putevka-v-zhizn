@@ -8,13 +8,13 @@ from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
-from telebot import TeleBot
+from telebot import TeleBot, types
 
 import config
 from core.models import TelegramAccount, RegistrationPersonalData
 from scholar_form.models import UserInfo
 
-logger = logging.getLogger('django.request')
+logger = logging.getLogger(__name__)
 
 bot_instances = {}
 
@@ -204,13 +204,38 @@ def webhook(request, bot_token):
         return JsonResponse({'status': 'error', 'message': 'Only POST requests are accepted'}, status=405)
 
 
-def send_tg_notification_to_user(message, user):
-    if not hasattr(user, 'telegram_account'):
-        return
-    if not user.telegram_account.telegram_id:
-        return
+def send_tg_notification_to_user(
+    user,
+    message: str,
+    url: str | None = None,
+    button_text: str = "Открыть",
+    disable_preview: bool = True,
+):
+    tg_id = getattr(getattr(user, "telegram_account", None), "telegram_id", None)
+    if not tg_id:
+
+        return False
+
+    markup = None
+    if url:
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton(text=button_text, url=url))
+
+    #костыль для разработки на локальной машине
+    if config.BASE_URL == 'http://localhost:8000':
+        markup = None
+
     try:
         bot_user = TeleBot(config.TG_TOKEN_USERS)
-        bot_user.send_message(user.telegram_account.telegram_id, message)
+        bot_user.send_message(
+            tg_id,
+            message,
+            reply_markup=markup,
+            disable_web_page_preview=disable_preview,
+            parse_mode="HTML",
+        )
+        logger.info(f"TG: сообщение успешно отправлено пользователю {tg_id}")
+        return True
     except Exception as e:
-        logger.info(f"Не получилось отправить сообщение в telegram: {e}")
+        logger.warning(f"TG: не удалось отправить сообщение пользователю {tg_id}: {e}")
+        return False
