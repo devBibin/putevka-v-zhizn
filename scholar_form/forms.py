@@ -8,6 +8,27 @@ from formtools.wizard.views import SessionWizardView
 
 from django.db import transaction
 
+def _sync_user_from_userinfo(userinfo: UserInfo):
+    user = getattr(userinfo, "user", None)
+    if not user:
+        return
+    updated_fields = []
+
+    if userinfo.first_name and user.first_name != userinfo.first_name:
+        user.first_name = userinfo.first_name
+        updated_fields.append("first_name")
+
+    if userinfo.last_name and user.last_name != userinfo.last_name:
+        user.last_name = userinfo.last_name
+        updated_fields.append("last_name")
+
+    if userinfo.email and user.email != userinfo.email:
+        user.email = userinfo.email
+        updated_fields.append("email")
+
+    if updated_fields:
+        user.save(update_fields=updated_fields)
+
 wizard_done = Signal()
 
 class PersonalForm(forms.ModelForm):
@@ -173,6 +194,9 @@ class ApplicationWizard(SessionWizardView):
             if field in model_fields:
                 setattr(instance, field, value)
         instance.save()
+
+        _sync_user_from_userinfo(instance)
+
         return super().process_step(form)
 
     def done(self, form_list, **kwargs):
@@ -185,6 +209,9 @@ class ApplicationWizard(SessionWizardView):
         instance.is_done = True
         wizard_done.send(sender=self.__class__, instance=instance, forms=form_list)
         instance.save()
+
+        _sync_user_from_userinfo(instance)
+
         return redirect('thank_you')
 
     def post(self, *args, **kwargs):
@@ -205,6 +232,9 @@ class ApplicationWizard(SessionWizardView):
                     if field in model_fields:
                         setattr(instance, field, value)
                 instance.save()
+
+                _sync_user_from_userinfo(instance)
+
                 from django.http import HttpResponse
                 return HttpResponse(status=204)
             else:

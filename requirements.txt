@@ -7,9 +7,10 @@ requests
 django-formtools
 django-widget-tweaks
 psycopg2-binary
-openai
+openai>=1.52.0
 python-magic
 dj_database_url
 psycopg
 Pillow
+pydantic
 requests

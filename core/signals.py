@@ -71,16 +71,21 @@ def notify_on_rating_change(sender, instance, created, **kwargs):
     message = build_motivation_rating_message(instance, user_url)
 
     try:
-        send_tg_notification_to_user(message, instance.user)
+        send_tg_notification_to_user(
+            instance.user,
+            message,
+            user_url,
+            button_text="📄 Посмотреть письмо"
+        )
         logger.info(f"TG: уведомление об оценке письма {instance.pk} отправлено пользователю {instance.user}")
     except Exception as e:
         logger.warning(e)
 
 def build_motivation_rating_message(letter, user_url: str) -> str:
-    admin_rating = letter.admin_rating
-
+    admin_rating = letter.admin_rating or "— без комментария —"
     return (
-        "Ваше мотивационное письмо оценено ✅\n\n"
-        f"Комментарий: {admin_rating}\n\n"
-        f"Посмотреть письмо: {user_url}"
+        "✅ <b>Ваше мотивационное письмо оценено!</b>\n\n"
+        f"<b>Комментарий:</b>\n{admin_rating}\n\n"
+        "👇 Откройте письмо по ссылке ниже\n"
+        f"{user_url}"
     )

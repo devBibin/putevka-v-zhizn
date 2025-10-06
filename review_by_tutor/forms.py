@@ -8,7 +8,7 @@ from scholar_form.models import UserInfo, ScholarVideo
 class MotivationLetterStaffForm(forms.ModelForm):
     class Meta:
         model = MotivationLetter
-        fields = ["admin_rating", "is_done"]
+        fields = ["admin_score", "admin_rating", "is_done"]
         widgets = {
             "admin_rating": forms.Textarea(attrs={
                 "rows": 6,
@@ -17,8 +17,9 @@ class MotivationLetterStaffForm(forms.ModelForm):
             }),
         }
         labels = {
-            "admin_rating": "Оценка/фидбэк администратора",
-            "is_done": "Письмо принято (галочка)",
+            "admin_score": "Оценка администратора",
+            "admin_rating": "Фидбэк администратора",
+            "is_done": "Письмо принято",
         }
 
 

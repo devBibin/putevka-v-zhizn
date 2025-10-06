@@ -4,6 +4,8 @@ from datetime import datetime, timedelta
 
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.contrib.contenttypes.fields import GenericRelation
+from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
 from django.utils import timezone
 
@@ -11,6 +13,9 @@ from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.conf import settings
+
+from scholar_form.models import StaffNote
+
 
 class TelegramAccount(models.Model):
     user = models.OneToOneField(
@@ -176,6 +181,14 @@ class MotivationLetter(models.Model):
         verbose_name='Текст мотивационного письма'
     )
 
+    admin_score = models.PositiveSmallIntegerField(
+        verbose_name='Итоговый балл',
+        validators=[MinValueValidator(0), MaxValueValidator(60)],
+        help_text="Введите значение от 0 до 60",
+        blank=True,
+        null=True
+    )
+
     admin_rating = models.TextField(
         verbose_name="Оценка администратора",
         null=True,
@@ -237,6 +250,8 @@ class MotivationLetter(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    notes = GenericRelation(StaffNote, related_query_name="documents")
 
     class Meta:
         verbose_name = "Мотивационное письмо"

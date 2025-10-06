@@ -1,9 +1,10 @@
+import json
 import logging
 import mimetypes
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required, user_passes_test
-from django.core.paginator import Paginator
+from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.db.models import Prefetch, Q, Subquery, OuterRef, Count, Exists
 
 from django.shortcuts import render, get_object_or_404, redirect
@@ -17,7 +18,7 @@ from review_by_tutor.forms import MotivationLetterStaffForm, UserInfoStaffForm, 
     DocumentStatusForm
 from django.contrib import messages
 
-from scholar_form.models import UserInfo, ScholarVideo
+from scholar_form.models import UserInfo, ScholarVideo, StaffNote
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -60,6 +61,7 @@ def staff_letter_detail(request, user_id: int):
         "gpt_review": getattr(letter, "gpt_review", None),
         "gpt_score": getattr(letter, "gpt_score", None),
         "gpt_word_count": getattr(letter, "gpt_word_count", None) or (letter.word_count() if letter else None),
+        'gpt_json': letter.gpt_json or None,
     }
 
     ctx = {
@@ -244,6 +246,59 @@ def staff_study_detail(request, user_id: int):
         "assessments": assessments,
         "active": "study",
     })
+
+@login_required
+@user_passes_test(_staff_check)
+def staff_notes_by_user(request, user_id: int):
+    user_obj = get_object_or_404(User, pk=user_id)
+
+    if request.method == "POST":
+        text = (request.POST.get("text") or "").strip()
+        if text:
+            StaffNote.objects.create(target_user=user_obj, author=request.user, text=text)
+            messages.success(request, "Запись добавлена.")
+            return redirect("staff_notes", user_id=user_id)
+        messages.error(request, "Текст записи обязателен.")
+
+    notes_qs = (StaffNote.objects
+                .select_related("author")
+                .filter(target_user=user_obj)
+                .order_by("-created_at"))
+
+    page = request.GET.get("page", 1)
+    paginator = Paginator(notes_qs, 5)
+    try:
+        notes = paginator.page(page)
+    except PageNotAnInteger:
+        notes = paginator.page(1)
+    except EmptyPage:
+        notes = paginator.page(paginator.num_pages)
+
+    try:
+        letter = MotivationLetter.objects.select_related("user").get(user=user_obj)
+    except MotivationLetter.DoesNotExist:
+        letter = None
+
+    documents = (Document.objects
+                 .filter(user=user_obj, is_deleted=False)
+                 .order_by("-uploaded_at")[:50])
+
+    try:
+        video = ScholarVideo.objects.select_related("user").get(user=user_obj)
+    except ScholarVideo.DoesNotExist:
+        video = None
+
+    ctx = {
+        "user_obj": user_obj,
+        "notes": notes,
+        "total_count": paginator.count,
+        "letter": letter,
+        "documents": documents,
+        "video": video,
+        "active": "notes",
+    }
+    return render(request, "staff_templates/staff_notes_by_user.html", ctx)
+
 
 
 @login_required
