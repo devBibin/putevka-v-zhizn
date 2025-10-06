@@ -3,11 +3,42 @@ import os
 import uuid
 from pathlib import Path
 
+from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
+from django.contrib.contenttypes.models import ContentType
 from importlib.resources._common import _
+from django.utils import timezone
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import models
+
+
+class StaffNote(models.Model):
+    target_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="staff_notes")
+
+    content_type = models.ForeignKey(ContentType, null=True, blank=True, on_delete=models.SET_NULL)
+    object_id    = models.PositiveIntegerField(null=True, blank=True)
+    content_object = GenericForeignKey("content_type", "object_id")
+
+    author = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name="staff_notes_authored")
+
+    text = models.TextField()
+
+    created_at = models.DateTimeField(default=timezone.now, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Заметка стаффа"
+        verbose_name_plural = "Заметки стаффа"
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["target_user", "-created_at"]),
+            models.Index(fields=["content_type", "object_id"]),
+            models.Index(fields=["created_at"]),
+        ]
+
+    def __str__(self):
+        return f"Заметка по {self.target_user_id} | {self.text[:60]}"
 
 
 class UserInfo(models.Model):
@@ -103,6 +134,8 @@ class ScholarVideo(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    notes = GenericRelation(StaffNote, related_query_name="videos")
 
     class Meta:
         verbose_name = "Видеовизитка"

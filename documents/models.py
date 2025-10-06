@@ -2,8 +2,11 @@ import os
 import uuid
 
 from django.contrib.auth.models import User
+from django.contrib.contenttypes.fields import GenericRelation
 from django.core.exceptions import ValidationError
 from django.db import models
+
+from scholar_form.models import StaffNote
 
 
 def upload_to_path(instance, filename):
@@ -37,6 +40,8 @@ class Document(models.Model):
     related_documents = models.ManyToManyField('self', blank=True, symmetrical=False, related_name='document_relations')
 
     is_locked = models.BooleanField(default=False, verbose_name="Блокировать (запретить редактирование)")
+
+    notes = GenericRelation(StaffNote, related_query_name="letters")
 
     def clean(self):
         super().clean()
