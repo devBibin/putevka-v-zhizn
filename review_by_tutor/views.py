@@ -61,7 +61,7 @@ def staff_letter_detail(request, user_id: int):
         "gpt_review": getattr(letter, "gpt_review", None),
         "gpt_score": getattr(letter, "gpt_score", None),
         "gpt_word_count": getattr(letter, "gpt_word_count", None) or (letter.word_count() if letter else None),
-        'gpt_json': letter.gpt_json if letter.gpt_json else None,
+        'gpt_json': letter.gpt_json if letter and letter.gpt_json else None,
     }
 
     ctx = {
