@@ -5,23 +5,26 @@
 {% block title %}Мои Документы{% endblock %}
 
 {% block content %}
-    <h1 class="mb-4 text-center">Мои Документы</h1>
+    <h1 class="h5 text-center mb-4">Мои Документы</h1>
 
     {% if messages %}
-        {% for message in messages %}
-            <div class="alert alert-{{ message.tags }}">{{ message }}</div>
-        {% endfor %}
+        <div class="container mb-3">
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} mb-2">{{ message }}</div>
+            {% endfor %}
+        </div>
     {% endif %}
 
     <div class="container">
+        <!-- Загрузка документа -->
         <div class="row justify-content-center">
             <div class="col-12 col-md-8 mb-4">
-                <div class="card">
-                    <div class="card-header bg-info text-white">
-                        <h2 class="card-title mb-0">Загрузить документ</h2>
+                <div class="card shadow-sm">
+                    <div class="d-flex align-items-center border-bottom bg-body p-3">
+                        <h2 class="h6 m-0 fw-semibold text-body">Загрузить документ</h2>
                     </div>
-                    <div class="card-body">
-                        <form method="post" enctype="multipart/form-data" id="generalDocumentForm">
+                    <div class="p-3">
+                        <form method="post" enctype="multipart/form-data" id="generalDocumentForm" class="gy-3">
                             {% csrf_token %}
                             <input type="hidden" name="form_type" value="general_document_form">
                             {% for field in general_document_form %}
@@ -31,28 +34,29 @@
                                         {{ field|add_class:"form-control"|attr:"accept:application/pdf,application/msword,text/plain,image/jpeg,image/png"|attr:"id:id_file_upload" }}
                                     {% elif field.name == 'caption' %}
                                         {{ field|add_class:"form-control"|attr:"id:id_caption_upload" }}
-                                        <div id="captionCharCount" class="form-text text-muted">0
-                                            / {{ field.field.max_length }} символов
+                                        <div id="captionCharCount" class="form-text text-body-secondary">
+                                            0 / {{ field.field.max_length }} символов
                                         </div>
                                     {% else %}
                                         {{ field|add_class:"form-control" }}
                                     {% endif %}
                                     {% if field.help_text %}
-                                        <div class="form-text text-muted">{{ field.help_text }}</div>
+                                        <div class="form-text text-body-secondary">{{ field.help_text }}</div>
                                     {% endif %}
                                     {% for error in field.errors %}
-                                        <div class="text-danger small">{{ error }}</div>
+                                        <div class="small text-danger">{{ error }}</div>
                                     {% endfor %}
                                 </div>
                             {% endfor %}
+
                             {% if general_document_form.non_field_errors %}
                                 <div class="alert alert-danger">
-                                    {% for error in general_document_form.non_field_errors %}
-                                        {{ error }}
-                                    {% endfor %}
+                                    {% for error in general_document_form.non_field_errors %}{{ error }}{% endfor %}
                                 </div>
                             {% endif %}
-                            <button type="submit" class="btn btn-primary mt-3" id="uploadButton" disabled>Загрузить
+
+                            <button type="submit" class="btn btn-outline-primary btn-sm" id="uploadButton" disabled>
+                                Загрузить
                             </button>
                         </form>
                     </div>
@@ -60,79 +64,107 @@
             </div>
         </div>
 
-        <div class="row justify-content-center mt-4">
-            <div class="col-12 col-md-8">
-                <div class="card">
-                    <div class="card-header bg-warning text-dark">
-                        <h2 class="card-title mb-0">Документы, загруженные сотрудниками (для вас)</h2>
+        <!-- Документы, загруженные сотрудниками -->
+        <div class="row justify-content-center">
+            <div class="col-12 col-md-8 mb-4">
+                <div class="card shadow-sm">
+                    <div class="d-flex align-items-center border-bottom bg-body p-3">
+                        <h2 class="h6 m-0 fw-semibold text-body">Документы, загруженные сотрудниками</h2>
                     </div>
-                    <div class="card-body">
+                    <div class="p-3">
                         {% if staff_documents %}
-                            <ul class="list-group">
+                            <ul class="list-group list-group-flush">
                                 {% for doc in staff_documents %}
-                                    <li class="list-group-item d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-2">
-                                        <div class="mb-2 mb-md-0 w-100 min-w-0">
-                                            <a href="{% url 'serve_document' doc.pk %}" target="_blank"
-                                               class="d-block text-break">
-                                                {{ doc.caption }} ({{ doc.user_file_name }})
-                                            </a>
-                                            <span class="badge
-                                                {% if doc.status == 'PENDING_SIGNATURE' %}bg-warning
-                                                {% elif doc.status == 'SIGNED' %}bg-success
-                                                {% elif doc.status == 'APPROVED' %}bg-success
-                                                {% elif doc.status == 'QUESTION' %}bg-danger
-                                                {% else %}bg-secondary{% endif %} text-dark ms-2">
-                                                {{ doc.get_status_display }}
-                                            </span>
-                                            <span class="badge bg-info text-dark">{{ doc.uploaded_at|date:"d.m.Y H:i" }}</span>
+                                    <li class="list-group-item px-0">
+                                        <div class="d-flex flex-column gap-2">
+                                            <div>
+                                                <a href="{% url 'serve_document' doc.pk %}" target="_blank"
+                                                   class="link-body-emphasis d-block text-break">
+                                                    {{ doc.caption }} ({{ doc.user_file_name }})
+                                                </a>
+                                                <div class="d-flex flex-wrap align-items-center gap-2 mt-1">
+                                                    {# статус как спокойный бейдж #}
+                                                    <span class="badge rounded-pill
+                            {% if doc.status == 'PENDING_SIGNATURE' %} text-warning-emphasis bg-warning-subtle border border-warning-subtle
+                            {% elif doc.status == 'SIGNED' %} text-success-emphasis bg-success-subtle border border-success-subtle
+                            {% elif doc.status == 'APPROVED' %} text-success-emphasis bg-success-subtle border border-success-subtle
+                            {% elif doc.status == 'QUESTION' %} text-danger-emphasis bg-danger-subtle border border-danger-subtle
+                            {% else %} text-body-secondary bg-body border border-secondary-subtle
+                            {% endif %}">
+                            {{ doc.get_status_display }}
+                          </span>
 
-                                            <button type="button"
-                                                    class="btn btn-sm btn-outline-secondary mt-2 attach-button"
-                                                    data-document-id="{{ doc.pk }}">
-                                                Прикрепить документы
-                                            </button>
+                                                    <span class="badge rounded-pill text-body-secondary bg-body border border-secondary-subtle">
+                            {{ doc.uploaded_at|date:"d.m.Y H:i" }}
+                          </span>
+                                                </div>
+                                            </div>
 
-                                            <div class="attach-form-container mt-3" id="attach-form-{{ doc.pk }}"
+                                            <div>
+                                                <button type="button"
+                                                        class="btn btn-outline-secondary btn-sm attach-button"
+                                                        data-document-id="{{ doc.pk }}">
+                                                    Прикрепить документы
+                                                </button>
+                                            </div>
+
+                                            <div class="attach-form-container mt-2" id="attach-form-{{ doc.pk }}"
                                                  style="display:none;">
                                                 <form method="post" action="" class="attach-documents-form"
                                                       id="attachForm-{{ doc.pk }}">
                                                     {% csrf_token %}
                                                     <input type="hidden" name="form_type" value="attach_documents_form">
                                                     <input type="hidden" name="target_document_id" value="{{ doc.pk }}">
-                                                    <div class="mb-3">
-                                                        {{ attach_documents_form.documents_to_attach.label_tag }}
-                                                        {% for checkbox in attach_documents_form.documents_to_attach %}
-                                                            <div class="form-check">
-                                                                <input type="checkbox" name="documents_to_attach"
-                                                                       id="{{ checkbox.id_for_label }}"
-                                                                       value="{{ checkbox.data.value }}"
-                                                                       {% if checkbox.data.selected %}checked{% endif %}>
-                                                                <label class="form-check-label"
-                                                                       for="{{ checkbox.id_for_label }}">
-                                                                    {{ checkbox.choice_label }}
-                                                                </label>
+
+                                                    {% if user_documents %}
+                                                        <div class="mb-2">
+                                                            {{ attach_documents_form.documents_to_attach.label_tag }}
+                                                            <div class="d-flex flex-column gap-1 mt-1">
+                                                                {% for checkbox in attach_documents_form.documents_to_attach %}
+                                                                    <div class="form-check">
+                                                                        <input class="form-check-input" type="checkbox"
+                                                                               name="documents_to_attach"
+                                                                               id="{{ checkbox.id_for_label }}"
+                                                                               value="{{ checkbox.data.value }}"
+                                                                               {% if checkbox.data.selected %}checked{% endif %}>
+                                                                        <label class="form-check-label"
+                                                                               for="{{ checkbox.id_for_label }}">
+                                                                            {{ checkbox.choice_label }}
+                                                                        </label>
+                                                                    </div>
+                                                                {% endfor %}
                                                             </div>
-                                                        {% endfor %}
-                                                        {% for error in attach_documents_form.documents_to_attach.errors %}
-                                                            <div class="text-danger small">{{ error }}</div>
-                                                        {% endfor %}
-                                                    </div>
-                                                    <button type="submit"
-                                                            class="btn btn-success btn-sm attach-submit-button"
-                                                            disabled>Прикрепить
-                                                    </button>
+                                                            {% for error in attach_documents_form.documents_to_attach.errors %}
+                                                                <div class="small text-danger">{{ error }}</div>
+                                                            {% endfor %}
+                                                        </div>
+
+                                                        <button type="submit"
+                                                                class="btn btn-outline-success btn-sm attach-submit-button"
+                                                                disabled>
+                                                            Прикрепить
+                                                        </button>
+                                                    {% else %}
+                                                        <div class="alert alert-info small mb-0">
+                                                            У вас пока нет собственных документов, которые можно
+                                                            прикрепить.<br>
+                                                            Пожалуйста, сначала загрузите их.
+                                                        </div>
+                                                    {% endif %}
                                                 </form>
                                             </div>
 
                                             {% if doc.related_documents.all %}
                                                 <div class="mt-2">
-                                                    <strong>Прикрепленные документы:</strong>
-                                                    <ul class="list-unstyled mt-1">
+                                                    <div class="text-body-secondary small mb-1">Прикрепленные
+                                                        документы:
+                                                    </div>
+                                                    <ul class="list-unstyled mb-0">
                                                         {% for related_doc in doc.related_documents.all %}
                                                             <li class="mb-1">
                                                                 <a href="{% url 'serve_document' related_doc.pk %}"
                                                                    target="_blank"
-                                                                   class="d-block text-break">
+                                                                   class="link-body-emphasis d-block text-break">
                                                                     {{ related_doc.caption }}
                                                                     ({{ related_doc.user_file_name }})
                                                                 </a>
@@ -146,8 +178,7 @@
                                 {% endfor %}
                             </ul>
                         {% else %}
-                            <div class="alert alert-info" role="alert">
-                                У вас нет документов, загруженных сотрудниками.
+                            <div class="alert alert-secondary mb-0">У вас нет документов, загруженных сотрудниками.
                             </div>
                         {% endif %}
                     </div>
@@ -155,53 +186,58 @@
             </div>
         </div>
 
-        <div class="row justify-content-center mt-4">
-            <div class="col-12 col-md-8">
-                <div class="card">
-                    <div class="card-header bg-dark text-white">
-                        <h2 class="card-title mb-0">Мои загруженные документы</h2>
+        <!-- Мои загруженные документы -->
+        <div class="row justify-content-center">
+            <div class="col-12 col-md-8 mb-4">
+                <div class="card shadow-sm">
+                    <div class="d-flex align-items-center border-bottom bg-body p-3">
+                        <h2 class="h6 m-0 fw-semibold text-body">Мои загруженные документы</h2>
                     </div>
-                    <div class="card-body">
+                    <div class="p-3">
                         {% if user_documents %}
-                            <ul class="list-group">
+                            <ul class="list-group list-group-flush">
                                 {% for doc in user_documents %}
-                                    <li class="list-group-item d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2">
-                                        <!-- Левая колонка: текст, занимает доступную ширину -->
-                                        <div class="w-100 min-w-0">
-                                            <a href="{% url 'serve_document' doc.pk %}" target="_blank"
-                                               class="d-block text-break">
-                                                {{ doc.caption|default:doc.user_file_name }}
-                                            </a>
-                                            {% if doc.caption %}
-                                                <small class="text-muted d-block text-break">{{ doc.user_file_name }}</small>
-                                            {% endif %}
-                                        </div>
+                                    <li class="list-group-item px-0">
+                                        <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2">
+                                            <div class="w-100 min-w-0">
+                                                <a href="{% url 'serve_document' doc.pk %}" target="_blank"
+                                                   class="link-body-emphasis d-block text-break">
+                                                    {{ doc.caption|default:doc.user_file_name }}
+                                                </a>
+                                                {% if doc.caption %}
+                                                    <small class="text-body-secondary d-block text-break">{{ doc.user_file_name }}</small>
+                                                {% endif %}
+                                            </div>
 
-                                        <div class="d-flex flex-wrap align-items-center ms-md-2 gap-2 flex-shrink-0">
-                                        <span class="badge
-                                          {% if doc.status == 'APPROVED' %}bg-success
-                                          {% elif doc.status == 'PENDING' %}bg-warning text-dark
-                                          {% elif doc.status == 'QUESTION' %}bg-danger
-                                          {% else %}bg-secondary{% endif %}">
-                                          {{ doc.get_status_display }}
-                                        </span>
+                                            <div class="d-flex flex-wrap align-items-center gap-2 flex-shrink-0">
+                        <span class="badge rounded-pill
+                          {% if doc.status == 'APPROVED' %} text-success-emphasis bg-success-subtle border border-success-subtle
+                          {% elif doc.status == 'PENDING' %} text-warning-emphasis bg-warning-subtle border border-warning-subtle
+                          {% elif doc.status == 'QUESTION' %} text-danger-emphasis bg-danger-subtle border border-danger-subtle
+                          {% else %} text-body-secondary bg-body border border-secondary-subtle
+                          {% endif %}">
+                          {{ doc.get_status_display }}
+                        </span>
 
-                                            <span class="badge bg-info text-dark">{{ doc.uploaded_at|date:"d.m.Y H:i" }}</span>
+                                                <span class="badge rounded-pill text-body-secondary bg-body border border-secondary-subtle">
+                          {{ doc.uploaded_at|date:"d.m.Y H:i" }}
+                        </span>
 
-                                            <form action="{% url 'delete_document' doc.pk %}" method="post"
-                                                  onsubmit="return confirm('Вы уверены, что хотите удалить этот документ?');">
-                                                {% csrf_token %}
-                                                <button type="submit" class="btn btn-danger btn-sm">X</button>
-                                            </form>
+                                                <form action="{% url 'delete_document' doc.pk %}" method="post"
+                                                      onsubmit="return confirm('Вы уверены, что хотите удалить этот документ?');">
+                                                    {% csrf_token %}
+                                                    <button type="submit" class="btn btn-outline-danger btn-sm"
+                                                            aria-label="Удалить документ">
+                                                        Удалить
+                                                    </button>
+                                                </form>
+                                            </div>
                                         </div>
                                     </li>
-
                                 {% endfor %}
                             </ul>
                         {% else %}
-                            <div class="alert alert-info" role="alert">
-                                У вас пока нет загруженных документов.
-                            </div>
+                            <div class="alert alert-secondary mb-0">У вас пока нет загруженных документов.</div>
                         {% endif %}
                     </div>
                 </div>
@@ -210,7 +246,6 @@
     </div>
 {% endblock %}
 
-{# ВАЖНО: скрипт вынесен на верхний уровень, а не внутри content #}
 {% block extra_js %}
     <script>
         document.addEventListener('DOMContentLoaded', function () {
@@ -227,16 +262,14 @@
                     checkUploadFormValidity();
                 });
             }
-            if (fileInput) {
-                fileInput.addEventListener('change', checkUploadFormValidity);
-            }
+            if (fileInput) fileInput.addEventListener('change', checkUploadFormValidity);
 
             function updateCharCount() {
                 if (captionInput && captionCharCount && maxCaptionLength) {
                     const currentCount = captionInput.value.length;
                     captionCharCount.textContent = `${currentCount} / ${maxCaptionLength} символов`;
                     captionCharCount.classList.toggle('text-danger', currentCount > maxCaptionLength);
-                    captionCharCount.classList.toggle('text-muted', currentCount <= maxCaptionLength);
+                    captionCharCount.classList.toggle('text-body-secondary', currentCount <= maxCaptionLength);
                 }
             }
 
@@ -244,12 +277,7 @@
                 const isCaptionFilled = captionInput && captionInput.value.trim() !== '';
                 const isFileSelected = fileInput && fileInput.files.length > 0;
                 const isCaptionWithinLimit = captionInput && (maxCaptionLength ? captionInput.value.length <= maxCaptionLength : true);
-
-                if (uploadButton) {
-                    uploadButton.disabled = !(isCaptionFilled && isFileSelected && isCaptionWithinLimit);
-                    uploadButton.classList.toggle('btn-secondary', uploadButton.disabled);
-                    uploadButton.classList.toggle('btn-primary', !uploadButton.disabled);
-                }
+                if (uploadButton) uploadButton.disabled = !(isCaptionFilled && isFileSelected && isCaptionWithinLimit);
             }
 
             updateCharCount();
@@ -277,11 +305,7 @@
 
             function checkAttachFormValidity(checkboxes, submitButton) {
                 const anyChecked = Array.from(checkboxes).some(cb => cb.checked);
-                if (submitButton) {
-                    submitButton.disabled = !anyChecked;
-                    submitButton.classList.toggle('btn-secondary', !anyChecked);
-                    submitButton.classList.toggle('btn-success', anyChecked);
-                }
+                if (submitButton) submitButton.disabled = !anyChecked;
             }
 
             document.querySelectorAll('.attach-documents-form').forEach(form => {
