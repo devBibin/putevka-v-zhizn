@@ -56,6 +56,7 @@ class UserInfo(models.Model):
     phone = models.CharField(max_length=20, verbose_name="Телефон", blank=True)
     email = models.EmailField(verbose_name="Email", blank=True)
     region = models.CharField(max_length=1000, verbose_name="Регион проживания", blank=True)
+    city = models.CharField(max_length=1000, verbose_name="Город проживания", blank=True)
     address = models.CharField(max_length=1000, verbose_name="Адрес проживания", blank=True)
 
     # Step 2: Education
@@ -88,6 +89,7 @@ class UserInfo(models.Model):
                                             blank=True)
 
     # Step 5: Additional
+    vk = models.URLField(max_length=500, verbose_name="Ссылка на вк", blank=True, null=True)
     achievements = models.CharField(max_length=10000, verbose_name="Достижения", blank=True)
     preparation_plan = models.CharField(max_length=10000, verbose_name="План подготовки к поступлению", blank=True)
     foundation_help = models.CharField(max_length=10000, verbose_name="Какая помощь от фонда нужна", blank=True)

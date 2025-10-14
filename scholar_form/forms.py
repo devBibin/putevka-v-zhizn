@@ -45,13 +45,14 @@ class PersonalForm(forms.ModelForm):
     class Meta:
         model = UserInfo
         fields = [
-            'last_name', 'first_name', 'middle_name', 'birth_date', 'region', 'address'
+            'last_name', 'first_name', 'middle_name', 'birth_date', 'region', 'city', 'address'
         ]
         widgets = {
             'last_name': forms.TextInput(attrs={'placeholder': 'Иванов'}),
             'first_name': forms.TextInput(attrs={'placeholder': 'Иван'}),
             'middle_name': forms.TextInput(attrs={'placeholder': 'Иванович'}),
             'region': forms.TextInput(attrs={'placeholder': 'Московская область'}),
+            'city': forms.TextInput(attrs={'placeholder': 'Город N'}),
             'address': forms.TextInput(attrs={'placeholder': 'ул. Ленина, д. 1, кв. 2'}),
         }
 
@@ -118,7 +119,7 @@ class AdditionalForm(forms.ModelForm):
     class Meta:
         model = UserInfo
         fields = [
-            'achievements', 'preparation_plan', 'foundation_help',
+            'vk', 'achievements', 'preparation_plan', 'foundation_help',
             'heard_about_program', 'willing_to_participate',
             'agree_processing', 'agree_documents'
         ]
@@ -162,8 +163,10 @@ class ApplicationWizard(SessionWizardView):
     def get_form(self, step=None, data=None, files=None):
         form = super().get_form(step, data, files)
 
+        required_false_list = ['legal_guardian', 'vk']
+
         for name, field in form.fields.items():
-            if name == 'legal_guardian':
+            if name in required_false_list:
                 field.required = False
                 if hasattr(field.widget, 'attrs'):
                     field.widget.attrs.pop('required', None)
