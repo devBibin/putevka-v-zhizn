@@ -45,12 +45,13 @@ class PersonalForm(forms.ModelForm):
     class Meta:
         model = UserInfo
         fields = [
-            'last_name', 'first_name', 'middle_name', 'birth_date', 'region', 'city', 'address'
+            'last_name', 'first_name', 'middle_name', 'gender', 'birth_date', 'region', 'city', 'address'
         ]
         widgets = {
             'last_name': forms.TextInput(attrs={'placeholder': 'Иванов'}),
             'first_name': forms.TextInput(attrs={'placeholder': 'Иван'}),
             'middle_name': forms.TextInput(attrs={'placeholder': 'Иванович'}),
+            'gender': forms.Select(attrs={'class': 'form-control'}),
             'region': forms.TextInput(attrs={'placeholder': 'Московская область'}),
             'city': forms.TextInput(attrs={'placeholder': 'Город N'}),
             'address': forms.TextInput(attrs={'placeholder': 'ул. Ленина, д. 1, кв. 2'}),

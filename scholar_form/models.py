@@ -42,6 +42,8 @@ class StaffNote(models.Model):
 
 
 class UserInfo(models.Model):
+    GENDERS = [('MAN', 'Мужчина'), ('WOMAN', 'Женщина')]
+
     avatar = models.ImageField(upload_to="avatars/", null=True, blank=True, verbose_name="Аватар")
 
     is_done = models.BooleanField(default=False, verbose_name='Анкета уже отправлена')
@@ -52,6 +54,7 @@ class UserInfo(models.Model):
     last_name = models.CharField(max_length=255, verbose_name="Фамилия", blank=True)
     first_name = models.CharField(max_length=255, verbose_name="Имя", blank=True)
     middle_name = models.CharField(max_length=255, verbose_name="Отчество", blank=True)
+    gender = models.CharField(max_length=10, choices=GENDERS, default='MAN', verbose_name="Пол")
     birth_date = models.DateField(verbose_name="Дата рождения", null=True)
     phone = models.CharField(max_length=20, verbose_name="Телефон", blank=True)
     email = models.EmailField(verbose_name="Email", blank=True)
