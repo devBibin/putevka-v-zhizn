@@ -80,6 +80,7 @@ class AssessmentResult(models.Model):
         PROBNIK = "probnik", _("Пробник")
         TEST = "test", _("Тестирование")
         OLYMPIAD = "olymp", _("Олимпиада")
+        FINAL_ESSAY = "essay", _("Итоговое сочинение")
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="assessments")
     kind = models.CharField(max_length=10, choices=Kind.choices)
