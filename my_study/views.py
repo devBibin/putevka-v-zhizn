@@ -2,7 +2,7 @@ import logging
 
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.core.paginator import Paginator
@@ -103,20 +103,26 @@ def unselect_course(request, course_id: int):
 def universities(request):
     priorities = (UniversityPriority.objects
                   .filter(user=request.user)
+                  .prefetch_related("subjects")
                   .order_by("priority"))
 
     if request.method == "POST":
         form = UniversityPriorityForm(request.POST, user=request.user)
         if form.is_valid():
             try:
-                obj, _ = UniversityPriority.objects.update_or_create(
-                    user=request.user,
-                    university=form.cleaned_data["university"],
-                    defaults={
-                        "priority": form.cleaned_data["priority"],
-                        "notes": form.cleaned_data.get("notes", "")
-                    }
-                )
+                with transaction.atomic():
+                    obj, created = UniversityPriority.objects.update_or_create(
+                        user=request.user,
+                        university=form.cleaned_data["university"],
+                        defaults={
+                            "priority": form.cleaned_data["priority"],
+                            "notes": form.cleaned_data.get("notes", ""),
+                            "city": form.cleaned_data.get("city", ""),
+                            "specialty": form.cleaned_data.get("specialty", ""),
+                            "is_targeted": form.cleaned_data.get("is_targeted", False),
+                        }
+                    )
+                    obj.subjects.set(form.cleaned_data.get("subjects") or [])
                 messages.success(request, "Запись сохранена.")
                 return redirect("study:universities")
             except IntegrityError:

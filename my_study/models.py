@@ -62,6 +62,11 @@ class CourseSelection(models.Model):
 class UniversityPriority(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="uni_priorities")
     university = models.CharField(max_length=200)
+    city = models.CharField("Город", max_length=120, blank=True)
+    specialty = models.CharField("Специальность/направление", max_length=200, blank=True)
+    is_targeted = models.BooleanField("Целевое обучение", default=False)
+    subjects = models.ManyToManyField(Subject, verbose_name="Предметы для специальности", blank=True)
+
     priority = models.PositiveIntegerField(help_text="1 — самый высокий приоритет")
     notes = models.CharField(max_length=300, blank=True)
 

@@ -23,17 +23,45 @@ class CourseSelectionForm(forms.ModelForm):
 
 
 class UniversityPriorityForm(forms.ModelForm):
+    subjects = forms.ModelMultipleChoiceField(
+        label="Предметы для специальности",
+        queryset=Subject.objects.all(),
+        required=False,
+        widget=forms.SelectMultiple()
+    )
+
     class Meta:
         model = UniversityPriority
-        fields = ["university", "priority", "notes"]
+        fields = [
+            "university",
+            "city",
+            "specialty",
+            "is_targeted",
+            "subjects",
+            "priority",
+            "notes",
+        ]
         widgets = {
             "priority": forms.Select(choices=[(i, str(i)) for i in range(1, 6)]),
             "notes": forms.Textarea(attrs={"rows": 6, "placeholder": "Почему вы выбрали этот вуз?"}),
+            "university": forms.TextInput(attrs={"placeholder": "ВМиП (вуз милых и прикольных"}),
+            "city": forms.TextInput(attrs={"placeholder": "Город N"}),
+            "specialty": forms.TextInput(attrs={"placeholder": "Программная инженерия"}),
+            "is_targeted": forms.CheckboxInput(),
+        }
+        labels = {
+            "university": "ВУЗ",
+            "city": "Город",
+            "specialty": "Специальность/направление",
+            "is_targeted": "Целевое обучение",
+            "priority": "Приоритет",
+            "notes": "Заметка",
         }
 
     def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.user = user
+        self.fields["subjects"].queryset = Subject.objects.all().order_by("name")
 
     def clean(self):
         cleaned = super().clean()
@@ -47,6 +75,13 @@ class UniversityPriorityForm(forms.ModelForm):
                 qs = qs.exclude(pk=self.instance.pk)
             if qs.exists() and not qs.filter(university=uni).exists():
                 self.add_error("priority", "Этот приоритет уже занят другим вузом.")
+
+        if user is not None and uni:
+            exists_qs = UniversityPriority.objects.filter(user=user, university=uni)
+            if self.instance and self.instance.pk:
+                exists_qs = exists_qs.exclude(pk=self.instance.pk)
+            if exists_qs.exists():
+                self.add_error("university", "Этот вуз уже есть в вашем списке.")
 
         return cleaned
 
