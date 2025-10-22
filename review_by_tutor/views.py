@@ -2,6 +2,7 @@ import json
 import logging
 import mimetypes
 
+from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
@@ -9,8 +10,9 @@ from django.db.models import Prefetch, Q, Subquery, OuterRef, Count, Exists
 
 from django.shortcuts import render, get_object_or_404, redirect
 from django.db import transaction
+from django.views.decorators.http import require_POST
 
-from core.models import MotivationLetter
+from core.models import MotivationLetter, Notification, UserNotification
 from documents.models import Document
 from my_study.models import CourseSelection, UniversityPriority, AssessmentResult
 from review_by_tutor.forms import MotivationLetterStaffForm, UserInfoStaffForm, ScholarVideoStaffForm, \
@@ -355,3 +357,36 @@ def staff_users_list(request):
         "role": role,
         "active": active,
     })
+
+@staff_member_required
+@require_POST
+def staff_send_notification(request):
+    raw_ids = request.POST.getlist('ids')
+    message_text = (request.POST.get('message') or '').strip()
+    include_inactive = request.POST.get('include_inactive') == '1'
+
+    ids = [int(x) for x in raw_ids if str(x).isdigit()]
+    if not ids:
+        messages.error(request, "Не выбраны пользователи.")
+        return redirect('staff_users_list')
+
+    if not message_text:
+        messages.error(request, "Введите текст сообщения.")
+        return redirect('staff_users_list')
+
+    qs = User.objects.filter(id__in=ids).only('id', 'is_active')
+    if not include_inactive:
+        qs = qs.filter(is_active=True)
+    final_ids = list(qs.values_list('id', flat=True))
+    if not final_ids:
+        messages.error(request, "Нет подходящих получателей (все неактивны или не найдены).")
+        return redirect('staff_users_list')
+
+    with transaction.atomic():
+        notif = Notification.objects.create(message=message_text, sender=request.user)
+        for uid in final_ids:
+            link, created = UserNotification.objects.get_or_create(notification=notif, recipient_id=uid)
+
+    logger.info(f'Оповещение {notif.pk} создано для {len(final_ids)} пользователей')
+    messages.success(request, f"Оповещение «{message_text[:50]}…» отправлено {len(final_ids)} пользователям.")
+    return redirect('staff_users_list')

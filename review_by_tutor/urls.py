@@ -10,4 +10,6 @@ urlpatterns = [
     path("study/<int:user_id>/", views.staff_study_detail, name="staff_study_detail"),
     path("notes/<int:user_id>/", views.staff_notes_by_user, name="staff_notes"),
     path("users/", views.staff_users_list, name="staff_users_list"),
+
+    path('users/send-notification/', views.staff_send_notification, name='staff_send_notification'),
 ]
