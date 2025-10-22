@@ -379,7 +379,7 @@ def staff_users_list(request):
         "course": course,
         "curator_need": curator_paid,
         "grade": grade,
-        "grades": grades,
+        # "grades": grades,
         "schools": schools,
         "courses": courses,
     })
