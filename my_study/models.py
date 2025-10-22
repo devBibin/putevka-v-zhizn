@@ -48,6 +48,7 @@ class CourseSelection(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="course_selections")
     course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name="selections")
     motivation = models.TextField(help_text="Почему вы выбрали этот курс/направление?")
+    need_tutor = models.BooleanField(default=False, help_text="Нужен куратор")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -81,6 +82,7 @@ class AssessmentResult(models.Model):
         TEST = "test", _("Тестирование")
         OLYMPIAD = "olymp", _("Олимпиада")
         FINAL_ESSAY = "essay", _("Итоговое сочинение")
+        OTHER = "other", _("Другое")
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="assessments")
     kind = models.CharField(max_length=10, choices=Kind.choices)

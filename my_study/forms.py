@@ -15,9 +15,10 @@ class CourseFilterForm(forms.Form):
 class CourseSelectionForm(forms.ModelForm):
     class Meta:
         model = CourseSelection
-        fields = ["motivation"]
+        fields = ["motivation", "need_tutor"]
         widgets = {
-            "motivation": forms.Textarea(attrs={"rows": 6, "placeholder": "Почему вы выбрали этот курс?"})
+            "motivation": forms.Textarea(attrs={"rows": 6, "placeholder": "Почему вы выбрали этот курс?"}),
+            'need_tutor': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
 
 

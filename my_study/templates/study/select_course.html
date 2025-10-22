@@ -5,7 +5,7 @@
         <div class="card-body">
             <h4 class="card-title">{{ course.title }}</h4>
             <p class="text-muted">{{ course.school.name }} • {{ course.subject.name }}</p>
-            {% if course.description %}<p>{{ course.description }}</p>{% endif %}
+            {% if course.description %}<p>{{ course.description|linebreaksbr }}</p>{% endif %}
             {% if course.link %}<p><a href="{{ course.link }}" target="_blank">Ссылка на курс</a></p>{% endif %}
 
             <hr>
@@ -15,11 +15,20 @@
                     <label class="form-label">Почему вы выбрали этот курс?</label>
                     {{ form.motivation|add_class:"form-control" }}
                 </div>
+
+                <div class="form-check mb-3">
+                    {{ form.need_tutor }}
+                    <label class="form-check-label" for="{{ form.need_tutor.id_for_label }}">
+                        Мне нужен куратор для прохождения курса
+                    </label>
+                </div>
+
                 <button class="btn btn-primary">Сохранить</button>
                 <a href="{% url 'study:schools' %}" class="btn btn-outline-secondary">Назад</a>
             </form>
 
             <hr class="my-3">
+
 
             <form method="post" action="{% url 'study:unselect_course' course.id %}">
                 {% csrf_token %}
