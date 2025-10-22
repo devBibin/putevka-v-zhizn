@@ -14,7 +14,7 @@ from django.views.decorators.http import require_POST
 
 from core.models import MotivationLetter, Notification, UserNotification
 from documents.models import Document
-from my_study.models import CourseSelection, UniversityPriority, AssessmentResult
+from my_study.models import CourseSelection, UniversityPriority, AssessmentResult, School, Course
 from review_by_tutor.forms import MotivationLetterStaffForm, UserInfoStaffForm, ScholarVideoStaffForm, \
     DocumentModerationForm, DocumentAttachForm, DocumentStaffUploadForm, DocumentCommentForm, DocumentLockForm, \
     DocumentStatusForm
@@ -241,12 +241,14 @@ def staff_study_detail(request, user_id: int):
         .order_by("-date", "-id")
     )
 
+
     return render(request, "staff_templates/study_detail.html", {
         "user_obj": user_obj,
         "selections": selections,
         "priorities": priorities,
         "assessments": assessments,
         "active": "study",
+
     })
 
 @login_required
@@ -307,10 +309,15 @@ def staff_notes_by_user(request, user_id: int):
 @user_passes_test(_staff_check)
 def staff_users_list(request):
     q = (request.GET.get("q") or "").strip()
-    role = (request.GET.get("role") or "").strip()
-    active = (request.GET.get("active") or "").strip()
+    school = (request.GET.get("school") or "").strip()
+    course = (request.GET.get("course") or "").strip()
+    curator_paid = (request.GET.get("curator_need") or "").strip()
+    grade = (request.GET.get("grade") or "").strip()
 
-    qs = User.objects.all()
+    qs = (User.objects
+          .all()
+          .select_related("user_info")
+          )
 
     if q:
         qs = qs.filter(
@@ -322,22 +329,27 @@ def staff_users_list(request):
             Q(user_info__region__icontains=q)
         )
 
-    if role == "user":
-        qs = qs.filter(is_staff=False, is_superuser=False)
-    elif role == "staff":
-        qs = qs.filter(is_staff=True)
-    elif role == "superuser":
-        qs = qs.filter(is_superuser=True)
+    if school:
+        qs = qs.filter(course_selections__course__school_id=school)
 
-    if active == "1":
-        qs = qs.filter(is_active=True)
-    elif active == "0":
-        qs = qs.filter(is_active=False)
+    if course:
+        qs = qs.filter(course_selections__course_id=course)
+
+    if grade:
+        qs = qs.filter(user_info__grade=grade)
+
+    if curator_paid == "1":
+        qs = qs.filter(course_selections__need_tutor=True)
+    elif curator_paid == "0":
+        qs = qs.filter(course_selections__need_tutor=False)
+
+    qs = qs.distinct()
 
     letter_status_sq = Subquery(
         MotivationLetter.objects.filter(user_id=OuterRef("pk"))
         .values("status")[:1]
     )
+
     qs = qs.annotate(
         docs_total=Count("documents", filter=Q(documents__is_deleted=False)),
         docs_pending=Count("documents", filter=Q(documents__is_deleted=False, documents__status="PENDING")),
@@ -351,11 +363,25 @@ def staff_users_list(request):
     paginator = Paginator(qs, 20)
     page_obj = paginator.get_page(request.GET.get("page"))
 
+    schools = School.objects.all().order_by("name")
+    courses_qs = Course.objects.all()
+    if school:
+        courses_qs = courses_qs.filter(school_id=school)
+    courses = courses_qs.order_by("title")
+
+    # grades = list(range(1, 12))
+
     return render(request, "staff_templates/users_list.html", {
         "page_obj": page_obj,
+
         "q": q,
-        "role": role,
-        "active": active,
+        "school": school,
+        "course": course,
+        "curator_need": curator_paid,
+        "grade": grade,
+        "grades": grades,
+        "schools": schools,
+        "courses": courses,
     })
 
 @staff_member_required

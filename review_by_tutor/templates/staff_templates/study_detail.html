@@ -19,6 +19,7 @@
                                 <th>Школа</th>
                                 <th>Предмет</th>
                                 <th style="min-width:320px;">Мотивация</th>
+                                <th style="min-width:320px;">Нужен куратор</th>
                                 <th class="text-end" style="width:1%;">Добавлено</th>
                             </tr>
                             </thead>
@@ -35,6 +36,7 @@
                                     <td>{{ s.course.school.name }}</td>
                                     <td>{{ s.course.subject.name }}</td>
                                     <td class="text-break">{{ s.motivation|default:"—" }}</td>
+                                    <td>{{ s.need_tutor }}</td>
                                     <td class="text-end"><span
                                             class="small text-muted">{{ s.created_at|date:"d.m.Y H:i" }}</span></td>
                                 </tr>

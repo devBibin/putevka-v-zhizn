@@ -7,30 +7,66 @@
   <h1 class="mb-4">Пользователи</h1>
 
   <!-- Форма фильтрации -->
-  <form class="row g-2 mb-3" method="get">
-    <div class="col-md-5">
-      <input type="search" name="q" value="{{ q }}" class="form-control"
-             placeholder="Поиск: имя, логин, email, телефон, регион">
-    </div>
-    <div class="col-md-3">
-      <select name="role" class="form-select">
-        <option value="">Все роли</option>
-        <option value="user" {% if role == 'user' %}selected{% endif %}>Пользователи</option>
-        <option value="staff" {% if role == 'staff' %}selected{% endif %}>Сотрудники</option>
-        <option value="superuser" {% if role == 'superuser' %}selected{% endif %}>Суперпользователи</option>
-      </select>
-    </div>
-    <div class="col-md-2">
-      <select name="active" class="form-select">
-        <option value="">Все статусы</option>
-        <option value="1" {% if active == '1' %}selected{% endif %}>Активные</option>
-        <option value="0" {% if active == '0' %}selected{% endif %}>Заблокированные</option>
-      </select>
-    </div>
-    <div class="col-md-2 d-grid">
-      <button class="btn btn-primary">Фильтр</button>
-    </div>
-  </form>
+  <form class="row g-3 mb-4" method="get">
+  <!-- Поиск -->
+  <div class="col-md-4">
+    <label class="form-label">Поиск</label>
+    <input type="search" name="q" value="{{ q }}" class="form-control"
+           placeholder="Имя, логин, email, телефон, регион">
+  </div>
+
+  <!-- Онлайн-школа -->
+  <div class="col-md-3">
+    <label class="form-label">Онлайн-школа</label>
+    <select name="school" class="form-select">
+      <option value="">Все школы</option>
+      {% for s in schools %}
+        <option value="{{ s.id }}" {% if s.id|stringformat:"s" == school %}selected{% endif %}>
+          {{ s.name }}
+        </option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <!-- Курс -->
+  <div class="col-md-3">
+    <label class="form-label">Курс</label>
+    <select name="course" class="form-select">
+      <option value="">Все курсы</option>
+      {% for c in courses %}
+        <option value="{{ c.id }}" {% if c.id|stringformat:"s" == course %}selected{% endif %}>
+          {{ c.title }}
+        </option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <!-- Класс -->
+  <div class="col-md-2">
+    <label class="form-label">Класс</label>
+    <select name="grade" class="form-select">
+      <option value="">Все</option>
+      {% for n in grades %}
+  <option value="{{ n }}" {% if grade == n|stringformat:"s" %}selected{% endif %}>{{ n }} класс</option>
+{% endfor %}
+    </select>
+  </div>
+
+  <!-- Куратор нужен -->
+  <div class="col-md-2">
+    <label class="form-label">Куратор нужен</label>
+    <select name="curator_need" class="form-select">
+      <option value="">Все</option>
+      <option value="1" {% if curator_need == '1' %}selected{% endif %}>Да</option>
+      <option value="0" {% if curator_need == '0' %}selected{% endif %}>Нет</option>
+    </select>
+  </div>
+
+  <div class="col-md-2 align-self-end d-grid">
+    <button class="btn btn-primary">Фильтр</button>
+  </div>
+</form>
+
 
   {% if page_obj.object_list %}
     <!-- Форма массовой отправки оповещений -->
