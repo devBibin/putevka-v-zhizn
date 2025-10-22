@@ -10,6 +10,8 @@ from django.views.generic import TemplateView
 
 from core.models import UserNotification, Notification
 from documents.models import Document
+from review_by_tutor.forms import StatusChangeForm
+from scholar_form.models import UserInfo
 
 User = get_user_model()
 
@@ -39,9 +41,11 @@ class StaffScholarDossierView(TemplateView):
         Document = self._get_model_safe("documents", "Document")
         UserNotification = self._get_model_safe("core", "UserNotification") or self._get_model_safe("notifications", "UserNotification")
 
-        uinfo = getattr(user, "user_info", None)
+        uinfo = UserInfo.objects.get_or_create(user=user)[0]
         video = getattr(user, "scholar_video", None)
         ml = getattr(user, "motivation_letter", None)
+
+        status_form = StatusChangeForm(instance=uinfo)
 
         questionnaire_done = bool(getattr(uinfo, "is_done", False))
 
@@ -98,7 +102,8 @@ class StaffScholarDossierView(TemplateView):
             "documents": documents_qs[:5],
             "notif_form": notif_form,
             "recent_notifs": recent_notifs,
-            'active': 'dossier'
+            'active': 'dossier',
+            "status_form": status_form
         })
         return ctx
 
@@ -155,6 +160,16 @@ def staff_scholar_action(request, user_id: int):
             messages.success(request, "Документ загружен.")
         else:
             messages.error(request, "Не удалось загрузить документ. Проверьте поля.")
+
+    elif action == "change_status":
+        uinfo, _ = UserInfo.objects.get_or_create(user=user)
+        form = StatusChangeForm(request.POST, instance=uinfo)
+        if form.is_valid():
+            u = form.save()
+            new = u.get_status_display()
+            messages.success(request, f"Статус обновлён: «{new}».")
+        else:
+            messages.error(request, "Не удалось обновить статус. Проверьте данные.")
 
     else:
         messages.error(request, "Неизвестное действие.")

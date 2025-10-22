@@ -10,7 +10,7 @@
             Здравствуйте, <strong>{{ user.username }}</strong>! Вы уже авторизованы.
         </div>
 
-        {% if not user.user_info.is_done %}
+        {% if not user.user_info.is_done and user.user_info.status == "CANDIDATE" %}
             <div class="alert alert-warning">
                 Ваша <strong>анкета</strong> ещё не отправлена.
                 <a href="{% url 'apply' %}" class="alert-link">Заполнить сейчас</a>.
@@ -18,13 +18,13 @@
         {% endif %}
 
         {% if user.motivation_letter %}
-            {% if not user.motivation_letter.is_done and user.motivation_letter.status != user.motivation_letter.Status.SUBMITTED %}
+            {% if not user.motivation_letter.is_done and user.motivation_letter.status != user.motivation_letter.Status.SUBMITTED and user.user_info.status == "CANDIDATE" %}
                 <div class="alert alert-warning">
                     Ваше <strong>мотивационное письмо</strong> ещё не отправлено.
                     <a href="{% url 'motivation_letter' %}" class="alert-link">Перейти к письму</a>.
                 </div>
             {% endif %}
-        {% else %}
+        {% elif user.user_info.status == "CANDIDATE" %}
             <div class="alert alert-warning">
                 У вас ещё нет <strong>мотивационного письма</strong>.
                 <a href="{% url 'motivation_letter' %}" class="alert-link">Создать письмо</a>.

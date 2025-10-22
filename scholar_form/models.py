@@ -43,19 +43,21 @@ class StaffNote(models.Model):
 
 class UserInfo(models.Model):
     GENDERS = [('MAN', 'Мужчина'), ('WOMAN', 'Женщина')]
+    STATUSES = [('CANDIDATE', 'Кандидат'), ('ALTERNATIVE', 'Альтернативный трек'), ('SCHOLAR', 'Участник'), ('ALUMNUS', 'Выпускник')]
 
     avatar = models.ImageField(upload_to="avatars/", null=True, blank=True, verbose_name="Аватар")
 
     is_done = models.BooleanField(default=False, verbose_name='Анкета уже отправлена')
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, null=True, related_name='user_info')
+    status = models.CharField(max_length=100, choices=STATUSES, default='CANDIDATE', verbose_name='Статус в программе')
 
     # Step 1: Personal Info
     last_name = models.CharField(max_length=255, verbose_name="Фамилия", blank=True)
     first_name = models.CharField(max_length=255, verbose_name="Имя", blank=True)
     middle_name = models.CharField(max_length=255, verbose_name="Отчество", blank=True)
     gender = models.CharField(max_length=10, choices=GENDERS, default='MAN', verbose_name="Пол")
-    birth_date = models.DateField(verbose_name="Дата рождения", null=True)
+    birth_date = models.DateField(verbose_name="Дата рождения", null=True, blank=True)
     phone = models.CharField(max_length=20, verbose_name="Телефон", blank=True)
     email = models.EmailField(verbose_name="Email", blank=True)
     region = models.CharField(max_length=1000, verbose_name="Регион проживания", blank=True)
@@ -81,9 +83,9 @@ class UserInfo(models.Model):
     mother = models.CharField(max_length=10000, verbose_name="Мама", blank=True)
     father = models.CharField(max_length=10000, verbose_name="Папа", blank=True)
     legal_guardian = models.CharField(max_length=10000, blank=True, verbose_name="Опекун")
-    siblings_count = models.IntegerField(verbose_name="Количество братьев и сестёр", null=True)
+    siblings_count = models.IntegerField(verbose_name="Количество братьев и сестёр", null=True, blank=True)
     siblings_info = models.CharField(max_length=10000, verbose_name="Информация о братьях и сёстрах", blank=True)
-    family_size = models.IntegerField(verbose_name="Общий состав семьи", null=True)
+    family_size = models.IntegerField(verbose_name="Общий состав семьи", null=True, blank=True)
     income_per_member = models.CharField(max_length=255, verbose_name="Доход на одного члена семьи", blank=True)
     is_low_income = models.CharField(max_length=10, verbose_name="Малообеспеченная семья", blank=True)
     receives_subsidy = models.CharField(max_length=255, verbose_name="Получает ли семья пособия", blank=True)

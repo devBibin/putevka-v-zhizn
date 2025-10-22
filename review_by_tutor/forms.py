@@ -4,6 +4,13 @@ from core.models import MotivationLetter
 from documents.models import Document
 from scholar_form.models import UserInfo, ScholarVideo
 
+class StatusChangeForm(forms.ModelForm):
+    class Meta:
+        model = UserInfo
+        fields = ["status"]
+        widgets = {
+            "status": forms.Select(attrs={"class": "form-select"}),
+        }
 
 class MotivationLetterStaffForm(forms.ModelForm):
     class Meta:
