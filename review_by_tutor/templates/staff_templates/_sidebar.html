@@ -17,6 +17,12 @@
     <a class="list-group-item list-group-item-action d-flex align-items-center {% if active == 'study' %} active{% endif %}"
        href="{% url 'staff_study_detail' user_obj.id %}">Моя учёба
     </a>
+    <a class="list-group-item list-group-item-action d-flex align-items-center {% if active == 'interview' %} active{% endif %}"
+       href="{% url 'interview_detail' user_obj.id %}">Собеседование
+    </a>
+    <a class="list-group-item list-group-item-action d-flex align-items-center {% if active == 'testing' %} active{% endif %}"
+       href="{% url 'staff_testing_list_for_user' user_obj.id %}">Тестирование
+    </a>
     <a class="list-group-item list-group-item-action d-flex align-items-center {% if active == 'notes' %} active{% endif %}"
        href="{% url 'staff_notes' user_obj.id %}">Заметки
     </a>
@@ -47,6 +53,15 @@
         <a href="{% url 'study:schools' %}"
            class="text-center {% if active == 'study' %}text-primary{% else %}text-secondary{% endif %}">
             <div class="small">Учёба</div>
+        </a>
+        <a class="list-group-item list-group-item-action d-flex align-items-center {% if active == 'interview' %} active{% endif %}"
+           href="{% url 'interview_detail' user_obj.id %}">Собес
+        </a>
+        <a class="list-group-item list-group-item-action d-flex align-items-center {% if active == 'testing' %} active{% endif %}"
+           href="{% url 'staff_testing_list_for_user' user_obj.id %}">Тест
+        </a>
+        <a class="list-group-item list-group-item-action d-flex align-items-center {% if active == 'notes' %} active{% endif %}"
+           href="{% url 'staff_notes' user_obj.id %}">Заметки
         </a>
     </div>
 </nav>

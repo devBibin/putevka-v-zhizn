@@ -1,29 +1,29 @@
-import json
 import logging
 import mimetypes
 
+from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
-from django.db.models import Prefetch, Q, Subquery, OuterRef, Count, Exists
-
-from django.shortcuts import render, get_object_or_404, redirect
 from django.db import transaction
+from django.db.models import Q, Subquery, OuterRef, Count, Exists
+from django.shortcuts import render, get_object_or_404, redirect
+from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from core.models import MotivationLetter, Notification, UserNotification
 from documents.models import Document
 from my_study.models import CourseSelection, UniversityPriority, AssessmentResult, School, Course
 from review_by_tutor.forms import MotivationLetterStaffForm, UserInfoStaffForm, ScholarVideoStaffForm, \
-    DocumentModerationForm, DocumentAttachForm, DocumentStaffUploadForm, DocumentCommentForm, DocumentLockForm, \
-    DocumentStatusForm
-from django.contrib import messages
-
+    DocumentStaffUploadForm, DocumentCommentForm, DocumentLockForm, \
+    DocumentStatusForm, InterviewForm, TestAssignmentCreateForm, TestAssignmentEditForm, TestResultForm
+from review_by_tutor.models import Interview, TestAssignment
 from scholar_form.models import UserInfo, ScholarVideo, StaffNote
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
+
 
 def _staff_check(user):
     return user.is_staff
@@ -241,7 +241,6 @@ def staff_study_detail(request, user_id: int):
         .order_by("-date", "-id")
     )
 
-
     return render(request, "staff_templates/study_detail.html", {
         "user_obj": user_obj,
         "selections": selections,
@@ -250,6 +249,7 @@ def staff_study_detail(request, user_id: int):
         "active": "study",
 
     })
+
 
 @login_required
 @user_passes_test(_staff_check)
@@ -302,7 +302,6 @@ def staff_notes_by_user(request, user_id: int):
         "active": "notes",
     }
     return render(request, "staff_templates/staff_notes_by_user.html", ctx)
-
 
 
 @login_required
@@ -384,6 +383,7 @@ def staff_users_list(request):
         "courses": courses,
     })
 
+
 @staff_member_required
 @require_POST
 def staff_send_notification(request):
@@ -416,3 +416,105 @@ def staff_send_notification(request):
     logger.info(f'Оповещение {notif.pk} создано для {len(final_ids)} пользователей')
     messages.success(request, f"Оповещение «{message_text[:50]}…» отправлено {len(final_ids)} пользователям.")
     return redirect('staff_users_list')
+
+
+@login_required
+@user_passes_test(_staff_check)
+def interview_detail(request, user_id: int):
+    user_obj = get_object_or_404(User, pk=user_id)
+    interview, _ = Interview.objects.get_or_create(user=user_obj)
+
+    if request.method == "POST":
+        form = InterviewForm(request.POST, instance=interview)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Изменения сохранены.")
+            return redirect("interview_detail", user_id=user_id)
+    else:
+        form = InterviewForm(instance=interview)
+
+    ctx = {
+        "user_obj": user_obj,
+        "form": form,
+        "interview": interview,
+        'active': 'interview'
+    }
+    return render(request, "staff_templates/interview_detail.html", ctx)
+
+
+@login_required
+def testing_list_for_candidate(request):
+    items = (TestAssignment.objects
+             .filter(user=request.user)
+             .order_by("-assigned_at", "-id"))
+    return render(request, "testing.html", {"items": items, "user_obj": request.user, "active": "testing"})
+
+
+@user_passes_test(_staff_check)
+def testing_list_for_user(request, user_id):
+    items = (TestAssignment.objects
+             .select_related("user", "assigned_by", "result_filled_by")
+             .filter(user_id=user_id)
+             .order_by("-assigned_at", "-id"))
+    return render(request, "staff_templates/testing/list.html", {"items": items, "target_user_id": user_id, "user_obj": get_object_or_404(User, pk=user_id), "active": 'testing'})
+
+
+@user_passes_test(_staff_check)
+def testing_create(request):
+    fixed_user_id = request.GET.get("user_id")
+
+    fixed_user = None
+    if fixed_user_id:
+        fixed_user = User.objects.filter(pk=fixed_user_id).only("id").first()
+
+    if request.method == "POST":
+        form = TestAssignmentCreateForm(request.POST)
+        if form.is_valid():
+            obj = form.save(commit=False)
+            if fixed_user:
+                obj.user = fixed_user
+            obj.assigned_by = request.user
+            obj.save()
+            return redirect("staff_testing_list_for_user", user_id=obj.user_id)
+    else:
+        if fixed_user:
+            form = TestAssignmentCreateForm(initial={"user": fixed_user.id})
+        else:
+            form = TestAssignmentCreateForm()
+
+    return render(request, "staff_templates/testing/form.html", {
+        "form": form,
+        "title": "Назначить тест",
+        "fixed_user": fixed_user,
+
+    })
+
+
+@user_passes_test(_staff_check)
+def testing_edit(request, pk):
+    obj = get_object_or_404(TestAssignment, pk=pk)
+    if request.method == "POST":
+        form = TestAssignmentEditForm(request.POST, instance=obj)
+        if form.is_valid():
+            form.save()
+            return redirect("staff_testing_list_for_user", user_id=obj.user_id)
+    else:
+        form = TestAssignmentEditForm(instance=obj)
+    return render(request, "staff_templates/testing/form.html", {"form": form, "title": "Редактировать тест", "user_obj": get_object_or_404(User, pk=obj.user.id)})
+
+
+@user_passes_test(_staff_check)
+def testing_fill_result(request, pk):
+    obj = get_object_or_404(TestAssignment, pk=pk)
+    if request.method == "POST":
+        form = TestResultForm(request.POST, instance=obj)
+        if form.is_valid():
+            filled = form.save(commit=False)
+            filled.result_filled_by = request.user
+            filled.result_filled_at = timezone.now()
+            filled.mark_completed()
+            filled.save()
+            return redirect("staff_testing_list_for_user", user_id=obj.user_id)
+    else:
+        form = TestResultForm(instance=obj)
+    return render(request, "staff_templates/testing/result_form.html", {"form": form, "obj": obj, "user_obj": get_object_or_404(User, pk=obj.user.id), "active": "testing"})

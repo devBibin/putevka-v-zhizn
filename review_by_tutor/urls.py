@@ -8,8 +8,14 @@ urlpatterns = [
     path("video/<int:user_id>/", views.staff_video_detail, name="staff_video_detail"),
     path("documents/<int:user_id>/", views.staff_documents_detail, name="staff_documents_detail"),
     path("study/<int:user_id>/", views.staff_study_detail, name="staff_study_detail"),
+    path("interview/<int:user_id>/", views.interview_detail, name="interview_detail"),
     path("notes/<int:user_id>/", views.staff_notes_by_user, name="staff_notes"),
     path("users/", views.staff_users_list, name="staff_users_list"),
 
     path('users/send-notification/', views.staff_send_notification, name='staff_send_notification'),
+
+    path("testing/<int:user_id>/", views.testing_list_for_user, name="staff_testing_list_for_user"),
+    path("testing/create/", views.testing_create, name="staff_testing_create"),
+    path("testing/<int:pk>/edit/", views.testing_edit, name="staff_testing_edit"),
+    path("testing/<int:pk>/result/", views.testing_fill_result, name="staff_testing_fill_result"),
 ]
