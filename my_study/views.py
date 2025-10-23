@@ -1,6 +1,8 @@
+import logging
+
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.core.paginator import Paginator
@@ -9,6 +11,7 @@ from core.decorators import ensure_registration_gate
 from .models import School, Course, CourseSelection, UniversityPriority, AssessmentResult, Subject
 from .forms import CourseFilterForm, CourseSelectionForm, UniversityPriorityForm, AssessmentResultForm
 
+logger = logging.getLogger(__name__)
 
 @login_required
 def schools_and_courses(request):
@@ -60,10 +63,12 @@ def select_course(request, course_id):
         if form.is_valid():
             selection, created = CourseSelection.objects.get_or_create(
                 user=request.user, course=course,
-                defaults={"motivation": form.cleaned_data["motivation"]}
+                defaults={"motivation": form.cleaned_data["motivation"],
+                          "need_tutor": form.cleaned_data["need_tutor"],}
             )
             if not created:
                 selection.motivation = form.cleaned_data["motivation"]
+                selection.need_tutor = form.cleaned_data["need_tutor"]
                 selection.save()
             messages.success(request, "Ваш выбор сохранён.")
             return redirect("study:schools")
@@ -72,6 +77,7 @@ def select_course(request, course_id):
         existing = CourseSelection.objects.filter(user=request.user, course=course).first()
         if existing:
             initial["motivation"] = existing.motivation
+            initial["need_tutor"] = existing.need_tutor
         form = CourseSelectionForm(initial=initial)
 
     return render(request, "study/select_course.html", {"course": course, "form": form})
@@ -97,20 +103,26 @@ def unselect_course(request, course_id: int):
 def universities(request):
     priorities = (UniversityPriority.objects
                   .filter(user=request.user)
+                  .prefetch_related("subjects")
                   .order_by("priority"))
 
     if request.method == "POST":
         form = UniversityPriorityForm(request.POST, user=request.user)
         if form.is_valid():
             try:
-                obj, _ = UniversityPriority.objects.update_or_create(
-                    user=request.user,
-                    university=form.cleaned_data["university"],
-                    defaults={
-                        "priority": form.cleaned_data["priority"],
-                        "notes": form.cleaned_data.get("notes", "")
-                    }
-                )
+                with transaction.atomic():
+                    obj, created = UniversityPriority.objects.update_or_create(
+                        user=request.user,
+                        university=form.cleaned_data["university"],
+                        defaults={
+                            "priority": form.cleaned_data["priority"],
+                            "notes": form.cleaned_data.get("notes", ""),
+                            "city": form.cleaned_data.get("city", ""),
+                            "specialty": form.cleaned_data.get("specialty", ""),
+                            "is_targeted": form.cleaned_data.get("is_targeted", False),
+                        }
+                    )
+                    obj.subjects.set(form.cleaned_data.get("subjects") or [])
                 messages.success(request, "Запись сохранена.")
                 return redirect("study:universities")
             except IntegrityError:

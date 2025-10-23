@@ -26,7 +26,7 @@ def personal_info(request):
     else:
         form = UserProfileForm(instance=profile)
 
-    return render(request, "personal_info.html", {"form": form, "active": "personal_info"})
+    return render(request, "personal_info.html", {"form": form, "active": "personal_info", 'profile': profile})
 
 @ensure_registration_gate('protected')
 @login_required

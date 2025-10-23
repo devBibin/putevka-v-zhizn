@@ -25,7 +25,7 @@
 
         <div class="row g-3">
             <div class="col-12 col-xl-4">
-                <div class="card sticky-xl">
+                <div class="card mb-3 sticky-xl">
                     <div class="card-body">
                         <h6 class="text-uppercase text-muted mb-3">Контакты</h6>
                         <div class="fw-semibold">{{ user_obj.first_name }} {{ user_obj.last_name }}</div>
@@ -43,6 +43,24 @@
                             {% else %}
                                 —
                             {% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <h6 class="text-uppercase text-muted mb-3">Статус участника</h6>
+                        <form method="post" action="{% url 'staff_scholar_action' user_obj.id %}" class="row g-2">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="change_status">
+                            <div class="col-12 col-sm-8">
+                                {% render_field status_form.status class+="form-select" %}
+                            </div>
+                            <div class="col-12 col-sm-4 d-grid">
+                                <button class="btn btn-primary">Сохранить</button>
+                            </div>
+                        </form>
+                        <div class="form-text mt-2">
+                            Текущий: <strong>{{ user_obj.user_info.get_status_display }}</strong>
                         </div>
                     </div>
                 </div>

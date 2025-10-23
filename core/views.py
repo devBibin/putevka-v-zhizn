@@ -13,7 +13,7 @@ from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password, password_validators_help_text_html
 from django.core.mail import send_mail
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.views.decorators.csrf import csrf_exempt
@@ -393,6 +393,38 @@ def motivation_letter(request):
         'letter': letter,
         'active': 'motivation_letter',
     })
+
+
+@login_required
+@require_POST
+def motivation_letter_autosave(request):
+    user = request.user
+    text = (request.POST.get("letter_text") or "").strip()
+
+    letter, created = MotivationLetter.objects.get_or_create(
+        user=user,
+        defaults={
+            "letter_text": text,
+            "status": MotivationLetter.Status.DRAFT,
+        },
+    )
+
+    if letter.status == MotivationLetter.Status.SUBMITTED:
+        return HttpResponse("Письмо уже отправлено — автосохранение отключено.", status=400)
+    if letter.admin_rating:
+        return HttpResponse("Письмо уже оценено администратором — редактирование запрещено.", status=400)
+
+    letter.letter_text = text
+    letter.status = MotivationLetter.Status.DRAFT
+
+    try:
+        letter.full_clean()
+        letter.save(update_fields=["letter_text", "status"])
+    except Exception as e:
+        return HttpResponse(f"Ошибка сохранения: {e}", status=400)
+
+    saved_at = timezone.localtime().strftime("%H:%M:%S")
+    return HttpResponse(f"Черновик сохранён в {saved_at}")
 
 
 @ensure_registration_gate('protected')

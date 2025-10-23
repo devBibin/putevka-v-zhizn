@@ -48,19 +48,15 @@
                                     {#                                    {% if field.field.widget.input_type == 'textarea' %}#}
                                     {#                                        {{ field|add_class:"form-control form-control-lg" }}#}
                                     {% if field.name == 'letter_text' %}
-                                        {% with maxlen=field.field.max_length|default:2000 %}
-                                            {# соберём строку "maxlength:<число>" для фильтра attr #}
-                                            {% with maxlen_attr="maxlength:"|add:maxlen %}
-                                                {{ field|add_class:"form-control"|attr:"id:id_caption_upload"|attr:maxlen_attr }}
-                                            {% endwith %}
-                                            <div id="captionCharCount" class="form-text text-muted">
-                                                0 / {{ maxlen }} символов
-                                            </div>
-                                        {% endwith %}
+                                        {{ field|add_class:"form-control" }}
+
+                                        <div id="captionCharCount" class="form-text text-muted">
+                                            0 / {{ field.field.max_length|default:2000 }} символов
+                                        </div>
+                                        <div id="autosaveStatus" class="form-text"></div>
                                     {% else %}
                                         {{ field|add_class:"form-control" }}
                                     {% endif %}
-
                                     {% if field.help_text %}
                                         <div class="form-text text-muted mt-2">{{ field.help_text }}</div>
                                     {% endif %}
@@ -125,10 +121,9 @@
             document.addEventListener('DOMContentLoaded', function () {
                 const textarea = document.getElementById('id_caption_upload');
                 const counter = document.getElementById('captionCharCount');
-
                 if (!textarea || !counter) return;
 
-                let maxLen = parseInt(textarea.getAttribute('maxlength'), 10);
+                let maxLen = parseInt(textarea.dataset.maxlen || textarea.getAttribute('maxlength'), 10);
                 if (isNaN(maxLen) || maxLen <= 0) maxLen = 2000;
 
                 function setCounter(len) {
@@ -150,45 +145,44 @@
                         e.ctrlKey || e.metaKey || e.altKey ||
                         ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'Tab', 'Enter'].includes(e.key)
                     );
-
                     if (allowedControl) return;
 
                     const hasSelection = textarea.selectionStart !== textarea.selectionEnd;
-                    if (textarea.value.length >= maxLen && !hasSelection) {
-                        e.preventDefault();
-                    }
+                    if (textarea.value.length >= maxLen && !hasSelection) e.preventDefault();
                 });
 
                 textarea.addEventListener('paste', function (e) {
                     const paste = (e.clipboardData || window.clipboardData).getData('text');
                     const start = textarea.selectionStart;
                     const end = textarea.selectionEnd;
-
                     const currentLen = textarea.value.length - (end - start);
                     const room = Math.max(0, maxLen - currentLen);
                     if (room <= 0) {
                         e.preventDefault();
                         return;
                     }
-
                     if (paste.length > room) {
                         e.preventDefault();
                         const toInsert = paste.slice(0, room);
                         const before = textarea.value.slice(0, start);
                         const after = textarea.value.slice(end);
                         textarea.value = before + toInsert + after;
-
                         const caretPos = start + toInsert.length;
                         textarea.setSelectionRange(caretPos, caretPos);
-
                         setCounter(textarea.value.length);
                     }
                 });
 
                 textarea.addEventListener('input', clampAndCount);
                 textarea.addEventListener('change', clampAndCount);
-
                 clampAndCount();
+            });
+            document.addEventListener('htmx:configRequest', function (evt) {
+                if (evt.detail.elt && evt.detail.elt.id === 'id_caption_upload') {
+                    const el = document.getElementById('autosaveStatus');
+                    if (el) el.textContent = 'Сохраняю...';
+                }
+                evt.detail.headers['X-CSRFToken'] = '{{ csrf_token }}';
             });
         </script>
     {% endblock %}

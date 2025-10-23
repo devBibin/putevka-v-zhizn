@@ -2,7 +2,17 @@ from django import forms
 
 from core.models import MotivationLetter
 from documents.models import Document
+from review_by_tutor.models import Interview, TestAssignment
 from scholar_form.models import UserInfo, ScholarVideo
+
+
+class StatusChangeForm(forms.ModelForm):
+    class Meta:
+        model = UserInfo
+        fields = ["status"]
+        widgets = {
+            "status": forms.Select(attrs={"class": "form-select"}),
+        }
 
 
 class MotivationLetterStaffForm(forms.ModelForm):
@@ -61,6 +71,7 @@ class ScholarVideoStaffForm(forms.ModelForm):
             "review": "Отзыв",
             "score": "Оценка в баллах",
         }
+
 
 class DocumentModerationForm(forms.ModelForm):
     class Meta:
@@ -126,6 +137,7 @@ class DocumentStatusForm(forms.ModelForm):
         }
         labels = {"status": "Статус"}
 
+
 class DocumentLockForm(forms.ModelForm):
     class Meta:
         model = Document
@@ -140,6 +152,7 @@ class DocumentLockForm(forms.ModelForm):
         if self.instance is not None:
             self.instance._ignore_lock_validation = True
 
+
 class DocumentCommentForm(forms.ModelForm):
     class Meta:
         model = Document
@@ -153,3 +166,39 @@ class DocumentCommentForm(forms.ModelForm):
         }
         labels = {"only_staff_comment": "Комментарий (только для сотрудников)"}
 
+
+class InterviewForm(forms.ModelForm):
+    class Meta:
+        model = Interview
+        fields = ["notes"]
+        widgets = {
+            "notes": forms.Textarea(attrs={
+                "rows": 6,
+                "placeholder": "Введите заметки по собеседованию..."
+            })
+        }
+
+
+class TestAssignmentCreateForm(forms.ModelForm):
+    class Meta:
+        model = TestAssignment
+        fields = ("user", "title", "external_url", "instructions", "due_at", "status")
+        widgets = {
+            "due_at": forms.DateTimeInput(attrs={"type": "datetime-local"}),
+            "instructions": forms.Textarea(attrs={"rows": 3}),
+        }
+
+
+class TestAssignmentEditForm(forms.ModelForm):
+    class Meta:
+        model = TestAssignment
+        fields = ("title", "external_url", "instructions", "due_at", "status")
+
+
+class TestResultForm(forms.ModelForm):
+    class Meta:
+        model = TestAssignment
+        fields = ("result_score", "result_text", "passed")
+        widgets = {
+            "result_text": forms.Textarea(attrs={"rows": 4}),
+        }

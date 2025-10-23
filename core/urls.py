@@ -52,6 +52,7 @@ urlpatterns = [
     ), name='password_reset_complete'),
 
     path('motivation/', views.motivation_letter, name='motivation_letter'),
+    path("motivation/autosave/", views.motivation_letter_autosave, name="motivation_letter_autosave"),
 
     path('notifications/dropdown/', views.notifications_dropdown, name='notifications_dropdown'),
     path('notifications/', views.notification_list, name='notifications'),

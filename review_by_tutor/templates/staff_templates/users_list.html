@@ -3,141 +3,289 @@
 {% block title %}Пользователи — модерация{% endblock %}
 
 {% block content %}
-    <div class="container py-4">
-        <h1 class="mb-4">Пользователи</h1>
+<div class="container py-4">
+  <h1 class="mb-4">Пользователи</h1>
 
-        <form class="row g-2 mb-3" method="get">
-            <div class="col-md-5">
-                <input type="search" name="q" value="{{ q }}" class="form-control"
-                       placeholder="Поиск: имя, логин, email, телефон, регион">
-            </div>
-            <div class="col-md-3">
-                <select name="role" class="form-select">
-                    <option value="">Все роли</option>
-                    <option value="user" {% if role == 'user' %}selected{% endif %}>Пользователи</option>
-                    <option value="staff" {% if role == 'staff' %}selected{% endif %}>Сотрудники</option>
-                    <option value="superuser" {% if role == 'superuser' %}selected{% endif %}>Суперпользователи</option>
-                </select>
-            </div>
-            <div class="col-md-2">
-                <select name="active" class="form-select">
-                    <option value="">Все статусы</option>
-                    <option value="1" {% if active == '1' %}selected{% endif %}>Активные</option>
-                    <option value="0" {% if active == '0' %}selected{% endif %}>Заблокированные</option>
-                </select>
-            </div>
-            <div class="col-md-2 d-grid">
-                <button class="btn btn-primary">Фильтр</button>
-            </div>
-        </form>
+  <!-- Форма фильтрации -->
+  <form class="row g-3 mb-4" method="get">
+  <!-- Поиск -->
+  <div class="col-md-4">
+    <label class="form-label">Поиск</label>
+    <input type="search" name="q" value="{{ q }}" class="form-control"
+           placeholder="Имя, логин, email, телефон, регион">
+  </div>
 
-        {% if page_obj.object_list %}
-            <div class="table-responsive">
-                <table class="table align-middle">
-                    <thead>
-                    <tr>
-                        <th style="min-width:260px;">Пользователь</th>
-                        <th>Email / Телефон</th>
-                        <th>Документы</th>
-                        <th>Письмо</th>
-                        <th>Анкета</th>
-                        <th>Видео</th>
-                    </tr>
-                    </thead>
-                    <tbody>
-                    {% for u in page_obj.object_list %}
-                        <tr>
-                            <td class="text-break">
-                                <div class="fw-semibold">
-                                    <a href="{% url 'staff_scholar_dossier' u.id %}"
-                                       class="link-dark text-decoration-none"
-                                       style="transition:color .15s ease;">
-                                        {{ u.get_full_name|default:u.username }}
-                                        {% if u.username %}
-                                            <span class="text-muted"> · {{ u.username }}</span>
-                                        {% endif %}
-                                    </a>
-                                </div>
-                                <div class="mt-1">
-                                    {% if u.is_active %}
-                                        <span class="badge text-bg-success">активен</span>
-                                    {% else %}
-                                        <span class="badge text-bg-secondary">заблокирован</span>
-                                    {% endif %}
-                                    {% if u.is_staff %}<span class="badge text-bg-primary ms-1">staff</span>{% endif %}
-                                    {% if u.is_superuser %}
-                                        <span class="badge text-bg-dark ms-1">superuser</span>{% endif %}
-                                </div>
-                            </td>
-                            <td>
-                                <div class="text-break">{{ u.email|default:"—" }}</div>
-                                <div class="small text-muted">{{ u.user_info.phone|default:"" }}</div>
-                            </td>
-                            <td>
-                                <div class="small">
-                                    всего: <span class="badge text-bg-secondary">{{ u.docs_total }}</span>
-                                    {% if u.docs_pending %} · на проверке:
-                                        <span class="badge text-bg-warning">{{ u.docs_pending }}</span>{% endif %}
-                                    {% if u.docs_question %} · уточнить:
-                                        <span class="badge text-bg-danger">{{ u.docs_question }}</span>{% endif %}
-                                    {% if u.docs_signed %} · подписаны:
-                                        <span class="badge text-bg-success">{{ u.docs_signed }}</span>{% endif %}
-                                </div>
-                            </td>
-                            <td>
-                                {% if u.letter_status %}
-                                    <span class="badge
-                  {% if u.letter_status == 'submitted' %}text-bg-success
-                  {% elif u.letter_status == 'draft' %}text-bg-secondary
-                  {% else %}text-bg-secondary{% endif %}">
-                  {% if u.letter_status == 'submitted' %}Отправлено{% elif u.letter_status == 'draft' %}
-                      Черновик{% else %}—{% endif %}
-                </span>
-                                {% else %}
-                                    <span class="text-muted">—</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if u.has_profile %}
-                                    <span class="badge text-bg-success">есть</span>
-                                {% else %}
-                                    <span class="badge text-bg-secondary">нет</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if u.has_video %}
-                                    <span class="badge text-bg-success">есть</span>
-                                {% else %}
-                                    <span class="badge text-bg-secondary">нет</span>
-                                {% endif %}
-                            </td>
-                        </tr>
-                    {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+  <!-- Онлайн-школа -->
+  <div class="col-md-3">
+    <label class="form-label">Онлайн-школа</label>
+    <select name="school" class="form-select">
+      <option value="">Все школы</option>
+      {% for s in schools %}
+        <option value="{{ s.id }}" {% if s.id|stringformat:"s" == school %}selected{% endif %}>
+          {{ s.name }}
+        </option>
+      {% endfor %}
+    </select>
+  </div>
 
-            <nav class="mt-3">
-                <ul class="pagination">
-                    {% if page_obj.has_previous %}
-                        <li class="page-item">
-                            <a class="page-link"
-                               href="?page={{ page_obj.previous_page_number }}&q={{ q }}&role={{ role }}&active={{ active }}">Назад</a>
-                        </li>
-                    {% endif %}
-                    <li class="page-item disabled"><span
-                            class="page-link">Стр. {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span>
-                    </li>
-                    {% if page_obj.has_next %}
-                        <li class="page-item">
-                            <a class="page-link"
-                               href="?page={{ page_obj.next_page_number }}&q={{ q }}&role={{ role }}&active={{ active }}">Вперёд</a>
-                        </li>
-                    {% endif %}
-                </ul>
-            </nav>
-        {% else %}
-            <div class="alert alert-info">Пользователи не найдены.</div>
-        {% endif %}
-    </div>
+  <!-- Курс -->
+  <div class="col-md-3">
+    <label class="form-label">Курс</label>
+    <select name="course" class="form-select">
+      <option value="">Все курсы</option>
+      {% for c in courses %}
+        <option value="{{ c.id }}" {% if c.id|stringformat:"s" == course %}selected{% endif %}>
+          {{ c.title }}
+        </option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <!-- Класс -->
+  <div class="col-md-2">
+    <label class="form-label">Класс</label>
+    <select name="grade" class="form-select">
+      <option value="">Все</option>
+      {% for n in grades %}
+  <option value="{{ n }}" {% if grade == n|stringformat:"s" %}selected{% endif %}>{{ n }} класс</option>
+{% endfor %}
+    </select>
+  </div>
+
+  <!-- Куратор нужен -->
+  <div class="col-md-2">
+    <label class="form-label">Куратор нужен</label>
+    <select name="curator_need" class="form-select">
+      <option value="">Все</option>
+      <option value="1" {% if curator_need == '1' %}selected{% endif %}>Да</option>
+      <option value="0" {% if curator_need == '0' %}selected{% endif %}>Нет</option>
+    </select>
+  </div>
+
+  <div class="col-md-2 align-self-end d-grid">
+    <button class="btn btn-primary">Фильтр</button>
+  </div>
+</form>
+
+
+  {% if page_obj.object_list %}
+    <!-- Форма массовой отправки оповещений -->
+    <form method="post" action="{% url 'staff_send_notification' %}" id="notifyForm">
+      {% csrf_token %}
+
+      <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+        <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#sendNotifModal" id="openModalBtn">
+          Отправить оповещение выбранным
+        </button>
+        <span class="text-muted small">Отметьте галочками пользователей в таблице ниже.</span>
+        <span class="ms-auto small">Выбрано: <strong id="selectedCount">0</strong></span>
+      </div>
+
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead>
+          <tr>
+            <th style="width:36px;">
+              <input class="form-check-input" type="checkbox" id="checkAllOnPage" title="Выбрать все на странице">
+            </th>
+            <th style="min-width:260px;">Пользователь</th>
+            <th>Email / Телефон</th>
+            <th>Документы</th>
+            <th>Письмо</th>
+            <th>Анкета</th>
+            <th>Видео</th>
+          </tr>
+          </thead>
+          <tbody>
+          {% for u in page_obj.object_list %}
+            <tr>
+              <td>
+                <input class="form-check-input row-check" type="checkbox" name="ids" value="{{ u.id }}">
+              </td>
+              <td class="text-break">
+                <div class="fw-semibold">
+                  <a href="{% url 'staff_scholar_dossier' u.id %}"
+                     class="link-dark text-decoration-none" style="transition:color .15s ease;">
+                    {{ u.get_full_name|default:u.username }}
+                    {% if u.username %}<span class="text-muted"> · {{ u.username }}</span>{% endif %}
+                  </a>
+                </div>
+                <div class="mt-1">
+                  {% if u.is_active %}
+                    <span class="badge text-bg-success">активен</span>
+                  {% else %}
+                    <span class="badge text-bg-secondary">заблокирован</span>
+                  {% endif %}
+                  {% if u.is_staff %}<span class="badge text-bg-primary ms-1">staff</span>{% endif %}
+                  {% if u.is_superuser %}<span class="badge text-bg-dark ms-1">superuser</span>{% endif %}
+                </div>
+              </td>
+              <td>
+                <div class="text-break">{{ u.email|default:"—" }}</div>
+                <div class="small text-muted">{{ u.user_info.phone|default:"" }}</div>
+              </td>
+              <td>
+                <div class="small">
+                  всего: <span class="badge text-bg-secondary">{{ u.docs_total }}</span>
+                  {% if u.docs_pending %} · на проверке: <span class="badge text-bg-warning">{{ u.docs_pending }}</span>{% endif %}
+                  {% if u.docs_question %} · уточнить: <span class="badge text-bg-danger">{{ u.docs_question }}</span>{% endif %}
+                  {% if u.docs_signed %} · подписаны: <span class="badge text-bg-success">{{ u.docs_signed }}</span>{% endif %}
+                </div>
+              </td>
+              <td>
+                {% if u.letter_status %}
+                  <span class="badge
+                    {% if u.letter_status == 'submitted' %}text-bg-success
+                    {% elif u.letter_status == 'draft' %}text-bg-secondary
+                    {% else %}text-bg-secondary{% endif %}">
+                    {% if u.letter_status == 'submitted' %}Отправлено
+                    {% elif u.letter_status == 'draft' %}Черновик
+                    {% else %}—{% endif %}
+                  </span>
+                {% else %}
+                  <span class="text-muted">—</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if u.has_profile %}
+                  <span class="badge text-bg-success">есть</span>
+                {% else %}
+                  <span class="badge text-bg-secondary">нет</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if u.has_video %}
+                  <span class="badge text-bg-success">есть</span>
+                {% else %}
+                  <span class="badge text-bg-secondary">нет</span>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Пагинация -->
+      <nav class="mt-3">
+        <ul class="pagination">
+          {% if page_obj.has_previous %}
+            <li class="page-item">
+              <a class="page-link"
+                 href="?page={{ page_obj.previous_page_number }}&q={{ q }}&role={{ role }}&active={{ active }}">Назад</a>
+            </li>
+          {% endif %}
+          <li class="page-item disabled">
+            <span class="page-link">Стр. {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span>
+          </li>
+          {% if page_obj.has_next %}
+            <li class="page-item">
+              <a class="page-link"
+                 href="?page={{ page_obj.next_page_number }}&q={{ q }}&role={{ role }}&active={{ active }}">Вперёд</a>
+            </li>
+          {% endif %}
+        </ul>
+      </nav>
+
+      <!-- Модалка отправки оповещения -->
+      <div class="modal fade" id="sendNotifModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title">Отправить оповещение выбранным пользователям</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+            </div>
+            <div class="modal-body">
+              <div class="mb-3">
+                <label for="messageText" class="form-label">Текст сообщения</label>
+                <textarea id="messageText" name="message" class="form-control" rows="5"
+                          placeholder="Сообщение для получателей…" required></textarea>
+                <div class="form-text">Сообщение увидят все отмеченные пользователи.</div>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Отмена</button>
+              <button type="submit" class="btn btn-primary" id="submitNotifBtn">Отправить</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </form>
+
+    <!-- Небольшой JS для удобства -->
+    <script>
+      (function () {
+        const checkAll = document.getElementById('checkAllOnPage');
+        const form = document.getElementById('notifyForm');
+        const selectedCount = document.getElementById('selectedCount');
+        const openModalBtn = document.getElementById('openModalBtn');
+        const submitBtn = document.getElementById('submitNotifBtn');
+        const messageText = document.getElementById('messageText');
+
+        function updateCount() {
+          const checked = document.querySelectorAll('.row-check:checked').length;
+          selectedCount.textContent = String(checked);
+          return checked;
+        }
+
+        function requireSelection(e) {
+          if (updateCount() === 0) {
+            e.preventDefault();
+            e.stopPropagation();
+            alert('Отметьте хотя бы одного пользователя.');
+          }
+        }
+
+        // Выбрать все на странице
+        if (checkAll) {
+          checkAll.addEventListener('change', function () {
+            document.querySelectorAll('.row-check').forEach(cb => { cb.checked = checkAll.checked; });
+            updateCount();
+          });
+        }
+
+        // Счётчик при клике по отдельным чекбоксам
+        document.addEventListener('change', function (e) {
+          if (e.target && e.target.classList && e.target.classList.contains('row-check')) {
+            updateCount();
+          }
+        });
+
+        // Не открываем модалку без выбранных
+        if (openModalBtn) {
+          openModalBtn.addEventListener('click', function (e) {
+            if (updateCount() === 0) {
+              e.preventDefault();
+              e.stopPropagation();
+              alert('Отметьте хотя бы одного пользователя.');
+            }
+          });
+        }
+
+        // Доп. валидация при сабмите (сообщение + выбор)
+        if (submitBtn) {
+          submitBtn.addEventListener('click', function (e) {
+            if (updateCount() === 0) {
+              e.preventDefault();
+              e.stopPropagation();
+              alert('Отметьте хотя бы одного пользователя.');
+              return;
+            }
+            if (!messageText.value.trim()) {
+              e.preventDefault();
+              e.stopPropagation();
+              alert('Введите текст сообщения.');
+            }
+          });
+        }
+
+        // Инициализация счётчика при загрузке
+        updateCount();
+      })();
+    </script>
+
+  {% else %}
+    <div class="alert alert-info">Пользователи не найдены.</div>
+  {% endif %}
+</div>
 {% endblock %}
