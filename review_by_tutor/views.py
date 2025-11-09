@@ -9,6 +9,7 @@ from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.db import transaction
 from django.db.models import Q, Subquery, OuterRef, Count, Exists
 from django.shortcuts import render, get_object_or_404, redirect
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 from django.views.generic import TemplateView
@@ -532,4 +533,7 @@ def interview_preparation_view(request):
         .first()
     )
 
-    return render(request, "interview_preparation.html", {"prep": prep})
+    return render(request, "interview_preparation.html", {"prep": prep, "active": "interview"})
+
+
+

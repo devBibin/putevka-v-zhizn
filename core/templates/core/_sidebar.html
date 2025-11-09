@@ -23,7 +23,7 @@
     <a class="list-group-item list-group-item-action d-flex align-items-center {% if active == 'testing' %} active{% endif %}"
        href="{% url 'candidate_testing_list' %}">Тестирование
     </a>
-    <a class="list-group-item list-group-item-action d-flex align-items-center {% if active == 'study' %} active{% endif %}"
+    <a class="list-group-item list-group-item-action d-flex align-items-center {% if active == 'interview' %} active{% endif %}"
        href="{% url 'preparation' %}">Подготовка к собеседованию
     </a>
     <a class="list-group-item list-group-item-action d-flex align-items-center {% if active == 'study' %} active{% endif %}"
@@ -64,7 +64,7 @@
             <div class="small">Тест</div>
         </a>
         <a href="{% url 'preparation' %}"
-           class="text-center {% if active == 'testing' %}text-primary{% else %}text-secondary{% endif %}">
+           class="text-center {% if active == 'interview' %}text-primary{% else %}text-secondary{% endif %}">
             <div class="small">Собес</div>
         </a>
         <a href="{% url 'study:schools' %}"

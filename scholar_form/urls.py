@@ -16,4 +16,7 @@ urlpatterns = [
     path("video/", views.my_video_page, name="my_video_page"),
     path("testing/", testing_list_for_candidate, name="candidate_testing_list"),
     path("preparation/", review_by_tutor.views.interview_preparation_view, name="preparation"),
+
+    path("tests/complete/<int:pk>/", views.test_assignment_complete, name="test_assignment_complete"),
+
 ]

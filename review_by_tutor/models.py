@@ -65,6 +65,16 @@ class TestAssignment(models.Model):
     )
 
     result_score = models.DecimalField("Баллы", max_digits=6, decimal_places=2, null=True, blank=True)
+
+    percentile = models.DecimalField(
+        "Перцентиль",
+        max_digits=5,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Результат в перцентилях (0–100)",
+    )
+
     result_text = models.TextField("Комментарий/результат", blank=True)
     passed = models.BooleanField("Пройдено успешно", null=True, blank=True)
 

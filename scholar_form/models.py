@@ -3,6 +3,7 @@ import os
 import uuid
 from pathlib import Path
 
+from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.contenttypes.models import ContentType
 from importlib.resources._common import _
@@ -150,3 +151,42 @@ class ScholarVideo(models.Model):
 
     def __str__(self):
         return f"Видеовизитка {self.user.get_full_name() or self.user.username}"
+
+
+class UserPersonalData(models.Model):
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="personal_data",
+    )
+
+    last_name = models.CharField("Фамилия", max_length=150, blank=True)
+    first_name = models.CharField("Имя", max_length=150, blank=True)
+    middle_name = models.CharField("Отчество", max_length=150, blank=True)
+
+    passport_series = models.CharField("Серия паспорта", max_length=10, blank=True)
+    passport_number = models.CharField("Номер паспорта", max_length=20, blank=True)
+    passport_issued_at = models.DateField("Дата выдачи", blank=True, null=True)
+    passport_issued_by = models.CharField("Кем выдан", max_length=255, blank=True)
+    passport_department_code = models.CharField("Код подразделения", max_length=20, blank=True)
+
+    registration_address = models.TextField("Адрес регистрации", blank=True)
+
+    bank_name = models.CharField("Банк", max_length=255, blank=True)
+    bank_account = models.CharField("Номер счёта", max_length=34, blank=True)
+    bank_bik = models.CharField("БИК", max_length=20, blank=True)
+    bank_correspondent_account = models.CharField("Корр. счёт", max_length=34, blank=True)
+
+    phone = models.CharField("Телефон", max_length=30, blank=True)
+    email = models.EmailField("E-mail", blank=True)
+
+    inn = models.CharField("ИНН", max_length=20, blank=True)
+
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Персональные данные"
+        verbose_name_plural = "Персональные данные"
+
+    def __str__(self):
+        return f"Персональные данные {self.user}"

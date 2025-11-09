@@ -1,12 +1,12 @@
 from django import forms
+from django.db import transaction
 from django.dispatch import Signal
 from django.forms import HiddenInput
 from django.shortcuts import redirect
-
-from .models import UserInfo, ScholarVideo
 from formtools.wizard.views import SessionWizardView
 
-from django.db import transaction
+from .models import UserInfo, ScholarVideo, UserPersonalData
+
 
 def _sync_user_from_userinfo(userinfo: UserInfo):
     user = getattr(userinfo, "user", None)
@@ -29,7 +29,9 @@ def _sync_user_from_userinfo(userinfo: UserInfo):
     if updated_fields:
         user.save(update_fields=updated_fields)
 
+
 wizard_done = Signal()
+
 
 class PersonalForm(forms.ModelForm):
     birth_date = forms.DateField(
@@ -148,6 +150,7 @@ TEMPLATES = {
     "step4": "step4.html",
     "step5": "step5.html",
 }
+
 
 class ApplicationWizard(SessionWizardView):
     def get_template_names(self):
@@ -289,11 +292,39 @@ class UserInfoForm(forms.ModelForm):
 
 class UserProfileForm(forms.ModelForm):
     avatar = forms.ImageField(required=False, widget=forms.FileInput(attrs={"accept": "image/*"}))
+
     class Meta:
         model = UserInfo
         fields = ["avatar"]
+
 
 class ScholarVideoForm(forms.ModelForm):
     class Meta:
         model = ScholarVideo
         fields = ["file"]
+
+class UserPersonalDataForm(forms.ModelForm):
+    class Meta:
+        model = UserPersonalData
+        fields = [
+            "last_name",
+            "first_name",
+            "middle_name",
+            "passport_series",
+            "passport_number",
+            "passport_issued_at",
+            "passport_issued_by",
+            "passport_department_code",
+            "registration_address",
+            "bank_name",
+            "bank_account",
+            "bank_bik",
+            "bank_correspondent_account",
+            "phone",
+            "email",
+            "inn",
+        ]
+        widgets = {
+            "passport_issued_at": forms.DateInput(attrs={"type": "date"}),
+            "registration_address": forms.Textarea(attrs={"rows": 2}),
+        }
