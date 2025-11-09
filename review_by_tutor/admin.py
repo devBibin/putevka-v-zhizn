@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from review_by_tutor.models import Interview, TestAssignment
+from review_by_tutor.models import Interview, TestAssignment, InterviewPreparation
 
 
 @admin.register(Interview)
@@ -17,3 +17,9 @@ class TestAssignmentAdmin(admin.ModelAdmin):
     search_fields = ("title", "user__username", "user__first_name", "user__last_name")
     autocomplete_fields = ("user", "assigned_by", "result_filled_by")
     readonly_fields = ("assigned_at", "result_filled_at", "completed_at")
+
+
+@admin.register(InterviewPreparation)
+class InterviewPreparationAdmin(admin.ModelAdmin):
+    list_display = ("title", "is_active", "updated_at")
+    list_filter = ("is_active",)

@@ -11,14 +11,16 @@ from django.db.models import Q, Subquery, OuterRef, Count, Exists
 from django.shortcuts import render, get_object_or_404, redirect
 from django.utils import timezone
 from django.views.decorators.http import require_POST
+from django.views.generic import TemplateView
 
+from core.decorators import ensure_registration_gate
 from core.models import MotivationLetter, Notification, UserNotification
 from documents.models import Document
 from my_study.models import CourseSelection, UniversityPriority, AssessmentResult, School, Course
 from review_by_tutor.forms import MotivationLetterStaffForm, UserInfoStaffForm, ScholarVideoStaffForm, \
     DocumentStaffUploadForm, DocumentCommentForm, DocumentLockForm, \
     DocumentStatusForm, InterviewForm, TestAssignmentCreateForm, TestAssignmentEditForm, TestResultForm
-from review_by_tutor.models import Interview, TestAssignment
+from review_by_tutor.models import Interview, TestAssignment, InterviewPreparation
 from scholar_form.models import UserInfo, ScholarVideo, StaffNote
 
 logger = logging.getLogger(__name__)
@@ -518,3 +520,16 @@ def testing_fill_result(request, pk):
     else:
         form = TestResultForm(instance=obj)
     return render(request, "staff_templates/testing/result_form.html", {"form": form, "obj": obj, "user_obj": get_object_or_404(User, pk=obj.user.id), "active": "testing"})
+
+
+@ensure_registration_gate('protected')
+@login_required
+def interview_preparation_view(request):
+    prep = (
+        InterviewPreparation.objects
+        .filter(is_active=True)
+        .order_by("-updated_at")
+        .first()
+    )
+
+    return render(request, "interview_preparation.html", {"prep": prep, "active": "interview"})

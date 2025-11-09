@@ -1,8 +1,9 @@
-from django.db import models
 from django.conf import settings
+from django.db import models
 from django.utils import timezone
 
 User = settings.AUTH_USER_MODEL
+
 
 class Interview(models.Model):
     user = models.OneToOneField(
@@ -93,3 +94,18 @@ class TestAssignment(models.Model):
             self.completed_at = timezone.now()
         if self.status != self.Status.COMPLETED:
             self.status = self.Status.COMPLETED
+
+
+class InterviewPreparation(models.Model):
+    title = models.CharField("Заголовок", max_length=200, default="Подготовка к собеседованию")
+    description = models.TextField("Описание", blank=True)
+    video = models.FileField("Видео", upload_to="interview_prep/")
+    is_active = models.BooleanField("Показывать на сайте", default=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Материал по подготовке к собеседованию"
+        verbose_name_plural = "Материалы по подготовке к собеседованию"
+
+    def __str__(self):
+        return self.title
