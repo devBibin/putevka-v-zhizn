@@ -44,6 +44,9 @@
                                     {% if t.result_score is not None %}
                                         <div class="small">Баллы: {{ t.result_score }}</div>
                                     {% endif %}
+                                    {% if t.percentile is not None %}
+                                        <div class="small">Перцентиль: {{ t.percentile }}%</div>
+                                    {% endif %}
                                 </div>
                             {% else %}
                                 <span class="badge text-bg-secondary">{{ t.get_status_display }}</span>
