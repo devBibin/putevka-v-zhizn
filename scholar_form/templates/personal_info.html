@@ -21,6 +21,8 @@
                                     src="
 
 
+
+
                                             {% if form.instance.avatar %}{{ form.instance.avatar.url }}{% else %}https://ui-avatars.com/api/?name={{ user.get_full_name|default:user.username|urlencode }}&size=256&background=0D6EFD&color=fff{% endif %}"
                                     alt="Аватар"
                                     class="rounded-circle border"
@@ -104,16 +106,22 @@
                                 {% endif %}
                             </div>
                         </div>
+                        <div class="alert alert-warning mb-4 small" role="alert">
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                            Эти данные являются <strong>персональными и крайне важными</strong>.
+                            Пожалуйста, указывайте их точно так, как в документах —
+                            особенно паспортные сведения и банковские реквизиты.
+                        </div>
                         <div class="card-body">
                             <div class="row g-3">
-                                {# Поле аватара рендерим скрыто, управляем через кнопку-метку на карточке #}
+                                {# скрытое поле аватара #}
                                 {% if form.avatar %}
                                     <div class="col-12 d-none">
                                         {% render_field form.avatar class+="form-control" %}
                                     </div>
                                 {% endif %}
 
-                                {# Остальные видимые поля — равномерно по сетке #}
+                                {# сначала обычные поля профиля #}
                                 {% for field in form.visible_fields %}
                                     {% if field.name != "avatar" %}
                                         <div class="col-md-6">
@@ -128,6 +136,21 @@
                                             {% endfor %}
                                         </div>
                                     {% endif %}
+                                {% endfor %}
+
+                                {# теперь паспорт/банк/контактные #}
+                                {% for field in personal_form.visible_fields %}
+                                    <div class="col-md-6">
+                                        <label class="form-label"
+                                               for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                        {% render_field field class+="form-control" %}
+                                        {% if field.help_text %}
+                                            <div class="form-text">{{ field.help_text }}</div>
+                                        {% endif %}
+                                        {% for error in field.errors %}
+                                            <div class="invalid-feedback d-block">{{ error }}</div>
+                                        {% endfor %}
+                                    </div>
                                 {% endfor %}
                             </div>
                         </div>

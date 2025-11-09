@@ -5,25 +5,38 @@ from django.urls import reverse
 
 from core.decorators import ensure_registration_gate
 from review_by_tutor.models import TestAssignment
-from scholar_form.forms import UserProfileForm, ScholarVideoForm
-from scholar_form.models import UserInfo
+from scholar_form.forms import UserProfileForm, ScholarVideoForm, UserPersonalDataForm
+from scholar_form.models import UserInfo, UserPersonalData
 
 
 @ensure_registration_gate('protected')
 @login_required
 def personal_info(request):
     profile, _ = UserInfo.objects.get_or_create(user=request.user)
+    personal_data, _ = UserPersonalData.objects.get_or_create(user=request.user)
 
     if request.method == "POST":
-        form = UserProfileForm(request.POST, request.FILES, instance=profile)
-        if form.is_valid():
-            form.save()
+        profile_form = UserProfileForm(request.POST, request.FILES, instance=profile)
+        personal_form = UserPersonalDataForm(request.POST, instance=personal_data)
+
+        if profile_form.is_valid() and personal_form.is_valid():
+            profile_form.save()
+            personal_form.save()
             return redirect("personal_info")
     else:
-        form = UserProfileForm(instance=profile)
+        profile_form = UserProfileForm(instance=profile)
+        personal_form = UserPersonalDataForm(instance=personal_data)
 
-    return render(request, "personal_info.html", {"form": form, "active": "personal_info", 'profile': profile})
-
+    return render(
+        request,
+        "personal_info.html",
+        {
+            "form": profile_form,
+            "personal_form": personal_form,
+            "active": "personal_info",
+            "profile": profile,
+        },
+    )
 
 @ensure_registration_gate('protected')
 @login_required
