@@ -1,0 +1,26 @@
+{% extends "core/base.html" %}
+
+{% block title %}Подготовка к собеседованию{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <h1 class="mb-3">Подготовка к собеседованию</h1>
+
+  {% if prep %}
+    {% if prep.description %}
+      <p class="mb-3">{{ prep.description|linebreaks }}</p>
+    {% endif %}
+
+    <div class="ratio ratio-16x9">
+      <video controls>
+        <source src="{{ prep.video.url }}" type="video/mp4">
+        Ваш браузер не поддерживает видео.
+      </video>
+    </div>
+  {% else %}
+    <div class="alert alert-info">
+      Материал пока не загружен.
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
