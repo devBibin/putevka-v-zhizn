@@ -100,3 +100,42 @@ class DocumentUploadForm(forms.ModelForm):
 
         uploaded_file.seek(0)
         return uploaded_file
+
+
+FIELD_TYPES = {
+    "string": forms.CharField,
+    "text": forms.CharField,
+    "date": forms.DateField,
+    "number": forms.DecimalField,
+    "integer": forms.IntegerField,
+    "boolean": forms.BooleanField,
+}
+
+WIDGETS = {
+    "text": forms.Textarea(attrs={"rows": 3}),
+    "date": forms.DateInput(attrs={"type": "date"}),
+}
+
+def build_params_form(required_params: dict):
+    class DynamicParamsForm(forms.Form):
+        pass
+
+    for name, meta in (required_params or {}).items():
+        ftype = (meta or {}).get("type", "string")
+        label = (meta or {}).get("label", name)
+        required = bool((meta or {}).get("required", False))
+
+        FieldClass = FIELD_TYPES.get(ftype, forms.CharField)
+        kwargs = {"label": label, "required": required}
+
+        widget = WIDGETS.get(ftype)
+        if widget:
+            kwargs["widget"] = widget
+
+        if ftype == "number":
+            kwargs.setdefault("decimal_places", 2)
+            kwargs.setdefault("max_digits", 12)
+
+        setattr(DynamicParamsForm, name, FieldClass(**kwargs))
+
+    return DynamicParamsForm

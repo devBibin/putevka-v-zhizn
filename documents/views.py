@@ -1,19 +1,26 @@
+import datetime
 import mimetypes
 import os
 import logging
 
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
-from django.http import Http404, FileResponse
+from django.contrib.auth import get_user_model
+from django.contrib.auth.decorators import login_required, user_passes_test
+from django.http import Http404, FileResponse, HttpResponse
 from django.shortcuts import get_object_or_404
 from django.shortcuts import render, redirect
 
 from core.decorators import ensure_registration_gate
+from review_by_tutor.views import _staff_check
+from .ctx_builders import merge_context, base_user_context
 from .decorators import rate_limit_uploads
-from .forms import DocumentUploadForm, AttachDocumentsForm
-from .models import Document
+from .forms import DocumentUploadForm, AttachDocumentsForm, build_params_form
+from .models import Document, DocTemplate
+from .services import render_docx_bytes
 
 logger = logging.getLogger(__name__)
+
+User = get_user_model()
 
 @login_required
 def serve_document(request, document_id):
@@ -124,3 +131,47 @@ def delete_document(request, document_id):
     messages.success(request, 'Документ успешно удален.')
     logger.info(f'Файл {document.file.name} помечен как удалённый')
     return redirect('documents_dashboard')
+
+
+@login_required
+@user_passes_test(_staff_check)
+def template_params(request, template_slug, user_id):
+    tpl = get_object_or_404(DocTemplate, slug=template_slug, is_active=True)
+    target_user = get_object_or_404(User, pk=user_id)
+    ParamsForm = build_params_form(tpl.required_params)
+
+    if request.method == "POST":
+        form = ParamsForm(request.POST)
+        if form.is_valid():
+            extra = form.cleaned_data
+            context = merge_context(base_user_context(target_user), extra)
+
+            filename = f"{tpl.slug}_{target_user.username or target_user.id}_{datetime.date.today():%Y%m%d}.docx"
+            content = render_docx_bytes(tpl.file, context)
+
+            resp = HttpResponse(
+                content,
+                content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            )
+            resp["Content-Disposition"] = f'attachment; filename="{filename}"'
+            resp["Content-Length"] = str(len(content))
+            return resp
+    else:
+        initial = {}
+        for k, meta in (tpl.required_params or {}).items():
+            if (meta or {}).get("type") == "date":
+                initial[k] = datetime.date.today().isoformat()
+        form = ParamsForm(initial=initial)
+
+    return render(request, "staff_templates/docs/template_params.html", {
+        "template": tpl,
+        "target_user": target_user,
+        "form": form,
+    })
+
+
+@login_required
+@user_passes_test(_staff_check())
+def template_list(request):
+    templates = DocTemplate.objects.filter(is_active=True).order_by("name")
+    return render(request, "staff_templates/docs/templates.html", {"templates": templates})

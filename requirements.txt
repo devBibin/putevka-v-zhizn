@@ -10,3 +10,7 @@ openai>=1.52.0
 python-magic
 Pillow
 pydantic
+requests
+jinja2
+num2words
+docxtpl

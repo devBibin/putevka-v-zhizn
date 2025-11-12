@@ -14,7 +14,8 @@ RUN pip install --no-cache-dir \
     --timeout 30 \
     --retries 10 \
     --default-timeout=30 \
-    -r requirements.txt
+    -r requirements.txt \
+    -vv
 
 COPY .env .
 COPY telegram_bot_polling.py .
