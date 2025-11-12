@@ -1,0 +1,49 @@
+<div class="card shadow-sm border-0 mb-3">
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-md-4">
+        <div class="small text-muted">ФИО</div>
+        <div class="fw-semibold">
+          {% with ln=personal.last_name|default:user_obj.last_name fn=personal.first_name|default:user_obj.first_name mn=personal.middle_name%}
+            {{ ln }} {{ fn }} {{ mn }}
+          {% endwith %}
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="small text-muted">Контакты</div>
+        <div>{{ personal.phone|default:"—" }}</div>
+        <div class="text-muted small">{{ personal.email|default:user_obj.email }}</div>
+      </div>
+      <div class="col-md-4">
+        <div class="small text-muted">Адрес регистрации</div>
+        <div class="text-break">{{ personal.registration_address|default:"—" }}</div>
+      </div>
+
+      <div class="col-md-4">
+        <div class="small text-muted">Паспорт</div>
+        <div>
+          серия {{ personal.passport_series|default:"—" }},
+          номер {{ personal.passport_number|default:"—" }}
+        </div>
+        <div class="text-muted small">
+          выдан {{ personal.passport_issued_by|default:"—" }}
+          {% if personal.passport_issued_at %} ({{ personal.passport_issued_at }}){% endif %}
+          {% if personal.passport_department_code %}, код {{ personal.passport_department_code }}{% endif %}
+        </div>
+      </div>
+
+      <div class="col-md-4">
+        <div class="small text-muted">Банковские реквизиты</div>
+        <div>{{ personal.bank_name|default:"—" }}</div>
+        <div class="text-muted small">р/с: {{ personal.bank_account|default:"—" }}</div>
+        <div class="text-muted small">БИК: {{ personal.bank_bik|default:"—" }}</div>
+        <div class="text-muted small">к/с: {{ personal.bank_correspondent_account|default:"—" }}</div>
+      </div>
+
+      <div class="col-md-4">
+        <div class="small text-muted">ИНН</div>
+        <div>{{ personal.inn|default:"—" }}</div>
+      </div>
+    </div>
+  </div>
+</div>

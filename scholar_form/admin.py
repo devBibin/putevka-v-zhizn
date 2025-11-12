@@ -3,7 +3,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 
 from scholar_form.forms import UserInfoForm
-from scholar_form.models import UserInfo, ScholarVideo
+from scholar_form.models import UserInfo, ScholarVideo, UserPersonalData
 
 from django.db import models
 
@@ -23,3 +23,7 @@ class ScholarVideoAdmin(admin.ModelAdmin):
     list_display = ('user',)
     list_filter = ('updated_at',)
     raw_id_fields = ('user',)
+
+
+class UserPersonalDataInline(admin.StackedInline):
+    model = UserPersonalData

@@ -9,8 +9,9 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 
 from core.models import TelegramAccount, RegistrationPersonalData
+from scholar_form.admin import UserPersonalDataInline
 from scholar_form.forms import UserInfoForm
-from scholar_form.models import UserInfo
+from scholar_form.models import UserInfo, UserPersonalData
 from django.db import models
 from django import forms
 
@@ -218,7 +219,7 @@ class UserNotificationAdmin(admin.ModelAdmin):
 
 
 class CustomUserAdmin(BaseUserAdmin):
-    inlines = (UserInfoInline, TelegramAccountInline, DocumentInline, MotivationLetterInline)
+    inlines = (UserInfoInline, TelegramAccountInline, DocumentInline, MotivationLetterInline, UserPersonalDataInline)
 
     list_display = ('username', 'email', 'first_name', 'last_name', 'is_staff')
     search_fields = ('username', 'first_name', 'last_name', 'email')

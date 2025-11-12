@@ -1,7 +1,7 @@
 import datetime
+import logging
 import mimetypes
 import os
-import logging
 
 from django.contrib import messages
 from django.contrib.auth import get_user_model
@@ -21,6 +21,7 @@ from .services import render_docx_bytes
 logger = logging.getLogger(__name__)
 
 User = get_user_model()
+
 
 @login_required
 def serve_document(request, document_id):
@@ -51,7 +52,8 @@ def serve_document(request, document_id):
             logger.error(f"Ошибка при отдаче файла: {e}")
             raise Http404("Произошла ошибка при попытке открыть документ.")
     else:
-        logger.info(f'Пользователь {request.user.username} пытается получить доступ к документам {document.user.username}')
+        logger.info(
+            f'Пользователь {request.user.username} пытается получить доступ к документам {document.user.username}')
         raise Http404("У вас нет доступа к этому документу.")
 
 
@@ -59,9 +61,10 @@ def serve_document(request, document_id):
 @login_required
 @rate_limit_uploads(rate_limit_seconds=1, max_uploads=1)
 def documents_dashboard(request):
-    user_documents = Document.objects.filter(user=request.user, uploaded_by_staff=False, is_deleted=False).order_by('-uploaded_at')
-    staff_documents = Document.objects.filter(user=request.user, uploaded_by_staff=True, is_deleted=False).order_by('-uploaded_at')
-
+    user_documents = Document.objects.filter(user=request.user, uploaded_by_staff=False, is_deleted=False).order_by(
+        '-uploaded_at')
+    staff_documents = Document.objects.filter(user=request.user, uploaded_by_staff=True, is_deleted=False).order_by(
+        '-uploaded_at')
 
     document_upload_form = DocumentUploadForm()
 
@@ -165,13 +168,16 @@ def template_params(request, template_slug, user_id):
 
     return render(request, "staff_templates/docs/template_params.html", {
         "template": tpl,
-        "target_user": target_user,
+        "personal": target_user.personal_data,
         "form": form,
+        "user_obj": get_object_or_404(User, pk=user_id),
     })
 
 
 @login_required
-@user_passes_test(_staff_check())
-def template_list(request):
+@user_passes_test(_staff_check)
+def template_list(request, user_id):
     templates = DocTemplate.objects.filter(is_active=True).order_by("name")
-    return render(request, "staff_templates/docs/templates.html", {"templates": templates})
+    return render(request, "staff_templates/docs/templates.html",
+                  {"templates": templates, "active": "documents_templates",
+                   "user_obj": get_object_or_404(User, pk=user_id), })
