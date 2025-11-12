@@ -2,6 +2,8 @@ from django.urls import path
 
 from . import views
 
+from documents import views as docviews
+
 urlpatterns = [
     path("letters/<int:user_id>/", views.staff_letter_detail, name="staff_letter_detail"),
     path("profiles/<int:user_id>/", views.staff_profile_detail, name="staff_profile_detail"),
@@ -18,4 +20,7 @@ urlpatterns = [
     path("testing/create/", views.testing_create, name="staff_testing_create"),
     path("testing/<int:pk>/edit/", views.testing_edit, name="staff_testing_edit"),
     path("testing/<int:pk>/result/", views.testing_fill_result, name="staff_testing_fill_result"),
+
+    path("templates/", docviews.template_list, name="staff_docs_templates"),
+    path("templates/<slug:template_slug>/user/<int:user_id>/", docviews.template_params, name="staff_docs_generate"),
 ]
