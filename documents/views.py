@@ -138,8 +138,8 @@ def delete_document(request, document_id):
 
 @login_required
 @user_passes_test(_staff_check)
-def template_params(request, template_slug, user_id):
-    tpl = get_object_or_404(DocTemplate, slug=template_slug, is_active=True)
+def template_params(request, template_id, user_id):
+    tpl = get_object_or_404(DocTemplate, pk=template_id, is_active=True)
     target_user = get_object_or_404(User, pk=user_id)
     ParamsForm = build_params_form(tpl.required_params)
 
@@ -149,7 +149,7 @@ def template_params(request, template_slug, user_id):
             extra = form.cleaned_data
             context = merge_context(base_user_context(target_user), extra)
 
-            filename = f"{tpl.slug}_{target_user.username or target_user.id}_{datetime.date.today():%Y%m%d}.docx"
+            filename = f"{tpl.id}_{target_user.username or target_user.id}_{datetime.date.today():%Y%m%d}.docx"
             content = render_docx_bytes(tpl.file, context)
 
             resp = HttpResponse(

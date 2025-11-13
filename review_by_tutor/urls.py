@@ -22,5 +22,5 @@ urlpatterns = [
     path("testing/<int:pk>/result/", views.testing_fill_result, name="staff_testing_fill_result"),
 
     path("templates/<int:user_id>/", docviews.template_list, name="staff_docs_templates"),
-    path("templates/<slug:template_slug>/user/<int:user_id>/", docviews.template_params, name="staff_docs_generate"),
+    path("templates/<int:template_id>/user/<int:user_id>/", docviews.template_params, name="staff_docs_generate"),
 ]
