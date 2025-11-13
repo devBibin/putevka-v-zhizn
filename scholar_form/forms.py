@@ -64,14 +64,13 @@ class EducationForm(forms.ModelForm):
     class Meta:
         model = UserInfo
         fields = [
-            'school_name', 'school_address', 'class_teacher', 'next_year_class',
+            'school_name', 'school_address', 'class_teacher', 'next_year_class_digit',
             'class_profile', 'planned_exams', 'subject_grades'
         ]
         widgets = {
             'school_name': forms.TextInput(attrs={'placeholder': 'МБОУ СОШ №1'}),
             'school_address': forms.TextInput(attrs={'placeholder': 'г. Москва, ул. Школьная, 5'}),
             'class_teacher': forms.TextInput(attrs={'placeholder': 'Петрова Мария Ивановна, +7 (999) 123-45-67'}),
-            'next_year_class': forms.TextInput(attrs={'placeholder': '11А'}),
             'class_profile': forms.TextInput(attrs={'placeholder': 'Физико-математический'}),
             'planned_exams': forms.Textarea(attrs={'placeholder': 'Математика, Русский язык, Физика'}),
             'subject_grades': forms.Textarea(attrs={'placeholder': 'Математика — 5, Физика — 4'}),

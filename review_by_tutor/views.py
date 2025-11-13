@@ -9,10 +9,8 @@ from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.db import transaction
 from django.db.models import Q, Subquery, OuterRef, Count, Exists
 from django.shortcuts import render, get_object_or_404, redirect
-from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.http import require_POST
-from django.views.generic import TemplateView
 
 from core.decorators import ensure_registration_gate
 from core.models import MotivationLetter, Notification, UserNotification
@@ -338,7 +336,7 @@ def staff_users_list(request):
         qs = qs.filter(course_selections__course_id=course)
 
     if grade:
-        qs = qs.filter(user_info__grade=grade)
+        qs = qs.filter(user_info__next_year_class_digit=grade)
 
     if curator_paid == "1":
         qs = qs.filter(course_selections__need_tutor=True)
@@ -371,7 +369,7 @@ def staff_users_list(request):
         courses_qs = courses_qs.filter(school_id=school)
     courses = courses_qs.order_by("title")
 
-    # grades = list(range(1, 12))
+    grades = list(range(9, 12))
 
     return render(request, "staff_templates/users_list.html", {
         "page_obj": page_obj,
@@ -381,7 +379,7 @@ def staff_users_list(request):
         "course": course,
         "curator_need": curator_paid,
         "grade": grade,
-        # "grades": grades,
+        "grades": grades,
         "schools": schools,
         "courses": courses,
     })
@@ -459,7 +457,9 @@ def testing_list_for_user(request, user_id):
              .select_related("user", "assigned_by", "result_filled_by")
              .filter(user_id=user_id)
              .order_by("-assigned_at", "-id"))
-    return render(request, "staff_templates/testing/list.html", {"items": items, "target_user_id": user_id, "user_obj": get_object_or_404(User, pk=user_id), "active": 'testing'})
+    return render(request, "staff_templates/testing/list.html",
+                  {"items": items, "target_user_id": user_id, "user_obj": get_object_or_404(User, pk=user_id),
+                   "active": 'testing'})
 
 
 @user_passes_test(_staff_check)
@@ -503,7 +503,8 @@ def testing_edit(request, pk):
             return redirect("staff_testing_list_for_user", user_id=obj.user_id)
     else:
         form = TestAssignmentEditForm(instance=obj)
-    return render(request, "staff_templates/testing/form.html", {"form": form, "title": "Редактировать тест", "user_obj": get_object_or_404(User, pk=obj.user.id)})
+    return render(request, "staff_templates/testing/form.html",
+                  {"form": form, "title": "Редактировать тест", "user_obj": get_object_or_404(User, pk=obj.user.id)})
 
 
 @user_passes_test(_staff_check)
@@ -520,7 +521,8 @@ def testing_fill_result(request, pk):
             return redirect("staff_testing_list_for_user", user_id=obj.user_id)
     else:
         form = TestResultForm(instance=obj)
-    return render(request, "staff_templates/testing/result_form.html", {"form": form, "obj": obj, "user_obj": get_object_or_404(User, pk=obj.user.id), "active": "testing"})
+    return render(request, "staff_templates/testing/result_form.html",
+                  {"form": form, "obj": obj, "user_obj": get_object_or_404(User, pk=obj.user.id), "active": "testing"})
 
 
 @ensure_registration_gate('protected')
@@ -534,6 +536,3 @@ def interview_preparation_view(request):
     )
 
     return render(request, "interview_preparation.html", {"prep": prep, "active": "interview"})
-
-
-

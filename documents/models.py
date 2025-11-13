@@ -64,7 +64,6 @@ class Document(models.Model):
 
 class DocTemplate(models.Model):
     name = models.CharField("Название", max_length=200)
-    slug = models.SlugField("Код", unique=True)
     description = models.TextField("Описание", blank=True)
     file = models.FileField(
         "Файл шаблона (.docx)",

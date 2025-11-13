@@ -9,7 +9,7 @@
     <div>
       <h4 class="mb-1">{{ template.name }}</h4>
       <div class="text-muted small">
-        Пользователь: {{ target_user.get_full_name|default:target_user.username }} · код шаблона: {{ template.slug }}
+        Пользователь: {{ user_obj.get_full_name|default:user_obj.username }}
       </div>
     </div>
     <div>
@@ -25,7 +25,7 @@
     Поля ниже — параметры шаблона; паспорт/адрес/реквизиты подтягиваются автоматически.
   </div>
 
-  {% include "staff_docs/_user_personal_preview.html" %}
+  {% include "staff_templates/docs/_user_personal_preview.html" %}
 
   <form method="post" class="mt-3" id="docGenForm" novalidate>
     {% csrf_token %}
