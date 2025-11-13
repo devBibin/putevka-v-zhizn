@@ -148,6 +148,7 @@ def template_params(request, template_id, user_id):
         if form.is_valid():
             extra = form.cleaned_data
             context = merge_context(base_user_context(target_user), extra)
+            context = merge_context(context, {"date": datetime.date.today()})
 
             filename = f"{tpl.id}_{target_user.username or target_user.id}_{datetime.date.today():%Y%m%d}.docx"
             content = render_docx_bytes(tpl.file, context)
