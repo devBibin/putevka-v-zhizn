@@ -336,7 +336,7 @@ def staff_users_list(request):
         qs = qs.filter(course_selections__course_id=course)
 
     if grade:
-        qs = qs.filter(user_info__grade=grade)
+        qs = qs.filter(user_info__next_year_class_digit=grade)
 
     if curator_paid == "1":
         qs = qs.filter(course_selections__need_tutor=True)
@@ -369,7 +369,7 @@ def staff_users_list(request):
         courses_qs = courses_qs.filter(school_id=school)
     courses = courses_qs.order_by("title")
 
-    # grades = list(range(1, 12))
+    grades = list(range(9, 12))
 
     return render(request, "staff_templates/users_list.html", {
         "page_obj": page_obj,
@@ -379,7 +379,7 @@ def staff_users_list(request):
         "course": course,
         "curator_need": curator_paid,
         "grade": grade,
-        # "grades": grades,
+        "grades": grades,
         "schools": schools,
         "courses": courses,
     })

@@ -6,6 +6,7 @@ from pathlib import Path
 from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.contenttypes.models import ContentType
+from django.core.validators import MinValueValidator, MaxValueValidator
 from importlib.resources._common import _
 from django.utils import timezone
 
@@ -69,7 +70,15 @@ class UserInfo(models.Model):
     school_name = models.CharField(max_length=255, verbose_name="Название школы", blank=True)
     school_address = models.CharField(max_length=1000, verbose_name="Адрес школы", blank=True)
     class_teacher = models.CharField(max_length=1000, verbose_name="Классный руководитель", blank=True)
+
+    #TODO: оставим, чтобы не удалять бд, потом удалить
     next_year_class = models.CharField(max_length=10, verbose_name="Класс в следующем учебном году", blank=True)
+
+    next_year_class_digit = models.IntegerField(verbose_name="Класс в следующем учебном году", blank=True, null=True, validators=[
+            MinValueValidator(1),
+            MaxValueValidator(11)
+        ])
+
     class_profile = models.CharField(max_length=255, blank=True, verbose_name="Профиль класса")
     planned_exams = models.CharField(max_length=1000, verbose_name="Планируемые экзамены", blank=True)
     subject_grades = models.CharField(max_length=1000, verbose_name="Оценки по предметам", blank=True)
