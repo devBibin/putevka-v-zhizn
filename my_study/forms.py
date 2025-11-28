@@ -68,20 +68,28 @@ class UniversityPriorityForm(forms.ModelForm):
         user = self.user
         pr = cleaned.get("priority")
         uni = cleaned.get("university")
+        spec = cleaned.get("specialty")
 
         if user is not None and pr is not None:
             qs = UniversityPriority.objects.filter(user=user, priority=pr)
             if self.instance and self.instance.pk:
                 qs = qs.exclude(pk=self.instance.pk)
-            if qs.exists() and not qs.filter(university=uni).exists():
-                self.add_error("priority", "Этот приоритет уже занят другим вузом.")
+            if qs.exists() and not qs.filter(university=uni, specialty=spec).exists():
+                self.add_error("priority", "Этот приоритет уже занят другой записью.")
 
-        if user is not None and uni:
-            exists_qs = UniversityPriority.objects.filter(user=user, university=uni)
+        if user is not None and uni and spec:
+            exists_qs = UniversityPriority.objects.filter(
+                user=user,
+                university=uni,
+                specialty=spec,
+            )
             if self.instance and self.instance.pk:
                 exists_qs = exists_qs.exclude(pk=self.instance.pk)
             if exists_qs.exists():
-                self.add_error("university", "Этот вуз уже есть в вашем списке.")
+                self.add_error(
+                    "specialty",
+                    "Это направление в этом вузе уже есть в вашем списке.",
+                )
 
         return cleaned
 
