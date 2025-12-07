@@ -324,6 +324,9 @@ class UserPersonalDataForm(forms.ModelForm):
             "inn",
         ]
         widgets = {
-            "passport_issued_at": forms.DateInput(attrs={"type": "date"}),
+            "passport_issued_at": forms.DateInput(
+                format="%Y-%m-%d",
+                attrs={"type": "date"},
+            ),
             "registration_address": forms.Textarea(attrs={"rows": 2}),
         }
