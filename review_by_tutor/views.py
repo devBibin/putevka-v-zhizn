@@ -17,7 +17,7 @@ from core.models import MotivationLetter, Notification, UserNotification
 from documents.models import Document
 from my_study.models import CourseSelection, UniversityPriority, AssessmentResult, School, Course
 from review_by_tutor.forms import MotivationLetterStaffForm, UserInfoStaffForm, ScholarVideoStaffForm, \
-    DocumentStaffUploadForm, DocumentCommentForm, DocumentLockForm, \
+    DocumentStaffUploadForm, DocumentCommentForm, \
     DocumentStatusForm, InterviewForm, TestAssignmentCreateForm, TestAssignmentEditForm, TestResultForm
 from review_by_tutor.models import Interview, TestAssignment, InterviewPreparation
 from scholar_form.models import UserInfo, ScholarVideo, StaffNote
@@ -167,9 +167,6 @@ def staff_documents_detail(request, user_id: int):
             if form_type == "update_status":
                 prefix = f"st-{doc.pk}"
                 form = DocumentStatusForm(request.POST, instance=doc, prefix=prefix)
-            elif form_type == "update_lock":
-                prefix = f"lk-{doc.pk}"
-                form = DocumentLockForm(request.POST, instance=doc, prefix=prefix)
             else:
                 prefix = f"cm-{doc.pk}"
                 form = DocumentCommentForm(request.POST, instance=doc, prefix=prefix)
@@ -204,7 +201,6 @@ def staff_documents_detail(request, user_id: int):
         rows.append((
             d,
             DocumentStatusForm(instance=d, prefix=f"st-{d.pk}"),
-            DocumentLockForm(instance=d, prefix=f"lk-{d.pk}"),
             DocumentCommentForm(instance=d, prefix=f"cm-{d.pk}"),
         ))
     upload_form = locals().get("upload_form", DocumentStaffUploadForm())

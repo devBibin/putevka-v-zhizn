@@ -74,11 +74,15 @@ class UniversityPriority(models.Model):
         ordering = ["priority"]
         constraints = [
             models.UniqueConstraint(fields=["user", "priority"], name="unique_priority_per_user"),
-            models.UniqueConstraint(fields=["user", "university"], name="unique_university_per_user"),
+            models.UniqueConstraint(
+                fields=["user", "university", "specialty"],
+                name="unique_uni_specialty_per_user",
+            ),
         ]
 
     def __str__(self):
-        return f"{self.user} → {self.university} (#{self.priority})"
+        return f"{self.user} → {self.university} / {self.specialty or 'без направления'} (#{self.priority})"
+
 
 
 class AssessmentResult(models.Model):

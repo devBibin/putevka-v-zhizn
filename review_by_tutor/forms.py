@@ -76,15 +76,14 @@ class ScholarVideoStaffForm(forms.ModelForm):
 class DocumentModerationForm(forms.ModelForm):
     class Meta:
         model = Document
-        fields = ["status", "only_staff_comment", "is_locked"]
+        fields = ["status", "only_staff_comment"]
         widgets = {
             "status": forms.Select(attrs={"class": "form-select"}),
             "only_staff_comment": forms.Textarea(attrs={"rows": 4, "class": "form-control"}),
         }
         labels = {
             "status": "Статус",
-            "only_staff_comment": "Комментарий только для сотрудников",
-            "is_locked": "Блокировать (запретить редактирование)",
+            "only_staff_comment": "Комментарий только для сотрудников"
         }
 
 
@@ -110,18 +109,16 @@ class DocumentAttachForm(forms.Form):
 class DocumentStaffUploadForm(forms.ModelForm):
     class Meta:
         model = Document
-        fields = ["file", "caption", "status", "is_locked", "only_staff_comment"]
+        fields = ["file", "caption", "status", "only_staff_comment"]
         widgets = {
             "caption": forms.TextInput(attrs={"class": "form-control", "placeholder": "Название/подпись документа"}),
             "status": forms.Select(attrs={"class": "form-select"}),
-            "is_locked": forms.CheckboxInput(attrs={"class": "form-check-input"}),
             "only_staff_comment": forms.Textarea(attrs={"rows": 3, "class": "form-control"}),
         }
         labels = {
             "file": "Файл",
             "caption": "Подпись",
             "status": "Статус",
-            "is_locked": "Блокировать (запретить редактирование)",
             "only_staff_comment": "Комментарий только для сотрудников",
         }
 
@@ -136,21 +133,6 @@ class DocumentStatusForm(forms.ModelForm):
             "status": forms.Select(attrs={"class": "form-select form-select-sm auto-submit"}),
         }
         labels = {"status": "Статус"}
-
-
-class DocumentLockForm(forms.ModelForm):
-    class Meta:
-        model = Document
-        fields = ["is_locked"]
-        widgets = {
-            "is_locked": forms.CheckboxInput(attrs={"class": "form-check-input auto-submit"}),
-        }
-        labels = {"is_locked": "Блокировать (запретить редактирование)"}
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        if self.instance is not None:
-            self.instance._ignore_lock_validation = True
 
 
 class DocumentCommentForm(forms.ModelForm):

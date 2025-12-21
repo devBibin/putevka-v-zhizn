@@ -42,14 +42,6 @@
                             <div class="text-danger small">{{ upload_form.status.errors }}</div>{% endif %}
                     </div>
 
-                    <div class="col-lg-2 d-flex align-items-end">
-                        <div class="form-check">
-                            {{ upload_form.is_locked|add_class:"form-check-input" }}
-                            <label class="form-check-label"
-                                   for="{{ upload_form.is_locked.id_for_label }}">{{ upload_form.is_locked.label }}</label>
-                        </div>
-                    </div>
-
                     <div class="col-12">
                         <label class="form-label">{{ upload_form.only_staff_comment.label }}</label>
                         {{ upload_form.only_staff_comment }}
@@ -75,7 +67,7 @@
                     </tr>
                     </thead>
                     <tbody>
-                    {% for doc, status_form, lock_form, comment_form in rows %}
+                    {% for doc, status_form, comment_form in rows %}
                         <tr>
                             <td>
                                 <a href="{% url 'serve_document' doc.pk %}" target="_blank" class="text-break">
@@ -96,8 +88,6 @@
                   {% else %}text-bg-secondary{% endif %}">
                   {{ doc.get_status_display }}
                 </span>
-                                    {% if doc.is_locked %}
-                                        <span class="badge text-bg-secondary ms-1">заблокирован</span>{% endif %}
                                 </div>
 
                                 {# --- Прикреплённые документы (ТОЛЬКО отображение) --- #}
@@ -132,12 +122,6 @@
                                     {% csrf_token %}
                                     <input type="hidden" name="form_type" value="update_lock">
                                     <input type="hidden" name="document_id" value="{{ doc.pk }}">
-                                    <div class="form-check">
-                                        {{ lock_form.is_locked }}
-                                        <label class="form-check-label" for="{{ lock_form.is_locked.id_for_label }}">
-                                            Блокировать (запретить редактирование)
-                                        </label>
-                                    </div>
                                 </form>
                             </td>
 

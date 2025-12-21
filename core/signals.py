@@ -8,6 +8,7 @@ from telebot import TeleBot
 import config
 from core.bot import send_tg_notification_to_user
 from core.models import MotivationLetter
+from scholar_form.models import UserInfo, UserPersonalData
 
 TELEGRAM_STAFF_CHAT_IDS = config.TELEGRAM_STAFF_CHAT_IDS
 TG_TOKEN = config.TG_TOKEN_ADMIN
@@ -80,6 +81,31 @@ def notify_on_rating_change(sender, instance, created, **kwargs):
         logger.info(f"TG: уведомление об оценке письма {instance.pk} отправлено пользователю {instance.user}")
     except Exception as e:
         logger.warning(e)
+
+
+@receiver(post_save, sender=UserInfo)
+def sync_userinfo_to_personal_data(sender, instance: UserInfo, **kwargs):
+    if instance.user is None:
+        return
+
+    personal_data, _ = UserPersonalData.objects.get_or_create(user=instance.user)
+
+    fields_map = {
+        "last_name": instance.last_name,
+        "first_name": instance.first_name,
+        "middle_name": instance.middle_name,
+        "phone": instance.phone,
+        "email": instance.email or instance.user.email,
+    }
+
+    changed = False
+    for field, value in fields_map.items():
+        if getattr(personal_data, field) != value:
+            setattr(personal_data, field, value)
+            changed = True
+
+    if changed:
+        personal_data.save(update_fields=list(fields_map.keys()) + ["updated_at"])
 
 def build_motivation_rating_message(letter, user_url: str) -> str:
     admin_rating = letter.admin_rating or "— без комментария —"
