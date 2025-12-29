@@ -1,8 +1,7 @@
 from django.urls import path
 
-from . import views
-
 from documents import views as docviews
+from . import views
 
 urlpatterns = [
     path("letters/<int:user_id>/", views.staff_letter_detail, name="staff_letter_detail"),
@@ -23,4 +22,10 @@ urlpatterns = [
 
     path("templates/<int:user_id>/", docviews.template_list, name="staff_docs_templates"),
     path("templates/<int:template_id>/user/<int:user_id>/", docviews.template_params, name="staff_docs_generate"),
+
+    path(
+        "interview/<int:user_id>/template/download/",
+        views.download_interview_template,
+        name="download_interview_template",
+    ),
 ]

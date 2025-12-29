@@ -8,8 +8,10 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.db import transaction
 from django.db.models import Q, Subquery, OuterRef, Count, Exists
+from django.http import Http404, FileResponse
 from django.shortcuts import render, get_object_or_404, redirect
 from django.utils import timezone
+from django.utils.encoding import smart_str
 from django.views.decorators.http import require_POST
 
 from core.decorators import ensure_registration_gate
@@ -19,7 +21,7 @@ from my_study.models import CourseSelection, UniversityPriority, AssessmentResul
 from review_by_tutor.forms import MotivationLetterStaffForm, UserInfoStaffForm, ScholarVideoStaffForm, \
     DocumentStaffUploadForm, DocumentCommentForm, \
     DocumentStatusForm, InterviewForm, TestAssignmentCreateForm, TestAssignmentEditForm, TestResultForm
-from review_by_tutor.models import Interview, TestAssignment, InterviewPreparation
+from review_by_tutor.models import Interview, TestAssignment, InterviewPreparation, InterviewTemplate
 from scholar_form.models import UserInfo, ScholarVideo, StaffNote
 
 logger = logging.getLogger(__name__)
@@ -415,16 +417,22 @@ def staff_send_notification(request):
     return redirect('staff_users_list')
 
 
-@login_required
-@user_passes_test(_staff_check)
 def interview_detail(request, user_id: int):
     user_obj = get_object_or_404(User, pk=user_id)
     interview, _ = Interview.objects.get_or_create(user=user_obj)
 
+    template_obj = (
+        InterviewTemplate.objects.filter(is_active=True).order_by("-uploaded_at").first()
+    )
+
     if request.method == "POST":
-        form = InterviewForm(request.POST, instance=interview)
+        form = InterviewForm(request.POST, request.FILES, instance=interview)
         if form.is_valid():
-            form.save()
+            obj = form.save(commit=False)
+            if "filled_form" in request.FILES:
+                obj.filled_uploaded_by = request.user
+                obj.filled_uploaded_at = timezone.now()
+            obj.save()
             messages.success(request, "Изменения сохранены.")
             return redirect("interview_detail", user_id=user_id)
     else:
@@ -434,10 +442,37 @@ def interview_detail(request, user_id: int):
         "user_obj": user_obj,
         "form": form,
         "interview": interview,
-        'active': 'interview'
+        "template_obj": template_obj,
+        "active": "interview",
     }
     return render(request, "staff_templates/interview_detail.html", ctx)
 
+@login_required
+@user_passes_test(_staff_check)
+def download_interview_template(request, user_id: int):
+    user_obj = get_object_or_404(User, pk=user_id)
+
+    template = (
+        InterviewTemplate.objects
+        .filter(is_active=True)
+        .order_by("-uploaded_at")
+        .first()
+    )
+    if not template:
+        raise Http404("Шаблон не найден")
+
+    full_name = user_obj.get_full_name() or user_obj.username
+    safe_name = full_name.replace(" ", "_")
+
+    ext = template.file.name.split(".")[-1]
+    filename = f"Interview_{safe_name}_ID{user_obj.id}.{ext}"
+
+    response = FileResponse(
+        template.file.open("rb"),
+        as_attachment=True,
+        filename=smart_str(filename),
+    )
+    return response
 
 @login_required
 def testing_list_for_candidate(request):

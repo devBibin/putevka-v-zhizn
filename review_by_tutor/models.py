@@ -5,30 +5,6 @@ from django.utils import timezone
 User = settings.AUTH_USER_MODEL
 
 
-class Interview(models.Model):
-    user = models.OneToOneField(
-        User,
-        on_delete=models.CASCADE,
-        related_name="interview",
-        help_text="Пользователь, проходящий собеседование"
-    )
-    notes = models.TextField(
-        "Заметки интервьюера",
-        blank=True,
-        help_text="Свободные заметки по итогам собеседования"
-    )
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        verbose_name = "Собеседование"
-        verbose_name_plural = "Собеседования"
-        ordering = ["-created_at"]
-
-    def __str__(self):
-        return f"Собеседование: {self.user}"
-
-
 class TestAssignment(models.Model):
     class Status(models.TextChoices):
         ASSIGNED = "assigned", "Назначено"
@@ -119,3 +95,39 @@ class InterviewPreparation(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class InterviewTemplate(models.Model):
+    title = models.CharField(max_length=200, default="Шаблон интервью")
+    file = models.FileField(upload_to="interview/templates/")
+    is_active = models.BooleanField(default=True)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-uploaded_at"]
+
+    def __str__(self):
+        return self.title
+
+
+class Interview(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="interview")
+    notes = models.TextField("Заметки интервьюера", blank=True)
+
+    filled_form = models.FileField(
+        "Заполненный шаблон",
+        upload_to="interview/filled/",
+        blank=True,
+        null=True,
+    )
+    filled_uploaded_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="interview_filled_uploaded",
+    )
+    filled_uploaded_at = models.DateTimeField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)

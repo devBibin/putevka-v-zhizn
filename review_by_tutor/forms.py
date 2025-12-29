@@ -152,12 +152,9 @@ class DocumentCommentForm(forms.ModelForm):
 class InterviewForm(forms.ModelForm):
     class Meta:
         model = Interview
-        fields = ["notes"]
+        fields = ["notes", "filled_form"]
         widgets = {
-            "notes": forms.Textarea(attrs={
-                "rows": 6,
-                "placeholder": "Введите заметки по собеседованию..."
-            })
+            "filled_form": forms.FileInput(),
         }
 
 

@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from review_by_tutor.models import Interview, TestAssignment, InterviewPreparation
+from review_by_tutor.models import Interview, TestAssignment, InterviewPreparation, InterviewTemplate
 
 
 @admin.register(Interview)
@@ -23,3 +23,10 @@ class TestAssignmentAdmin(admin.ModelAdmin):
 class InterviewPreparationAdmin(admin.ModelAdmin):
     list_display = ("title", "is_active", "updated_at")
     list_filter = ("is_active",)
+
+
+@admin.register(InterviewTemplate)
+class InterviewTemplateAdmin(admin.ModelAdmin):
+    list_display = ("title", "is_active", "uploaded_at")
+    list_filter = ("is_active",)
+    search_fields = ("title",)
