@@ -8,8 +8,10 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.db import transaction
 from django.db.models import Q, Subquery, OuterRef, Count, Exists
+from django.http import Http404, FileResponse
 from django.shortcuts import render, get_object_or_404, redirect
 from django.utils import timezone
+from django.utils.encoding import smart_str
 from django.views.decorators.http import require_POST
 
 from core.decorators import ensure_registration_gate
@@ -18,8 +20,9 @@ from documents.models import Document
 from my_study.models import CourseSelection, UniversityPriority, AssessmentResult, School, Course
 from review_by_tutor.forms import MotivationLetterStaffForm, UserInfoStaffForm, ScholarVideoStaffForm, \
     DocumentStaffUploadForm, DocumentCommentForm, \
-    DocumentStatusForm, InterviewForm, TestAssignmentCreateForm, TestAssignmentEditForm, TestResultForm
-from review_by_tutor.models import Interview, TestAssignment, InterviewPreparation
+    DocumentStatusForm, InterviewForm, TestAssignmentCreateForm, TestAssignmentEditForm, TestResultForm, \
+    LetterRevisionForm
+from review_by_tutor.models import Interview, TestAssignment, InterviewPreparation, InterviewTemplate
 from scholar_form.models import UserInfo, ScholarVideo, StaffNote
 
 logger = logging.getLogger(__name__)
@@ -42,19 +45,46 @@ def staff_letter_detail(request, user_id: int):
         .first()
     )
 
+    revision_form = LetterRevisionForm(request.POST or None)
+
     if request.method == "POST":
         if letter is None:
             messages.error(request, "У пользователя ещё нет мотивационного письма — сохранять нечего.")
             return redirect("staff_letter_detail", user_id=user_id)
 
-        form = MotivationLetterStaffForm(request.POST, instance=letter)
-        if form.is_valid():
-            updated = form.save(commit=False)
-            updated.save()
-            messages.success(request, "Оценка/фидбэк сохранены.")
-            return redirect("staff_letter_detail", user_id=user_id)
+        if "action_revision" in request.POST:
+            if revision_form.is_valid():
+                comment = revision_form.cleaned_data["revision_comment"].strip()
+
+                letter.status = MotivationLetter.Status.REVISION
+                letter.revision_comment = comment
+                letter.revision_requested_at = timezone.now()
+                letter.revision_requested_by = request.user
+
+                letter.is_done = False
+
+                letter.save(update_fields=[
+                    "status",
+                    "revision_comment",
+                    "revision_requested_at",
+                    "revision_requested_by",
+                    "is_done",
+                    "updated_at",
+                ])
+                messages.success(request, "Письмо отправлено на дописывание.")
+                return redirect("staff_letter_detail", user_id=user_id)
+            else:
+                messages.error(request, "Укажите комментарий для доработки.")
+
         else:
-            messages.error(request, "Исправьте ошибки в форме.")
+            form = MotivationLetterStaffForm(request.POST, instance=letter)
+            if form.is_valid():
+                updated = form.save(commit=False)
+                updated.save()
+                messages.success(request, "Оценка/фидбэк сохранены.")
+                return redirect("staff_letter_detail", user_id=user_id)
+            else:
+                messages.error(request, "Исправьте ошибки в форме.")
     else:
         form = MotivationLetterStaffForm(instance=letter) if letter else None
 
@@ -64,15 +94,19 @@ def staff_letter_detail(request, user_id: int):
         "gpt_review": getattr(letter, "gpt_review", None),
         "gpt_score": getattr(letter, "gpt_score", None),
         "gpt_word_count": getattr(letter, "gpt_word_count", None) or (letter.word_count() if letter else None),
-        'gpt_json': letter.gpt_json if letter and letter.gpt_json else None,
+        "gpt_json": letter.gpt_json if letter and letter.gpt_json else None,
+
+        "revision_comment": getattr(letter, "revision_comment", None),
+        "revision_requested_at": getattr(letter, "revision_requested_at", None),
     }
 
     ctx = {
         "user_obj": user,
         "letter": letter,
         "form": form,
-        'active': 'motivation_letter',
-        'readonly': readonly_ctx,
+        "revision_form": revision_form,   # ✅ важно
+        "active": "motivation_letter",
+        "readonly": readonly_ctx,
     }
     return render(request, "staff_templates/letter_detail.html", ctx)
 
@@ -415,16 +449,22 @@ def staff_send_notification(request):
     return redirect('staff_users_list')
 
 
-@login_required
-@user_passes_test(_staff_check)
 def interview_detail(request, user_id: int):
     user_obj = get_object_or_404(User, pk=user_id)
     interview, _ = Interview.objects.get_or_create(user=user_obj)
 
+    template_obj = (
+        InterviewTemplate.objects.filter(is_active=True).order_by("-uploaded_at").first()
+    )
+
     if request.method == "POST":
-        form = InterviewForm(request.POST, instance=interview)
+        form = InterviewForm(request.POST, request.FILES, instance=interview)
         if form.is_valid():
-            form.save()
+            obj = form.save(commit=False)
+            if "filled_form" in request.FILES:
+                obj.filled_uploaded_by = request.user
+                obj.filled_uploaded_at = timezone.now()
+            obj.save()
             messages.success(request, "Изменения сохранены.")
             return redirect("interview_detail", user_id=user_id)
     else:
@@ -434,10 +474,37 @@ def interview_detail(request, user_id: int):
         "user_obj": user_obj,
         "form": form,
         "interview": interview,
-        'active': 'interview'
+        "template_obj": template_obj,
+        "active": "interview",
     }
     return render(request, "staff_templates/interview_detail.html", ctx)
 
+@login_required
+@user_passes_test(_staff_check)
+def download_interview_template(request, user_id: int):
+    user_obj = get_object_or_404(User, pk=user_id)
+
+    template = (
+        InterviewTemplate.objects
+        .filter(is_active=True)
+        .order_by("-uploaded_at")
+        .first()
+    )
+    if not template:
+        raise Http404("Шаблон не найден")
+
+    full_name = user_obj.get_full_name() or user_obj.username
+    safe_name = full_name.replace(" ", "_")
+
+    ext = template.file.name.split(".")[-1]
+    filename = f"Interview_{safe_name}_ID{user_obj.id}.{ext}"
+
+    response = FileResponse(
+        template.file.open("rb"),
+        as_attachment=True,
+        filename=smart_str(filename),
+    )
+    return response
 
 @login_required
 def testing_list_for_candidate(request):

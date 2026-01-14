@@ -61,7 +61,6 @@
                     <tr>
                         <th style="min-width: 280px;">Документ</th>
                         <th>Статус</th>
-                        <th>Блокировка</th>
                         <th style="min-width: 260px;">Комментарий (staff)</th>
                         <th class="text-end">Действия</th>
                     </tr>
@@ -114,14 +113,6 @@
                                     <input type="hidden" name="form_type" value="update_status">
                                     <input type="hidden" name="document_id" value="{{ doc.pk }}">
                                     {{ status_form.status }}
-                                </form>
-                            </td>
-
-                            <td>
-                                <form method="post" class="m-0 doc-row-form">
-                                    {% csrf_token %}
-                                    <input type="hidden" name="form_type" value="update_lock">
-                                    <input type="hidden" name="document_id" value="{{ doc.pk }}">
                                 </form>
                             </td>
 

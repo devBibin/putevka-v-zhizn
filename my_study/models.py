@@ -118,3 +118,16 @@ class AssessmentResult(models.Model):
 
     def __str__(self):
         return f"{self.get_kind_display()} {self.subject} — {self.title}"
+
+
+class ProgressTrackerFile(models.Model):
+    file = models.FileField(upload_to="progress_trackers/")
+    title = models.CharField(max_length=255, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Файл трекера прогресса"
+        verbose_name_plural = "Файл трекера прогресса"
+
+    def __str__(self):
+        return self.title or f"Трекер (обновлён: {self.updated_at:%d.%m.%Y})"

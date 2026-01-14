@@ -152,12 +152,9 @@ class DocumentCommentForm(forms.ModelForm):
 class InterviewForm(forms.ModelForm):
     class Meta:
         model = Interview
-        fields = ["notes"]
+        fields = ["notes", "filled_form"]
         widgets = {
-            "notes": forms.Textarea(attrs={
-                "rows": 6,
-                "placeholder": "Введите заметки по собеседованию..."
-            })
+            "filled_form": forms.FileInput(),
         }
 
 
@@ -185,3 +182,10 @@ class TestResultForm(forms.ModelForm):
             "result_text": forms.Textarea(attrs={"rows": 4}),
             "percentile": forms.NumberInput(attrs={"step": "0.01", "min": "0", "max": "100"}),
         }
+
+class LetterRevisionForm(forms.Form):
+    revision_comment = forms.CharField(
+        label="Комментарий для соискателя",
+        widget=forms.Textarea(attrs={"rows": 4}),
+        required=True
+    )

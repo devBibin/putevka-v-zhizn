@@ -4,35 +4,81 @@
 {% block title %}Собеседование — {{ user_obj.get_full_name|default:user_obj.username }}{% endblock %}
 
 {% block content %}
-<div class="container py-4">
-  <div class="d-flex align-items-center gap-2 mb-3">
-    <h4 class="mb-0">Собеседование: {{ user_obj.get_full_name|default:user_obj.username }}</h4>
-    <span class="badge text-bg-secondary">ID {{ user_obj.id }}</span>
-  </div>
-
-  {% if messages %}
-    {% for m in messages %}
-      <div class="alert alert-{{ m.tags }}">{{ m }}</div>
-    {% endfor %}
-  {% endif %}
-
-  <div class="card shadow-sm">
-    <div class="card-header bg-white">
-      <strong>Заметки интервьюера</strong>
-    </div>
-    <div class="card-body">
-      <form method="post">
-        {% csrf_token %}
-        {% render_field form.notes class+="form-control" %}
-        <div class="mt-3 text-end">
-          <button type="submit" class="btn btn-primary">Сохранить</button>
+    <div class="container py-4">
+        <div class="d-flex align-items-center gap-2 mb-3">
+            <h4 class="mb-0">Собеседование: {{ user_obj.get_full_name|default:user_obj.username }}</h4>
+            <span class="badge text-bg-secondary">ID {{ user_obj.id }}</span>
         </div>
-      </form>
+
+        {% if messages %}
+            {% for m in messages %}
+                <div class="alert alert-{{ m.tags }}">{{ m }}</div>
+            {% endfor %}
+        {% endif %}
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-white d-flex align-items-center justify-content-between">
+                <strong>Шаблон интервью</strong>
+                {% if template_obj %}
+                    <a
+                            href="{% url 'download_interview_template' user_obj.id %}"
+                            class="btn btn-sm btn-outline-primary"
+                    >
+                        Скачать шаблон
+                    </a>
+
+                {% else %}
+                    <span class="small text-muted">Шаблон не загружен</span>
+                {% endif %}
+            </div>
+            <div class="card-body">
+                {% if interview.filled_form %}
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                        <span>Загруженный файл:</span>
+                        <a href="{{ interview.filled_form.url }}" download>
+                            Скачать заполненный вариант
+                        </a>
+                        <span class="text-muted small">
+            {% if interview.filled_uploaded_at %}· {{ interview.filled_uploaded_at|date:"d.m.Y H:i" }}{% endif %}
+                            {% if interview.filled_uploaded_by %}·
+                                {{ interview.filled_uploaded_by.get_full_name|default:interview.filled_uploaded_by.username }}{% endif %}
+          </span>
+                    </div>
+                {% else %}
+                    <div class="text-muted">Заполненный файл ещё не загружен.</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card shadow-sm">
+            <div class="card-header bg-white">
+                <strong>Заметки интервьюера + загрузка заполненного шаблона</strong>
+            </div>
+            <div class="card-body">
+                <form method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+
+                    <div class="mb-3">
+                        <label class="form-label">Заметки</label>
+                        {% render_field form.notes class+="form-control" %}
+                    </div>
+
+                    <div class="mb-3">
+                        {% render_field form.filled_form class+="form-control" %}
+                        {% if form.filled_form.errors %}
+                            <div class="text-danger small mt-1">{{ form.filled_form.errors }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="mt-3 text-end">
+                        <button type="submit" class="btn btn-primary">Сохранить</button>
+                    </div>
+                </form>
+            </div>
+            <div class="card-footer small text-muted">
+                Создано: {{ interview.created_at|date:"d.m.Y H:i" }},
+                обновлено: {{ interview.updated_at|date:"d.m.Y H:i" }}
+            </div>
+        </div>
     </div>
-    <div class="card-footer small text-muted">
-      Создано: {{ interview.created_at|date:"d.m.Y H:i" }},
-      обновлено: {{ interview.updated_at|date:"d.m.Y H:i" }}
-    </div>
-  </div>
-</div>
 {% endblock %}

@@ -1,7 +1,7 @@
 from django.contrib import admin
 
 from scholar_form.models import ScholarVideo
-from .models import Subject, School, Course, CourseSelection, UniversityPriority, AssessmentResult
+from .models import Subject, School, Course, CourseSelection, UniversityPriority, AssessmentResult, ProgressTrackerFile
 
 
 @admin.register(Subject)
@@ -42,3 +42,7 @@ class AssessmentResultAdmin(admin.ModelAdmin):
     list_filter = ("kind", "subject", "date")
     search_fields = ("title", "notes", "place")
 
+
+@admin.register(ProgressTrackerFile)
+class ProgressTrackerFileAdmin(admin.ModelAdmin):
+    list_display = ("title", "updated_at")
