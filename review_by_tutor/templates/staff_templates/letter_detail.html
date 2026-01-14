@@ -78,6 +78,49 @@
                 </div>
             </div>
 
+            {# --- Вернуть на дописывание --- #}
+            <div class="card shadow-sm mb-4">
+                <div class="card-header">На дописывание</div>
+                <div class="card-body">
+                    {% if not letter %}
+                        <div class="alert alert-info mb-0">Действие недоступно: нет мотивационного письма.</div>
+                    {% else %}
+
+                        {# если уже на дописывании — покажем текущий комментарий #}
+                        {% if letter.status == "revision" and letter.revision_comment %}
+                            <div class="alert alert-warning">
+                                <div class="fw-semibold mb-1">Письмо уже на дописывании</div>
+                                <div>{{ letter.revision_comment|linebreaksbr }}</div>
+                                {% if letter.revision_requested_at %}
+                                    <div class="small text-muted mt-2">
+                                        Отправлено: {{ letter.revision_requested_at|date:"d.m.Y H:i" }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        {% endif %}
+
+                        <form method="post">
+                            {% csrf_token %}
+
+                            <div class="mb-3">
+                                <label class="form-label">{{ revision_form.revision_comment.label }}</label>
+                                {{ revision_form.revision_comment|add_class:"form-control" }}
+                                {% if revision_form.revision_comment.errors %}
+                                    <div class="text-danger small mt-1">{{ revision_form.revision_comment.errors }}</div>
+                                {% endif %}
+                                <div class="form-text">Соискатель увидит этот комментарий и сможет отредактировать
+                                    письмо.
+                                </div>
+                            </div>
+
+                            <button class="btn btn-outline-warning" type="submit" name="action_revision">
+                                Отправить на дописывание
+                            </button>
+                        </form>
+                    {% endif %}
+                </div>
+            </div>
+
             <div class="col-lg-12">
                 <div class="card shadow-sm mb-4">
                     <div class="card-header">Системные поля</div>

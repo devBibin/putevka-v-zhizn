@@ -20,7 +20,8 @@ from documents.models import Document
 from my_study.models import CourseSelection, UniversityPriority, AssessmentResult, School, Course
 from review_by_tutor.forms import MotivationLetterStaffForm, UserInfoStaffForm, ScholarVideoStaffForm, \
     DocumentStaffUploadForm, DocumentCommentForm, \
-    DocumentStatusForm, InterviewForm, TestAssignmentCreateForm, TestAssignmentEditForm, TestResultForm
+    DocumentStatusForm, InterviewForm, TestAssignmentCreateForm, TestAssignmentEditForm, TestResultForm, \
+    LetterRevisionForm
 from review_by_tutor.models import Interview, TestAssignment, InterviewPreparation, InterviewTemplate
 from scholar_form.models import UserInfo, ScholarVideo, StaffNote
 
@@ -44,19 +45,46 @@ def staff_letter_detail(request, user_id: int):
         .first()
     )
 
+    revision_form = LetterRevisionForm(request.POST or None)
+
     if request.method == "POST":
         if letter is None:
             messages.error(request, "У пользователя ещё нет мотивационного письма — сохранять нечего.")
             return redirect("staff_letter_detail", user_id=user_id)
 
-        form = MotivationLetterStaffForm(request.POST, instance=letter)
-        if form.is_valid():
-            updated = form.save(commit=False)
-            updated.save()
-            messages.success(request, "Оценка/фидбэк сохранены.")
-            return redirect("staff_letter_detail", user_id=user_id)
+        if "action_revision" in request.POST:
+            if revision_form.is_valid():
+                comment = revision_form.cleaned_data["revision_comment"].strip()
+
+                letter.status = MotivationLetter.Status.REVISION
+                letter.revision_comment = comment
+                letter.revision_requested_at = timezone.now()
+                letter.revision_requested_by = request.user
+
+                letter.is_done = False
+
+                letter.save(update_fields=[
+                    "status",
+                    "revision_comment",
+                    "revision_requested_at",
+                    "revision_requested_by",
+                    "is_done",
+                    "updated_at",
+                ])
+                messages.success(request, "Письмо отправлено на дописывание.")
+                return redirect("staff_letter_detail", user_id=user_id)
+            else:
+                messages.error(request, "Укажите комментарий для доработки.")
+
         else:
-            messages.error(request, "Исправьте ошибки в форме.")
+            form = MotivationLetterStaffForm(request.POST, instance=letter)
+            if form.is_valid():
+                updated = form.save(commit=False)
+                updated.save()
+                messages.success(request, "Оценка/фидбэк сохранены.")
+                return redirect("staff_letter_detail", user_id=user_id)
+            else:
+                messages.error(request, "Исправьте ошибки в форме.")
     else:
         form = MotivationLetterStaffForm(instance=letter) if letter else None
 
@@ -66,15 +94,19 @@ def staff_letter_detail(request, user_id: int):
         "gpt_review": getattr(letter, "gpt_review", None),
         "gpt_score": getattr(letter, "gpt_score", None),
         "gpt_word_count": getattr(letter, "gpt_word_count", None) or (letter.word_count() if letter else None),
-        'gpt_json': letter.gpt_json if letter and letter.gpt_json else None,
+        "gpt_json": letter.gpt_json if letter and letter.gpt_json else None,
+
+        "revision_comment": getattr(letter, "revision_comment", None),
+        "revision_requested_at": getattr(letter, "revision_requested_at", None),
     }
 
     ctx = {
         "user_obj": user,
         "letter": letter,
         "form": form,
-        'active': 'motivation_letter',
-        'readonly': readonly_ctx,
+        "revision_form": revision_form,   # ✅ важно
+        "active": "motivation_letter",
+        "readonly": readonly_ctx,
     }
     return render(request, "staff_templates/letter_detail.html", ctx)
 

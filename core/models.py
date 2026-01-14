@@ -165,6 +165,7 @@ class MotivationLetter(models.Model):
     class Status(models.TextChoices):
         DRAFT = 'draft', 'Черновик'
         SUBMITTED = 'submitted', 'Отправлено'
+        REVISION = 'revision', 'На дописывании'
 
     is_done = models.BooleanField(default=False, verbose_name='Мотивационное письмо принято')
 
@@ -239,6 +240,23 @@ class MotivationLetter(models.Model):
         verbose_name="Время автооценки"
     )
 
+    revision_comment = models.TextField(
+        null=True, blank=True,
+        verbose_name="Комментарий на доработку (видит соискатель)"
+    )
+    revision_requested_at = models.DateTimeField(
+        null=True, blank=True,
+        verbose_name="Отправлено на доработку в",
+        db_index=True
+    )
+    revision_requested_by = models.ForeignKey(
+        User,
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name="motivation_letters_revision_requested",
+        verbose_name="Кто отправил на доработку"
+    )
+
     status = models.CharField(
         max_length=10,
         choices=Status.choices,
@@ -265,7 +283,12 @@ class MotivationLetter(models.Model):
     def clean(self):
         if self.pk:
             original = MotivationLetter.objects.get(pk=self.pk)
-            if original.status == self.Status.SUBMITTED and self.letter_text != original.letter_text:
+
+            if (
+                original.status == self.Status.SUBMITTED
+                and self.status == self.Status.SUBMITTED
+                and self.letter_text != original.letter_text
+            ):
                 raise ValidationError("Нельзя изменять текст письма после отправки.")
 
         if self.status == self.Status.SUBMITTED and not self.submitted_at:
@@ -278,6 +301,10 @@ class MotivationLetter(models.Model):
         if self.status == self.Status.SUBMITTED and self.submitted_at is None:
             self.submitted_at = timezone.now()
             self.is_done = True
+
+        if self.status == self.Status.REVISION:
+            self.is_done = False
+
         super().save(*args, **kwargs)
 
     def word_count(self) -> int:
@@ -303,6 +330,13 @@ class MotivationLetter(models.Model):
         if rubric_version is not None:
             self.gpt_version = rubric_version
         self.gpt_scored_at = timezone.now()
+
+    def send_to_revision(self, *, comment: str, by_user):
+        self.status = self.Status.REVISION
+        self.revision_comment = comment
+        self.revision_requested_at = timezone.now()
+        self.revision_requested_by = by_user
+        self.is_done = False
 
     def __str__(self):
         return f"Письмо от {self.user.username} - {self.created_at.strftime('%Y-%m-%d')}"

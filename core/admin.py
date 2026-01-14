@@ -44,6 +44,7 @@ class MotivationLetterInlineFormSet(BaseInlineFormSet):
 
 class MotivationLetterInline(admin.StackedInline):
     model = MotivationLetter
+    fk_name = "user"
     can_delete = False
     verbose_name_plural = 'Мотивационное письмо'
 
