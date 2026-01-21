@@ -112,10 +112,20 @@
                 </div>
                 <div class="mt-1">
                   {% if u.is_active %}
-                    <span class="badge text-bg-success">активен</span>
-                  {% else %}
-                    <span class="badge text-bg-secondary">заблокирован</span>
-                  {% endif %}
+  {% if u.user_info.status == "CANDIDATE" %}
+    <span class="badge text-bg-warning">Кандидат</span>
+  {% elif u.user_info.status == "ALTERNATIVE" %}
+    <span class="badge text-bg-info">Альтернативный трек</span>
+  {% elif u.user_info.status == "SCHOLAR" %}
+    <span class="badge text-bg-success">Участник</span>
+  {% elif u.user_info.status == "ALUMNUS" %}
+    <span class="badge text-bg-secondary">Выпускник</span>
+  {% else %}
+    <span class="badge text-bg-light">Неизвестно</span>
+  {% endif %}
+{% else %}
+  <span class="badge text-bg-dark">Неактивен</span>
+{% endif %}
                   {% if u.is_staff %}<span class="badge text-bg-primary ms-1">staff</span>{% endif %}
                   {% if u.is_superuser %}<span class="badge text-bg-dark ms-1">superuser</span>{% endif %}
                 </div>
