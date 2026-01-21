@@ -50,6 +50,8 @@ logger = logging.getLogger(__name__)
 @login_required()
 @ensure_registration_gate('protected')
 def index(request):
+    if request.user.is_staff:
+        return redirect('/staff/users')
     return render(request, 'core/index.html')
 
 
