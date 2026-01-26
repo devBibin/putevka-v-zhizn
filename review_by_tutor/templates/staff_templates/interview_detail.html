@@ -50,6 +50,35 @@
             </div>
         </div>
 
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-white d-flex align-items-center justify-content-between">
+                <strong>Видео собеседования</strong>
+                {% if interview.video %}
+                    <a href="{{ interview.video.url }}" class="btn btn-sm btn-outline-primary" download>
+                        Скачать видео
+                    </a>
+                {% endif %}
+            </div>
+
+            <div class="card-body">
+                {% if interview.video %}
+                    <video controls style="width: 100%; max-height: 420px;">
+                        <source src="{{ interview.video.url }}">
+                        Ваш браузер не поддерживает видео.
+                    </video>
+
+                    <div class="text-muted small mt-2">
+                        {% if interview.video_uploaded_at %}
+                            {{ interview.video_uploaded_at|date:"d.m.Y H:i" }}{% endif %}
+                        {% if interview.video_uploaded_by %} ·
+                            {{ interview.video_uploaded_by.get_full_name|default:interview.video_uploaded_by.username }}{% endif %}
+                    </div>
+                {% else %}
+                    <div class="text-muted">Видео ещё не загружено.</div>
+                {% endif %}
+            </div>
+        </div>
+
         <div class="card shadow-sm">
             <div class="card-header bg-white">
                 <strong>Заметки интервьюера + загрузка заполненного шаблона</strong>
@@ -64,10 +93,22 @@
                     </div>
 
                     <div class="mb-3">
+                        <label class="form-label">Заполненная форма</label>
                         {% render_field form.filled_form class+="form-control" %}
                         {% if form.filled_form.errors %}
                             <div class="text-danger small mt-1">{{ form.filled_form.errors }}</div>
                         {% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Видео</label>
+                        {% render_field form.video class+="form-control" %}
+                        {% if form.video.errors %}
+                            <div class="text-danger small mt-1">{{ form.video.errors }}</div>
+                        {% endif %}
+                        <div class="form-text">
+                            Загрузите видеофайл (может быть большим — загрузка займёт время).
+                        </div>
                     </div>
 
                     <div class="mt-3 text-end">
@@ -79,6 +120,8 @@
                 Создано: {{ interview.created_at|date:"d.m.Y H:i" }},
                 обновлено: {{ interview.updated_at|date:"d.m.Y H:i" }}
             </div>
+
+
         </div>
     </div>
 {% endblock %}

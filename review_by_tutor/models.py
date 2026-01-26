@@ -114,20 +114,28 @@ class Interview(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="interview")
     notes = models.TextField("Заметки интервьюера", blank=True)
 
-    filled_form = models.FileField(
-        "Заполненный шаблон",
-        upload_to="interview/filled/",
+    filled_form = models.FileField("Заполненный шаблон", upload_to="interview/filled/", blank=True, null=True)
+    filled_uploaded_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name="interview_filled_uploaded"
+    )
+    filled_uploaded_at = models.DateTimeField(null=True, blank=True)
+
+    # NEW: видео
+    video = models.FileField(
+        "Видео собеседования",
+        upload_to="interview/video/",
         blank=True,
         null=True,
     )
-    filled_uploaded_by = models.ForeignKey(
+    video_uploaded_by = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name="interview_filled_uploaded",
+        related_name="interview_video_uploaded",
     )
-    filled_uploaded_at = models.DateTimeField(null=True, blank=True)
+    video_uploaded_at = models.DateTimeField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+

@@ -461,9 +461,15 @@ def interview_detail(request, user_id: int):
         form = InterviewForm(request.POST, request.FILES, instance=interview)
         if form.is_valid():
             obj = form.save(commit=False)
+
             if "filled_form" in request.FILES:
                 obj.filled_uploaded_by = request.user
                 obj.filled_uploaded_at = timezone.now()
+
+            if "video" in request.FILES:
+                obj.video_uploaded_by = request.user
+                obj.video_uploaded_at = timezone.now()
+
             obj.save()
             messages.success(request, "Изменения сохранены.")
             return redirect("interview_detail", user_id=user_id)

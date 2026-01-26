@@ -152,7 +152,7 @@ class DocumentCommentForm(forms.ModelForm):
 class InterviewForm(forms.ModelForm):
     class Meta:
         model = Interview
-        fields = ["notes", "filled_form"]
+        fields = ["notes", "filled_form", "video"]
         widgets = {
             "filled_form": forms.FileInput(),
         }
