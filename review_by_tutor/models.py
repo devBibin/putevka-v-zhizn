@@ -1,8 +1,9 @@
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.db import models
 from django.utils import timezone
 
-User = settings.AUTH_USER_MODEL
+User = get_user_model()
 
 
 class TestAssignment(models.Model):
@@ -13,7 +14,7 @@ class TestAssignment(models.Model):
         CANCELLED = "cancelled", "Отменено"
 
     user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
+        User,
         on_delete=models.CASCADE,
         related_name="test_assignments",
         verbose_name="Кандидат",
@@ -23,7 +24,7 @@ class TestAssignment(models.Model):
     instructions = models.TextField("Инструкции/Комментарий", blank=True)
 
     assigned_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
+        User,
         on_delete=models.SET_NULL,
         null=True, blank=True,
         related_name="assigned_tests",
@@ -56,7 +57,7 @@ class TestAssignment(models.Model):
 
     completed_at = models.DateTimeField("Завершено", null=True, blank=True)
     result_filled_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
+        User,
         on_delete=models.SET_NULL,
         null=True, blank=True,
         related_name="filled_test_results",
@@ -120,7 +121,6 @@ class Interview(models.Model):
     )
     filled_uploaded_at = models.DateTimeField(null=True, blank=True)
 
-    # NEW: видео
     video = models.FileField(
         "Видео собеседования",
         upload_to="interview/video/",
@@ -135,6 +135,21 @@ class Interview(models.Model):
         related_name="interview_video_uploaded",
     )
     video_uploaded_at = models.DateTimeField(null=True, blank=True)
+
+    transcript = models.TextField("Транскрипт", blank=True)
+    transcript_status = models.CharField(
+        "Статус транскрибации",
+        max_length=20,
+        choices=[
+            ("PENDING", "Ожидает"),
+            ("PROCESSING", "В работе"),
+            ("DONE", "Готово"),
+            ("FAILED", "Ошибка"),
+        ],
+        default="PENDING",
+    )
+    transcript_error = models.TextField("Ошибка транскрибации", blank=True)
+    transcript_updated_at = models.DateTimeField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

@@ -79,6 +79,58 @@
             </div>
         </div>
 
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <strong>Транскрипция видео</strong>
+
+                {% if interview.transcript_status == "PROCESSING" %}
+                    <span class="badge text-bg-warning">В обработке</span>
+                {% elif interview.transcript_status == "DONE" %}
+                    <span class="badge text-bg-success">Готово</span>
+                {% elif interview.transcript_status == "FAILED" %}
+                    <span class="badge text-bg-danger">Ошибка</span>
+                {% else %}
+                    <span class="badge text-bg-secondary">Ожидает</span>
+                {% endif %}
+            </div>
+
+            <div class="card-body">
+                {% if interview.transcript %}
+                    <div class="border rounded p-3 bg-light transcript-box"
+                         style="white-space: pre-wrap;
+                                max-height: 420px;
+                                overflow-y: auto;
+                                overflow-x: hidden;
+                                font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+                                font-size: 0.9rem;
+                                line-height: 1.5;
+                            ">{{ interview.transcript }}
+                    </div>
+
+                    {% if interview.transcript_uploaded_at %}
+                        <div class="text-muted small mt-2">
+                            Обновлено: {{ interview.transcript_uploaded_at|date:"d.m.Y H:i" }}
+                        </div>
+                    {% endif %}
+
+                {% elif interview.transcript_status == "FAILED" %}
+                    <div class="alert alert-danger small mb-0">
+                        Не удалось получить транскрипцию.
+                        {% if interview.transcript_error %}
+                            <br>
+                            <code>{{ interview.transcript_error }}</code>
+                        {% endif %}
+                    </div>
+
+                {% else %}
+                    <div class="text-muted">
+                        Транскрипт ещё не готов. Обработка выполняется в фоне.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+
         <div class="card shadow-sm">
             <div class="card-header bg-white">
                 <strong>Заметки интервьюера + загрузка заполненного шаблона</strong>

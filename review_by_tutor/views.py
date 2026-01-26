@@ -469,6 +469,9 @@ def interview_detail(request, user_id: int):
             if "video" in request.FILES:
                 obj.video_uploaded_by = request.user
                 obj.video_uploaded_at = timezone.now()
+                obj.transcript_status = "PENDING"
+                obj.transcript_error = ""
+                obj.transcript = ""
 
             obj.save()
             messages.success(request, "Изменения сохранены.")
