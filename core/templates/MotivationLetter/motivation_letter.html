@@ -32,6 +32,16 @@
                     {% endif %}
                 </p>
 
+                {% if instruction %}
+                    <div class="alert alert-info">
+                        <strong>{{ instruction.title }}</strong><br>
+                        <a href="{{ instruction.file.url }}" target="_blank">
+                            Скачать требования
+                        </a>
+                    </div>
+                {% endif %}
+
+
                 {% if letter and letter.status == 'revision' %}
                     <div class="alert alert-warning shadow-sm mb-4" role="alert">
                         <div class="fw-semibold mb-1">
@@ -67,7 +77,8 @@
 
                             {% for field in form %}
                                 <div class="mb-4">
-                                    <label for="{{ field.id_for_label }}" class="form-label fs-5">{{ field.label }}</label>
+                                    <label for="{{ field.id_for_label }}"
+                                           class="form-label fs-5">{{ field.label }}</label>
 
                                     {% if field.name == 'letter_text' %}
                                         {{ field|add_class:"form-control" }}

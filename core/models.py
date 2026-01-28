@@ -342,6 +342,20 @@ class MotivationLetter(models.Model):
         return f"Письмо от {self.user.username} - {self.created_at.strftime('%Y-%m-%d')}"
 
 
+
+class MotivationLetterInstruction(models.Model):
+    title = models.CharField(max_length=200, default="Требования к мотивационному письму")
+    file = models.FileField(upload_to="motivation/instructions/")
+    is_active = models.BooleanField(default=True)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-uploaded_at"]
+
+    def __str__(self):
+        return self.title
+
+
 class Notification(models.Model):
     message = models.TextField(verbose_name='Сообщение')
 

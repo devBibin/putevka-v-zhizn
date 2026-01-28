@@ -23,7 +23,7 @@ import config
 from Putevka import settings
 from .decorators import ensure_registration_gate
 from .forms import CustomUserCreationForm, RegistrationForm, VerifyEmailForm, PhoneNumberForm, MotivationLetterForm
-from .models import TelegramAccount, RegistrationPersonalData
+from .models import TelegramAccount, RegistrationPersonalData, MotivationLetterInstruction
 from scholar_form.models import UserInfo
 from datetime import datetime, timedelta
 from .models import MotivationLetter
@@ -337,6 +337,11 @@ def finish_registration(request):
 @login_required
 def motivation_letter(request):
     user = request.user
+    instruction = (
+        MotivationLetterInstruction.objects
+        .filter(is_active=True)
+        .first()
+    )
     letter = None
     is_new_letter = True
 
@@ -392,6 +397,7 @@ def motivation_letter(request):
         'is_new_letter': is_new_letter,
         'user': user,
         'letter': letter,
+        'instruction': instruction,
         'active': 'motivation_letter',
     })
 
