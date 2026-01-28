@@ -108,10 +108,8 @@ def sync_userinfo_to_personal_data(sender, instance: UserInfo, **kwargs):
         personal_data.save(update_fields=list(fields_map.keys()) + ["updated_at"])
 
 def build_motivation_rating_message(letter, user_url: str) -> str:
-    admin_rating = letter.admin_rating or "— без комментария —"
     return (
-        "✅ <b>Ваше мотивационное письмо оценено!</b>\n\n"
-        f"<b>Комментарий:</b>\n{admin_rating}\n\n"
+        "✅ <b>Ваше мотивационное письмо оценено!</b>\n"
         "👇 Откройте письмо по ссылке ниже\n"
         f"{user_url}"
     )
