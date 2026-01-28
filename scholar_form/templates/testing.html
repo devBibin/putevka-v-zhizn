@@ -17,13 +17,13 @@
                                     {% if t.due_at %} • Дедлайн: {{ t.due_at|date:"d.m.Y H:i" }}{% endif %}
                                 </div>
                                 {% if t.instructions %}<p class="mb-1 mt-2">{{ t.instructions }}</p>{% endif %}
-                                {% if t.status != 'completed' %}
-                                    {% if t.external_url %}
+                            {% if t.external_url %}
                                         <a class="btn btn-sm btn-primary mt-2 me-2" href="{{ t.external_url }}"
                                            target="_blank" rel="noopener">
                                             Перейти к тестированию
                                         </a>
                                     {% endif %}
+                                {% if t.status != 'completed' %}
                                     <form method="post" action="{% url 'test_assignment_complete' t.id %}"
                                           class="d-inline">
                                         {% csrf_token %}
@@ -63,7 +63,7 @@
                 {% endfor %}
             </div>
         {% else %}
-            <div class="alert alert-info">Администратор выдаст вам инструкции после собеседования.</div>
+            <div class="alert alert-info">Администратор выдаст вам инструкции.</div>
         {% endif %}
     </div>
 {% endblock %}
