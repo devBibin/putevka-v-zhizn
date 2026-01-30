@@ -1,6 +1,7 @@
 from django.contrib import admin
 
-from review_by_tutor.models import Interview, TestAssignment, InterviewPreparation, InterviewTemplate, GoogleOAuthToken
+from review_by_tutor.models import Interview, TestAssignment, InterviewPreparation, InterviewTemplate, GoogleOAuthToken, \
+    InterviewSheetTemplate
 
 
 @admin.register(Interview)
@@ -30,6 +31,11 @@ class InterviewTemplateAdmin(admin.ModelAdmin):
     list_display = ("title", "is_active", "uploaded_at")
     list_filter = ("is_active",)
     search_fields = ("title",)
+
+
+@admin.register(InterviewSheetTemplate)
+class InterviewSheetTemplateAdmin(admin.ModelAdmin):
+    list_display = ("name", "is_active", "updated_at")
 
 @admin.register(GoogleOAuthToken)
 class GoogleOAuthTokenAdmin(admin.ModelAdmin):

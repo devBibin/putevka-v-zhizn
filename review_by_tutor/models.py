@@ -118,6 +118,24 @@ class Interview(models.Model):
     google_sheet_id = models.CharField(max_length=128, blank=True, default="")
     google_sheet_url = models.URLField(blank=True, default="")
 
+    sheet_fill_status = models.CharField(
+        max_length=16,
+        default="PENDING",
+        choices=[
+            ("PENDING", "Pending"),
+            ("PROCESSING", "Processing"),
+            ("DONE", "Done"),
+            ("ERROR", "Error"),
+        ],
+    )
+    sheet_fill_error = models.TextField(blank=True, default="")
+
+    sheet_filled_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Когда Google-таблица была заполнена автоматически"
+    )
+
     filled_form = models.FileField("Заполненный шаблон", upload_to="interview/filled/", blank=True, null=True)
     filled_uploaded_by = models.ForeignKey(
         User, on_delete=models.SET_NULL, null=True, blank=True, related_name="interview_filled_uploaded"
@@ -163,3 +181,20 @@ class GoogleOAuthToken(models.Model):
     token_json = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+
+class InterviewSheetTemplate(models.Model):
+    name = models.CharField(max_length=200)
+    is_active = models.BooleanField(default=False)
+
+    template_spreadsheet_id = models.CharField(max_length=128)
+    target_folder_id = models.CharField(max_length=128)
+
+    fields_json = models.JSONField(null=True, blank=True)
+
+    fields_scanned_at = models.DateTimeField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.name
