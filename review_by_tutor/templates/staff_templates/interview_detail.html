@@ -19,18 +19,29 @@
         <div class="card shadow-sm mb-4">
             <div class="card-header bg-white d-flex align-items-center justify-content-between">
                 <strong>Шаблон интервью</strong>
-                {% if template_obj %}
-                    <a
-                            href="{% url 'download_interview_template' user_obj.id %}"
-                            class="btn btn-sm btn-outline-primary"
-                    >
-                        Скачать шаблон
-                    </a>
 
-                {% else %}
-                    <span class="small text-muted">Шаблон не загружен</span>
-                {% endif %}
+                <div class="d-flex align-items-center gap-2">
+                    {% if interview.sheet_fill_status == "PROCESSING" %}
+                        <span class="badge text-bg-warning">Заполнение в обработке</span>
+                    {% elif interview.sheet_fill_status == "DONE" %}
+                        <span class="badge text-bg-success">Заполнено</span>
+                    {% elif interview.sheet_fill_status == "FAILED" %}
+                        <span class="badge text-bg-danger">Ошибка заполнения</span>
+                    {% else %}
+                        <span class="badge text-bg-secondary">Ожидает заполнения</span>
+                    {% endif %}
+
+                    {% if template_obj %}
+                        <a href="{% url 'download_interview_template' user_obj.id %}"
+                           class="btn btn-sm btn-outline-primary">
+                            Скачать шаблон
+                        </a>
+                    {% else %}
+                        <span class="small text-muted">Шаблон не загружен</span>
+                    {% endif %}
+                </div>
             </div>
+
             <div class="card-body">
                 {% if interview.filled_form %}
                     <div class="d-flex flex-wrap align-items-center gap-2">
@@ -47,8 +58,108 @@
                 {% else %}
                     <div class="text-muted">Заполненный файл ещё не загружен.</div>
                 {% endif %}
+                {% if interview.google_sheet_url %}
+                    <a class="btn btn-outline-primary btn-sm" target="_blank" href="{{ interview.google_sheet_url }}">
+                        Открыть Google-таблицу
+                    </a>
+                {% endif %}
+                {% if interview.sheet_fill_status == "DONE" and interview.sheet_filled_at %}
+                    <div class="text-muted small mt-2">
+                        Заполнено: {{ interview.sheet_filled_at|date:"d.m.Y H:i" }}
+                    </div>
+                {% elif interview.sheet_fill_status == "FAILED" and interview.sheet_fill_error %}
+                    <div class="alert alert-danger small mt-2 mb-0">
+                        Не удалось заполнить Google-таблицу.
+                        <br><code>{{ interview.sheet_fill_error }}</code>
+                    </div>
+                {% elif interview.sheet_fill_status == "PROCESSING" %}
+                    <div class="text-muted small mt-2">
+                        Заполнение выполняется в фоне. Обнови страницу через минуту.
+                    </div>
+                {% endif %}
             </div>
         </div>
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-white d-flex align-items-center justify-content-between">
+                <strong>Видео собеседования</strong>
+                {% if interview.video %}
+                    <a href="{{ interview.video.url }}" class="btn btn-sm btn-outline-primary" download>
+                        Скачать видео
+                    </a>
+                {% endif %}
+            </div>
+
+            <div class="card-body">
+                {% if interview.video %}
+                    <video controls style="width: 100%; max-height: 420px;">
+                        <source src="{{ interview.video.url }}">
+                        Ваш браузер не поддерживает видео.
+                    </video>
+
+                    <div class="text-muted small mt-2">
+                        {% if interview.video_uploaded_at %}
+                            {{ interview.video_uploaded_at|date:"d.m.Y H:i" }}{% endif %}
+                        {% if interview.video_uploaded_by %} ·
+                            {{ interview.video_uploaded_by.get_full_name|default:interview.video_uploaded_by.username }}{% endif %}
+                    </div>
+                {% else %}
+                    <div class="text-muted">Видео ещё не загружено.</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <strong>Транскрипция видео</strong>
+
+                {% if interview.transcript_status == "PROCESSING" %}
+                    <span class="badge text-bg-warning">В обработке</span>
+                {% elif interview.transcript_status == "DONE" %}
+                    <span class="badge text-bg-success">Готово</span>
+                {% elif interview.transcript_status == "FAILED" %}
+                    <span class="badge text-bg-danger">Ошибка</span>
+                {% else %}
+                    <span class="badge text-bg-secondary">Ожидает</span>
+                {% endif %}
+            </div>
+
+            <div class="card-body">
+                {% if interview.transcript %}
+                    <div class="border rounded p-3 bg-light transcript-box"
+                         style="white-space: pre-wrap;
+                                max-height: 420px;
+                                overflow-y: auto;
+                                overflow-x: hidden;
+                                font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+                                font-size: 0.9rem;
+                                line-height: 1.5;
+                            ">{{ interview.transcript }}
+                    </div>
+
+                    {% if interview.transcript_uploaded_at %}
+                        <div class="text-muted small mt-2">
+                            Обновлено: {{ interview.transcript_uploaded_at|date:"d.m.Y H:i" }}
+                        </div>
+                    {% endif %}
+
+                {% elif interview.transcript_status == "FAILED" %}
+                    <div class="alert alert-danger small mb-0">
+                        Не удалось получить транскрипцию.
+                        {% if interview.transcript_error %}
+                            <br>
+                            <code>{{ interview.transcript_error }}</code>
+                        {% endif %}
+                    </div>
+
+                {% else %}
+                    <div class="text-muted">
+                        Транскрипт ещё не готов. Обработка выполняется в фоне.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
 
         <div class="card shadow-sm">
             <div class="card-header bg-white">
@@ -64,10 +175,22 @@
                     </div>
 
                     <div class="mb-3">
+                        <label class="form-label">Заполненная форма</label>
                         {% render_field form.filled_form class+="form-control" %}
                         {% if form.filled_form.errors %}
                             <div class="text-danger small mt-1">{{ form.filled_form.errors }}</div>
                         {% endif %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Видео</label>
+                        {% render_field form.video class+="form-control" %}
+                        {% if form.video.errors %}
+                            <div class="text-danger small mt-1">{{ form.video.errors }}</div>
+                        {% endif %}
+                        <div class="form-text">
+                            Загрузите видеофайл (может быть большим — загрузка займёт время).
+                        </div>
                     </div>
 
                     <div class="mt-3 text-end">
@@ -79,6 +202,8 @@
                 Создано: {{ interview.created_at|date:"d.m.Y H:i" }},
                 обновлено: {{ interview.updated_at|date:"d.m.Y H:i" }}
             </div>
+
+
         </div>
     </div>
 {% endblock %}

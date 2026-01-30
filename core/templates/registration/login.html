@@ -18,15 +18,15 @@
                 {% csrf_token %}
 
                 <div class="mb-3">
-                    <label for="id_username" class="form-label">Email или логин</label>
+                    <label for="id_username" class="form-label">Email</label>
                     {% if form.username.errors %}
-                        {% render_field form.username class+="form-control is-invalid" placeholder="Введите ваш email или логин" %}
+                        {% render_field form.username class+="form-control is-invalid" placeholder="Введите ваш email" %}
                         <div class="invalid-feedback">
                             {% for err in form.username.errors %}{{ err }}{% if not forloop.last %}<br>
                             {% endif %}{% endfor %}
                         </div>
                     {% else %}
-                        {% render_field form.username class+="form-control" placeholder="Введите ваш email или логин" %}
+                        {% render_field form.username class+="form-control" placeholder="Введите ваш email" %}
                     {% endif %}
                 </div>
 

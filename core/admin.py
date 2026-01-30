@@ -8,7 +8,8 @@ from django.urls import reverse
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 
-from core.models import TelegramAccount, RegistrationPersonalData
+from core.models import TelegramAccount, RegistrationPersonalData, MotivationLetterInstruction
+from review_by_tutor.models import InterviewTemplate
 from scholar_form.admin import UserPersonalDataInline
 from scholar_form.forms import UserInfoForm
 from scholar_form.models import UserInfo, UserPersonalData
@@ -180,6 +181,11 @@ class MotivationLetterAdmin(admin.ModelAdmin):
         "gpt_version",
         "gpt_scored_at",
     )
+
+
+@admin.register(MotivationLetterInstruction)
+class MotivationLetterInstructionAdmin(admin.ModelAdmin):
+    list_display = ('title', )
 
 @admin.register(Notification)
 class NotificationAdmin(admin.ModelAdmin):

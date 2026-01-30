@@ -1,8 +1,9 @@
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.db import models
 from django.utils import timezone
 
-User = settings.AUTH_USER_MODEL
+User = get_user_model()
 
 
 class TestAssignment(models.Model):
@@ -13,7 +14,7 @@ class TestAssignment(models.Model):
         CANCELLED = "cancelled", "Отменено"
 
     user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
+        User,
         on_delete=models.CASCADE,
         related_name="test_assignments",
         verbose_name="Кандидат",
@@ -23,7 +24,7 @@ class TestAssignment(models.Model):
     instructions = models.TextField("Инструкции/Комментарий", blank=True)
 
     assigned_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
+        User,
         on_delete=models.SET_NULL,
         null=True, blank=True,
         related_name="assigned_tests",
@@ -56,7 +57,7 @@ class TestAssignment(models.Model):
 
     completed_at = models.DateTimeField("Завершено", null=True, blank=True)
     result_filled_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
+        User,
         on_delete=models.SET_NULL,
         null=True, blank=True,
         related_name="filled_test_results",
@@ -114,20 +115,86 @@ class Interview(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="interview")
     notes = models.TextField("Заметки интервьюера", blank=True)
 
-    filled_form = models.FileField(
-        "Заполненный шаблон",
-        upload_to="interview/filled/",
+    google_sheet_id = models.CharField(max_length=128, blank=True, default="")
+    google_sheet_url = models.URLField(blank=True, default="")
+
+    sheet_fill_status = models.CharField(
+        max_length=16,
+        default="PENDING",
+        choices=[
+            ("PENDING", "Pending"),
+            ("PROCESSING", "Processing"),
+            ("DONE", "Done"),
+            ("ERROR", "Error"),
+        ],
+    )
+    sheet_fill_error = models.TextField(blank=True, default="")
+
+    sheet_filled_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Когда Google-таблица была заполнена автоматически"
+    )
+
+    filled_form = models.FileField("Заполненный шаблон", upload_to="interview/filled/", blank=True, null=True)
+    filled_uploaded_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name="interview_filled_uploaded"
+    )
+    filled_uploaded_at = models.DateTimeField(null=True, blank=True)
+
+    video = models.FileField(
+        "Видео собеседования",
+        upload_to="interview/video/",
         blank=True,
         null=True,
     )
-    filled_uploaded_by = models.ForeignKey(
+    video_uploaded_by = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
-        related_name="interview_filled_uploaded",
+        related_name="interview_video_uploaded",
     )
-    filled_uploaded_at = models.DateTimeField(null=True, blank=True)
+    video_uploaded_at = models.DateTimeField(null=True, blank=True)
+
+    transcript = models.TextField("Транскрипт", blank=True)
+    transcript_status = models.CharField(
+        "Статус транскрибации",
+        max_length=20,
+        choices=[
+            ("PENDING", "Ожидает"),
+            ("PROCESSING", "В работе"),
+            ("DONE", "Готово"),
+            ("FAILED", "Ошибка"),
+        ],
+        default="PENDING",
+    )
+    transcript_error = models.TextField("Ошибка транскрибации", blank=True)
+    transcript_updated_at = models.DateTimeField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+
+class GoogleOAuthToken(models.Model):
+    name = models.CharField(max_length=64, unique=True, default="default")
+    token_json = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
+class InterviewSheetTemplate(models.Model):
+    name = models.CharField(max_length=200)
+    is_active = models.BooleanField(default=False)
+
+    template_spreadsheet_id = models.CharField(max_length=128)
+    target_folder_id = models.CharField(max_length=128)
+
+    fields_json = models.JSONField(null=True, blank=True)
+
+    fields_scanned_at = models.DateTimeField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.name

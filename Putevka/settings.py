@@ -18,6 +18,8 @@ from dotenv import load_dotenv
 import config
 import dj_database_url, os
 
+
+
 load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -161,6 +163,9 @@ EMAIL_USE_TLS = True
 EMAIL_HOST_USER = 'your_email@gmail.com'
 EMAIL_HOST_PASSWORD = 'your_email_password_or_app_password'
 
+GOOGLE_SA_JSON_PATH = BASE_DIR / "secrets" / "google-sa.json"
+GOOGLE_OAUTH_CLIENT_SECRETS = BASE_DIR / "secrets" / "google-oauth-client.json"
+
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/'
 
@@ -274,3 +279,6 @@ if not os.path.exists(LOG_DIR):
 ALLOWED_VIDEO_MIME = {
     "video/mp4", "video/quicktime", "video/x-matroska", "video/webm", "application/octet-stream"
 }
+
+if DEBUG:
+    os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
