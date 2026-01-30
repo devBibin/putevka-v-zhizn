@@ -151,19 +151,18 @@
     {% block extra_js %}
         <script>
             document.addEventListener('DOMContentLoaded', function () {
-                const textarea = document.getElementById('id_letter_text');
+                const textarea = document.getElementById('{{ form.letter_text.id_for_label }}');
                 const counter = document.getElementById('captionCharCount');
                 if (!textarea || !counter) return;
 
-                let maxLen = parseInt(textarea.dataset.maxlen || textarea.getAttribute('maxlength'), 10);
+                let maxLen = parseInt(textarea.getAttribute('maxlength'), 10);
                 if (isNaN(maxLen) || maxLen <= 0) maxLen = 2000;
 
                 function setCounter(len) {
                     counter.textContent = `${len} / ${maxLen} символов`;
-                    const near = Math.floor(maxLen * 0.9);
-                    counter.classList.toggle('text-danger', len >= near);
-                    counter.classList.toggle('text-muted', len < near);
                 }
+
+                setCounter(textarea.value.length);
 
                 function clampAndCount() {
                     if (textarea.value.length > maxLen) {
@@ -207,7 +206,7 @@
                     }
                 });
 
-                textarea.addEventListener('input', clampAndCount);
+                textarea.addEventListener('input', () => setCounter(textarea.value.length));
                 textarea.addEventListener('change', clampAndCount);
                 clampAndCount();
             });
