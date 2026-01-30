@@ -8,22 +8,29 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.db import transaction
 from django.db.models import Q, Subquery, OuterRef, Count, Exists
-from django.http import Http404, FileResponse
+from django.http import Http404, FileResponse, HttpRequest, HttpResponse
 from django.shortcuts import render, get_object_or_404, redirect
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.encoding import smart_str
 from django.views.decorators.http import require_POST
 
+import config
+from Putevka import settings
 from core.decorators import ensure_registration_gate
 from core.models import MotivationLetter, Notification, UserNotification
 from documents.models import Document
 from my_study.models import CourseSelection, UniversityPriority, AssessmentResult, School, Course
+from review_by_tutor import google_sheets
 from review_by_tutor.forms import MotivationLetterStaffForm, UserInfoStaffForm, ScholarVideoStaffForm, \
     DocumentStaffUploadForm, DocumentCommentForm, \
     DocumentStatusForm, InterviewForm, TestAssignmentCreateForm, TestAssignmentEditForm, TestResultForm, \
     LetterRevisionForm
-from review_by_tutor.models import Interview, TestAssignment, InterviewPreparation, InterviewTemplate
+from review_by_tutor.google_sheets import create_user_sheet_from_template, get_drive_service, \
+    copy_template_sheet_for_user
+from review_by_tutor.models import Interview, TestAssignment, InterviewPreparation, InterviewTemplate, GoogleOAuthToken
 from scholar_form.models import UserInfo, ScholarVideo, StaffNote
+from google_auth_oauthlib.flow import Flow
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -457,6 +464,18 @@ def interview_detail(request, user_id: int):
         InterviewTemplate.objects.filter(is_active=True).order_by("-uploaded_at").first()
     )
 
+    if not interview.google_sheet_id:
+        try:
+            sheet_id, sheet_url = copy_template_sheet_for_user(
+                user_id=user_obj.id,
+                user_name=(user_obj.get_full_name() or user_obj.username),
+            )
+            interview.google_sheet_id = sheet_id
+            interview.google_sheet_url = sheet_url
+            interview.save(update_fields=["google_sheet_id", "google_sheet_url"])
+        except Exception as e:
+            messages.error(request, f"Не удалось создать Google-таблицу: {e}")
+
     if request.method == "POST":
         form = InterviewForm(request.POST, request.FILES, instance=interview)
         if form.is_valid():
@@ -608,3 +627,54 @@ def interview_preparation_view(request):
     )
 
     return render(request, "interview_preparation.html", {"prep": prep, "active": "interview"})
+
+
+
+def google_connect(request: HttpRequest) -> HttpResponse:
+    flow = Flow.from_client_secrets_file(
+        str(settings.GOOGLE_OAUTH_CLIENT_SECRETS),
+        scopes=google_sheets.DRIVE_SCOPES,
+        redirect_uri=request.build_absolute_uri(reverse("google_callback")),
+    )
+
+    authorization_url, state = flow.authorization_url(
+        access_type="offline",
+        include_granted_scopes="true",
+        prompt="consent",
+    )
+
+    request.session["google_oauth_state"] = state
+    return redirect(authorization_url)
+
+
+def google_callback(request: HttpRequest) -> HttpResponse:
+    state = request.session.get("google_oauth_state")
+    if not state:
+        messages.error(request, "OAuth state потерялся. Попробуй подключить Google заново.")
+        return redirect("/admin")
+
+    flow = Flow.from_client_secrets_file(
+        str(settings.GOOGLE_OAUTH_CLIENT_SECRETS),
+        scopes=google_sheets.DRIVE_SCOPES,
+        state=state,
+        redirect_uri=request.build_absolute_uri(reverse("google_callback")),
+    )
+
+    flow.fetch_token(authorization_response=request.build_absolute_uri())
+
+    creds = flow.credentials
+    if not creds.refresh_token:
+        messages.warning(
+            request,
+            "Refresh token не выдан. Часто это значит, что аккаунт уже давал доступ ранее. "
+            "Попробуй отозвать доступ приложению в Google Account -> Security -> Third-party access "
+            "и подключить заново (или проверь prompt=consent)."
+        )
+
+    GoogleOAuthToken.objects.update_or_create(
+        name="default",
+        defaults={"token_json": creds.to_json()},
+    )
+
+    messages.success(request, "Google Drive подключён. Теперь можно создавать таблицы.")
+    return redirect("/admin")

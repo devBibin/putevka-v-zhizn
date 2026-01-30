@@ -47,6 +47,11 @@
                 {% else %}
                     <div class="text-muted">Заполненный файл ещё не загружен.</div>
                 {% endif %}
+                {% if interview.google_sheet_url %}
+                    <a class="btn btn-outline-primary btn-sm" target="_blank" href="{{ interview.google_sheet_url }}">
+                        Открыть Google-таблицу
+                    </a>
+                {% endif %}
             </div>
         </div>
 
