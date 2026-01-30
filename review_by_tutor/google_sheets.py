@@ -6,7 +6,7 @@ from django.conf import settings
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
-from requests.sessions import Request
+from google.auth.transport.requests import Request
 
 import config
 from review_by_tutor.models import GoogleOAuthToken
