@@ -35,15 +35,6 @@
                                 <div class="text-muted small break-anywhere">{{ uinfo.phone }}</div>
                             {% endif %}
                         {% endwith %}
-                        <hr>
-                        <div class="small text-muted">Последнее действие:</div>
-                        <div class="fw-semibold">
-                            {% if summary.last_action %}
-                                {{ summary.last_action|date:"d.m.Y H:i" }}
-                            {% else %}
-                                —
-                            {% endif %}
-                        </div>
                     </div>
                 </div>
                 <div class="card mb-3">
