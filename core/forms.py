@@ -112,7 +112,7 @@ class MotivationLetterForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         ta = self.fields["letter_text"].widget
-        maxlen = self.fields["letter_text"].max_length or 2000
+        maxlen = self.fields["letter_text"].max_length or 15000
 
         ta.attrs.update({
             "id": "id_caption_upload",

@@ -84,7 +84,7 @@
                                         {{ field|add_class:"form-control" }}
 
                                         <div id="captionCharCount" class="form-text text-muted">
-                                            0 / {{ field.field.max_length|default:2000 }} символов
+                                            0 / {{ field.field.max_length|default:15000 }} символов
                                         </div>
                                         <div id="autosaveStatus" class="form-text"></div>
                                     {% else %}
@@ -156,7 +156,7 @@
                 if (!textarea || !counter) return;
 
                 let maxLen = parseInt(textarea.getAttribute('maxlength'), 10);
-                if (isNaN(maxLen) || maxLen <= 0) maxLen = 2000;
+                if (isNaN(maxLen) || maxLen <= 0) maxLen = 15000;
 
                 function setCounter(len) {
                     counter.textContent = `${len} / ${maxLen} символов`;
