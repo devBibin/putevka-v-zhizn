@@ -46,6 +46,12 @@ class StaffNote(models.Model):
 class UserInfo(models.Model):
     GENDERS = [('MAN', 'Мужчина'), ('WOMAN', 'Женщина')]
     STATUSES = [('CANDIDATE', 'Кандидат'), ('ALTERNATIVE', 'Альтернативный трек'), ('SCHOLAR', 'Участник'), ('ALUMNUS', 'Выпускник')]
+    PROFILES = [
+        ("humanities", "Гуманитарный профиль"),
+        ("chem_bio", "Химико-биологический профиль"),
+        ("technical", "Технический профиль"),
+        ("creative", "Творческий профиль"),
+    ]
 
     avatar = models.ImageField(upload_to="avatars/", null=True, blank=True, verbose_name="Аватар")
 
@@ -53,6 +59,8 @@ class UserInfo(models.Model):
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, null=True, related_name='user_info')
     status = models.CharField(max_length=100, choices=STATUSES, default='CANDIDATE', verbose_name='Статус в программе')
+
+    profile = models.CharField(max_length=100, choices=PROFILES, verbose_name='Профиль', blank=True, null=True)
 
     # Step 1: Personal Info
     last_name = models.CharField(max_length=255, verbose_name="Фамилия", blank=True)

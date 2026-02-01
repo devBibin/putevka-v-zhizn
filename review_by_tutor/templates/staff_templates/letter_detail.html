@@ -146,7 +146,7 @@
                         {% if readonly and readonly.gpt_review %}
                             <div class="mt-2">
                                 <strong>Краткий обзор GPT:</strong>
-                                <div class="border rounded p-2 mt-1 bg-body-tertiary">{{ readonly.gpt_review }}</div>
+                                <div class="border rounded p-2 mt-1 bg-body-tertiary">{{ readonly.gpt_review|linebreaksbr }}</div>
                             </div>
                         {% endif %}
 

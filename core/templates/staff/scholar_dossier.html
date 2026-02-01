@@ -35,15 +35,6 @@
                                 <div class="text-muted small break-anywhere">{{ uinfo.phone }}</div>
                             {% endif %}
                         {% endwith %}
-                        <hr>
-                        <div class="small text-muted">Последнее действие:</div>
-                        <div class="fw-semibold">
-                            {% if summary.last_action %}
-                                {{ summary.last_action|date:"d.m.Y H:i" }}
-                            {% else %}
-                                —
-                            {% endif %}
-                        </div>
                     </div>
                 </div>
                 <div class="card mb-3">
@@ -62,6 +53,42 @@
                         <div class="form-text mt-2">
                             Текущий: <strong>{{ user_obj.user_info.get_status_display }}</strong>
                         </div>
+                    </div>
+                </div>
+
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <h6 class="text-uppercase text-muted mb-3">Учебный профиль</h6>
+                        <form method="post" action="{% url 'staff_scholar_action' user_obj.id %}" class="row g-2">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="change_profile">
+                            <div class="col-12 col-sm-8">
+                                {% render_field profile_form.profile class+="form-select" %}
+                            </div>
+                            <div class="col-12 col-sm-4 d-grid">
+                                <button class="btn btn-primary">Сохранить</button>
+                            </div>
+                        </form>
+                        <div class="form-text mt-2">
+                            Текущий: <strong>{{ user_obj.user_info.get_profile_display|default:"Не установлен" }}</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <div class="text-uppercase text-muted mb-3">Документы</div>
+                        {% if documents %}
+                            <div class="fw-semibold">Последние загрузки:</div>
+                            <ul class="small text-muted mb-0">
+                                {% for d in documents %}
+                                    <li>{{ d.uploaded_at|date:"d.m.Y H:i" }}
+                                        — {{ d.caption|default:"без названия" }}</li>
+                                {% endfor %}
+                            </ul>
+                        {% else %}
+                            <div class="fw-semibold text-muted">Нет документов</div>
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -124,28 +151,12 @@
                                 </div>
                             </div>
 
-                            <div class="col-12 col-md-6">
-                                <div class="p-3 border rounded">
-                                    <div class="small text-muted">Документы</div>
-                                    {% if documents %}
-                                        <div class="fw-semibold">Последние загрузки:</div>
-                                        <ul class="small text-muted mb-0">
-                                            {% for d in documents %}
-                                                <li>{{ d.uploaded_at|date:"d.m.Y H:i" }}
-                                                    — {{ d.caption|default:"без названия" }}</li>
-                                            {% endfor %}
-                                        </ul>
-                                    {% else %}
-                                        <div class="fw-semibold text-muted">Нет документов</div>
-                                    {% endif %}
-                                </div>
-                            </div>
+
                         </div>
 
                     </div>
                 </div>
 
-                {# Форма быстрого сообщения — оставить обязательно #}
                 <div class="card">
                     <div class="card-body">
                         <h6 class="text-uppercase text-muted mb-3">Быстрое сообщение</h6>
@@ -160,11 +171,17 @@
                             </div>
                         </form>
 
-                        {% if recent_notifs %}
+                        {% if notifs_page %}
                             <hr>
-                            <div class="small text-muted mb-2">Последние оповещения:</div>
+                            <div class="small text-muted mb-2">
+                                Последние оповещения:
+                                {% if notifs_page.paginator.count %}
+                                    <span class="ms-1">({{ notifs_page.paginator.count }})</span>
+                                {% endif %}
+                            </div>
+
                             <ul class="list-group list-group-flush">
-                                {% for un in recent_notifs %}
+                                {% for un in notifs_page %}
                                     <li class="list-group-item">
                                         <div class="small text-muted">
                                             {{ un.notification.created_at|date:"d.m.Y H:i" }}
@@ -174,7 +191,45 @@
                                     </li>
                                 {% endfor %}
                             </ul>
+
+                            {% if notifs_page.paginator.num_pages > 1 %}
+                                <nav class="mt-3" aria-label="Пагинация оповещений">
+                                    <ul class="pagination pagination-sm mb-0">
+
+                                        <li class="page-item {% if not notifs_page.has_previous %}disabled{% endif %}">
+                                            {% if notifs_page.has_previous %}
+                                                <a class="page-link"
+                                                   href="?page={{ notifs_page.previous_page_number }}">←</a>
+                                            {% else %}
+                                                <span class="page-link">←</span>
+                                            {% endif %}
+                                        </li>
+
+                                        {# компактно: показываем окна вокруг текущей #}
+                                        {% for p in notifs_page.paginator.page_range %}
+                                            {% if p == 1 or p == notifs_page.paginator.num_pages or p >= notifs_page.number|add:-2 and p <= notifs_page.number|add:2 %}
+                                                <li class="page-item {% if p == notifs_page.number %}active{% endif %}">
+                                                    <a class="page-link" href="?page={{ p }}">{{ p }}</a>
+                                                </li>
+                                            {% elif p == notifs_page.number|add:-3 or p == notifs_page.number|add:3 %}
+                                                <li class="page-item disabled"><span class="page-link">…</span></li>
+                                            {% endif %}
+                                        {% endfor %}
+
+                                        <li class="page-item {% if not notifs_page.has_next %}disabled{% endif %}">
+                                            {% if notifs_page.has_next %}
+                                                <a class="page-link"
+                                                   href="?page={{ notifs_page.next_page_number }}">→</a>
+                                            {% else %}
+                                                <span class="page-link">→</span>
+                                            {% endif %}
+                                        </li>
+
+                                    </ul>
+                                </nav>
+                            {% endif %}
                         {% endif %}
+
                     </div>
                 </div>
 

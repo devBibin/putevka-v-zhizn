@@ -2,6 +2,7 @@ from django.apps import apps
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth import get_user_model
+from django.core.paginator import Paginator
 from django.http import HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
@@ -10,7 +11,7 @@ from django.views.generic import TemplateView
 
 from core.models import UserNotification, Notification
 from documents.models import Document
-from review_by_tutor.forms import StatusChangeForm
+from review_by_tutor.forms import StatusChangeForm, ProfileChangeForm
 from scholar_form.models import UserInfo
 
 User = get_user_model()
@@ -29,6 +30,7 @@ class StaffScholarDossierView(TemplateView):
             return None
 
     def get_context_data(self, **kwargs):
+        global notifs_page
         ctx = super().get_context_data(**kwargs)
         user_id = kwargs["user_id"]
 
@@ -46,6 +48,7 @@ class StaffScholarDossierView(TemplateView):
         ml = getattr(user, "motivation_letter", None)
 
         status_form = StatusChangeForm(instance=uinfo)
+        profile_form = ProfileChangeForm(instance=uinfo)
 
         questionnaire_done = bool(getattr(uinfo, "is_done", False))
 
@@ -61,13 +64,18 @@ class StaffScholarDossierView(TemplateView):
         recent_notifs = []
         if UserNotification:
             try:
-                recent_notifs = (UserNotification.objects
-                                 .select_related("notification")
-                                 .filter(recipient=user)
-                                 .order_by("-notification__created_at")[:10])
-                unseen_notifs_count = UserNotification.objects.filter(recipient=user, is_seen=False).count()
+                notifs_qs = (UserNotification.objects
+                             .select_related("notification")
+                             .filter(recipient=user)
+                             .order_by("-notification__created_at"))
+
+                unseen_notifs_count = notifs_qs.filter(is_seen=False).count()
+
+                paginator = Paginator(notifs_qs, 5)
+                page_number = self.request.GET.get("page") or 1
+                notifs_page = paginator.get_page(page_number)
             except Exception:
-                recent_notifs = []
+                notifs_page = None
                 unseen_notifs_count = 0
 
         candidates = [
@@ -80,8 +88,9 @@ class StaffScholarDossierView(TemplateView):
         if Document and hasattr(Document, "uploaded_at"):
             latest_doc = documents_qs[:1].first() if hasattr(documents_qs, "first") else None
             candidates.append(getattr(latest_doc, "uploaded_at", None))
-        if recent_notifs:
-            candidates.append(getattr(recent_notifs[0].notification, "created_at", None))
+        if notifs_page and notifs_page.object_list:
+            first_un = notifs_page.object_list[0]
+            candidates.append(getattr(first_un.notification, "created_at", None))
 
         last_action = max([d for d in candidates if d], default=None)
 
@@ -101,9 +110,10 @@ class StaffScholarDossierView(TemplateView):
             },
             "documents": documents_qs[:5],
             "notif_form": notif_form,
-            "recent_notifs": recent_notifs,
+            "notifs_page": notifs_page,
             'active': 'dossier',
-            "status_form": status_form
+            "status_form": status_form,
+            "profile_form": profile_form,
         })
         return ctx
 
@@ -170,6 +180,16 @@ def staff_scholar_action(request, user_id: int):
             messages.success(request, f"Статус обновлён: «{new}».")
         else:
             messages.error(request, "Не удалось обновить статус. Проверьте данные.")
+
+    elif action == "change_profile":
+        uinfo, _ = UserInfo.objects.get_or_create(user=user)
+        form = ProfileChangeForm(request.POST, instance=uinfo)
+        if form.is_valid():
+            u = form.save()
+            new = u.get_profile_display()
+            messages.success(request, f"Статус обновлён: «{new}».")
+        else:
+            messages.error(request, "Не удалось обновить профиль. Проверьте данные.")
 
     else:
         messages.error(request, "Неизвестное действие.")
