@@ -1,62 +1,92 @@
 {% extends "core/base.html" %}
 {% block content %}
-<script src="https://unpkg.com/htmx.org@1.9.12"></script>
-{% load widget_tweaks %}
-<div class="container mt-5 mb-5">
-    <div class="card shadow">
-        <div class="card-body">
+    <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+    {% load widget_tweaks %}
+    <div class="container mt-5 mb-5">
+        <div class="card shadow">
+            <div class="card-body">
                 <h1 class="h4 mb-4 text-center">Шаг {{ wizard.steps.step1 }} из {{ wizard.steps.count }}</h1>
                 <form method="post"
-                        action=""
-                        hx-post="{{ request.path }}"
-                        hx-trigger="change, input delay:500ms"
-                        hx-include="this"
-                        hx-vals='{"_autosave":"1"}'
-                        hx-swap="none"
-                        novalidate>
-                {% csrf_token %}
-                {{ wizard.management_form }}
+                      action=""
+                      hx-post="{{ request.path }}"
+                      hx-trigger="change, input delay:500ms"
+                      hx-include="this"
+                      hx-vals='{"_autosave":"1"}'
+                      hx-swap="none"
+                      novalidate>
+                    {% csrf_token %}
+                    {{ wizard.management_form }}
 
-                {% for field in form.visible_fields %}
-                    <div class="mb-3">
-                        <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
-                        {% if field.field.widget.input_type == 'checkbox' %}
-                            <div class="form-check">
-                                {{ field|add_class:"form-check-input" }}
-                            </div>
-                        {% else %}
-                            {{ field|add_class:"form-control" }}
+                    {% for field in form.visible_fields %}
+                        <div class="mb-3">
+                            <label for="{{ field.id_for_label }}" class="form-label d-flex align-items-center gap-1">
+                                {{ field.label }}
+
+                                {% if field.help_text %}
+                                    <span
+                                            class="text-muted"
+                                            role="button"
+                                            tabindex="0"
+                                            data-bs-toggle="tooltip"
+                                            data-bs-placement="right"
+                                            title="{{ field.help_text }}"
+                                            style="cursor: help; font-size: 0.9em;"
+                                    >
+                                        <i
+                                                class="bi bi-question-circle text-muted"
+                                                data-bs-toggle="tooltip"
+                                                style="cursor: help;"
+                                        ></i>
+                                    </span>
+                                {% endif %}
+                            </label>
+                            {% if field.field.widget.input_type == 'checkbox' %}
+                                <div class="form-check">
+                                    {{ field|add_class:"form-check-input" }}
+                                </div>
+                            {% else %}
+                                {{ field|add_class:"form-control" }}
+                            {% endif %}
+                            {% for error in field.errors %}
+                                <div class="text-danger small">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                    {% endfor %}
+
+                    {% for hidden in form.hidden_fields %}
+                        {{ hidden }}
+                    {% endfor %}
+
+                    <div class="d-flex justify-content-between">
+                        {% if wizard.steps.prev %}
+                            <button name="wizard_goto_step" type="submit"
+                                    value="{{ wizard.steps.prev }}" class="btn btn-outline-secondary">
+                                Назад
+                            </button>
                         {% endif %}
-                        {% if field.help_text %}
-                            <div class="form-text">{{ field.help_text }}</div>
-                        {% endif %}
-                        {% for error in field.errors %}
-                            <div class="text-danger small">{{ error }}</div>
-                        {% endfor %}
-                    </div>
-                {% endfor %}
-
-                {% for hidden in form.hidden_fields %}
-                    {{ hidden }}
-                {% endfor %}
-
-                <div class="d-flex justify-content-between">
-                    {% if wizard.steps.prev %}
-                        <button name="wizard_goto_step" type="submit"
-                                value="{{ wizard.steps.prev }}" class="btn btn-outline-secondary">
-                            Назад
+                        <button type="submit" class="btn btn-primary ms-auto">
+                            {% if wizard.steps.current == wizard.steps.last %}
+                                Отправить
+                            {% else %}
+                                Далее
+                            {% endif %}
                         </button>
-                    {% endif %}
-                    <button type="submit" class="btn btn-primary ms-auto">
-                        {% if wizard.steps.current == wizard.steps.last %}
-                            Отправить
-                        {% else %}
-                            Далее
-                        {% endif %}
-                    </button>
-                </div>
+                    </div>
                 </form>
+            </div>
         </div>
     </div>
-</div>
+{% endblock %}
+
+{% block extra_js %}
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const tooltipTriggerList = [].slice.call(
+                document.querySelectorAll('[data-bs-toggle="tooltip"]')
+            );
+            tooltipTriggerList.forEach(function (el) {
+                new bootstrap.Tooltip(el);
+            });
+        });
+    </script>
 {% endblock %}
