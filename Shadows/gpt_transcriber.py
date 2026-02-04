@@ -28,7 +28,47 @@ POLLING_INTERVAL = int(os.getenv("INTERVIEW_TRANSCRIBE_POLLING_INTERVAL", 60))
 BATCH_LIMIT = int(os.getenv("INTERVIEW_TRANSCRIBE_BATCH_LIMIT", 2))
 LANGUAGE = os.getenv("INTERVIEW_TRANSCRIBE_LANGUAGE", "ru").strip() or None
 
+MAX_MODEL_AUDIO_SECONDS = int(os.getenv("OPENAI_TRANSCRIBE_MAX_SECONDS", 1400))
+CHUNK_SECONDS = int(os.getenv("OPENAI_TRANSCRIBE_CHUNK_SECONDS", 1100))
+CHUNK_OVERLAP_SECONDS = int(os.getenv("OPENAI_TRANSCRIBE_CHUNK_OVERLAP_SECONDS", 2))
+
 client = OpenAI(api_key=OPENAI_API_KEY)
+
+
+def _probe_duration_seconds(media_path: str) -> float:
+    cmd = [
+        "ffprobe",
+        "-v", "error",
+        "-show_entries", "format=duration",
+        "-of", "default=noprint_wrappers=1:nokey=1",
+        media_path,
+    ]
+    p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    if p.returncode != 0:
+        raise RuntimeError(f"ffprobe failed ({p.returncode})\n{p.stderr}")
+    out = (p.stdout or "").strip()
+    try:
+        return float(out)
+    except ValueError:
+        raise RuntimeError(f"ffprobe returned non-float duration: {out!r}")
+
+
+def _extract_audio_chunk(video_path: str, audio_path: str, start_sec: int, duration_sec: int) -> None:
+    cmd = [
+        "ffmpeg", "-y",
+        "-ss", str(start_sec),
+        "-t", str(duration_sec),
+        "-i", video_path,
+        "-vn",
+        "-ac", "1",
+        "-ar", "16000",
+        "-c:a", "pcm_s16le",
+        audio_path,
+    ]
+    p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    if p.returncode != 0:
+        raise RuntimeError(f"ffmpeg chunk extract failed ({p.returncode})\n{p.stderr}")
+
 
 
 def _extract_audio(video_path: str, audio_path: str) -> None:
@@ -38,31 +78,58 @@ def _extract_audio(video_path: str, audio_path: str) -> None:
         "-vn",
         "-ac", "1",
         "-ar", "16000",
-        "-b:a", "64k",
+        "-c:a", "pcm_s16le",
         audio_path,
     ]
-    subprocess.run(cmd, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    p = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    if p.returncode != 0:
+        raise RuntimeError(f"ffmpeg failed ({p.returncode})\n{p.stderr}")
+
+def _transcribe_audio_file(audio_path: str) -> str:
+    with open(audio_path, "rb") as f:
+        kwargs = {"model": OPENAI_TRANSCRIBE_MODEL, "file": f}
+        if LANGUAGE:
+            kwargs["language"] = LANGUAGE
+        result = client.audio.transcriptions.create(**kwargs)
+
+    text = getattr(result, "text", None)
+    return text or str(result)
 
 
 def transcribe_video_file(video_path: str) -> str:
+    video_duration = _probe_duration_seconds(video_path)
+
+    if video_duration <= MAX_MODEL_AUDIO_SECONDS:
+        with tempfile.TemporaryDirectory() as tmp:
+            audio_path = os.path.join(tmp, "audio.wav")
+            _extract_audio(video_path, audio_path)
+            return _transcribe_audio_file(audio_path)
+
+    parts: list[str] = []
     with tempfile.TemporaryDirectory() as tmp:
-        audio_path = os.path.join(tmp, "audio.mp3")
-        _extract_audio(video_path, audio_path)
+        step = max(1, CHUNK_SECONDS - CHUNK_OVERLAP_SECONDS)
 
-        with open(audio_path, "rb") as f:
-            kwargs = {
-                "model": OPENAI_TRANSCRIBE_MODEL,
-                "file": f,
-            }
-            if LANGUAGE:
-                kwargs["language"] = LANGUAGE
+        start = 0
+        idx = 0
+        total_int = int(video_duration) + 1
 
-            result = client.audio.transcriptions.create(**kwargs)
+        while start < total_int:
+            dur = min(CHUNK_SECONDS, total_int - start)
+            audio_chunk_path = os.path.join(tmp, f"chunk_{idx:03d}.wav")
 
-    text = getattr(result, "text", None)
-    if not text:
-        text = str(result)
-    return text
+            _extract_audio_chunk(video_path, audio_chunk_path, start_sec=start, duration_sec=dur)
+
+            chunk_text = _transcribe_audio_file(audio_chunk_path).strip()
+
+            hh = start // 3600
+            mm = (start % 3600) // 60
+            ss = start % 60
+            parts.append(f"[{hh:02d}:{mm:02d}:{ss:02d}]\n{chunk_text}\n")
+
+            idx += 1
+            start += step
+
+    return "\n".join(parts).strip()
 
 
 def pick_interviews_to_transcribe():
