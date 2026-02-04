@@ -70,7 +70,8 @@
                             </div>
                         </form>
                         <div class="form-text mt-2">
-                            Текущий: <strong>{{ user_obj.user_info.get_profile_display|default:"Не установлен" }}</strong>
+                            Текущий:
+                            <strong>{{ user_obj.user_info.get_profile_display|default:"Не установлен" }}</strong>
                         </div>
                     </div>
                 </div>
@@ -119,6 +120,15 @@
                                         {% else %}
                                             <div class="fw-semibold text-success">Есть (оценена/просмотрена)</div>
                                         {% endif %}
+
+                                        <div class="small text-muted mt-1">
+                                            Баллы:
+                                            {% if summary.video_score is not None %}
+                                                <span class="fw-semibold">{{ summary.video_score }}</span>
+                                            {% else %}
+                                                —
+                                            {% endif %}
+                                        </div>
                                     {% else %}
                                         <div class="fw-semibold text-muted">Нет</div>
                                     {% endif %}
@@ -134,6 +144,15 @@
                                         {% else %}
                                             <div class="fw-semibold text-success">Есть (обработано)</div>
                                         {% endif %}
+
+                                        <div class="small text-muted mt-1">
+                                            Баллы:
+                                            {% if summary.ml_score is not None %}
+                                                <span class="fw-semibold">{{ summary.ml_score }}</span>
+                                            {% else %}
+                                                —
+                                            {% endif %}
+                                        </div>
                                     {% else %}
                                         <div class="fw-semibold text-muted">Нет</div>
                                     {% endif %}

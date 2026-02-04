@@ -47,6 +47,9 @@ class StaffScholarDossierView(TemplateView):
         video = getattr(user, "scholar_video", None)
         ml = getattr(user, "motivation_letter", None)
 
+        video_score = getattr(video, "score", None) if video else None
+        ml_score = getattr(ml, "admin_score", None) if ml else None
+
         status_form = StatusChangeForm(instance=uinfo)
         profile_form = ProfileChangeForm(instance=uinfo)
 
@@ -107,6 +110,8 @@ class StaffScholarDossierView(TemplateView):
                 "ml_needs_review": ml_needs_review,
                 "unseen_notifs_count": unseen_notifs_count,
                 "last_action": last_action,
+                "video_score": video_score,
+                "ml_score": ml_score,
             },
             "documents": documents_qs[:5],
             "notif_form": notif_form,
