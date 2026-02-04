@@ -1,13 +1,16 @@
 import logging
 
+from django.core.mail import EmailMultiAlternatives
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 from django.urls import reverse
 from telebot import TeleBot
 
 import config
+from Putevka import settings
 from core.bot import send_tg_notification_to_user
 from core.models import MotivationLetter
+from core.services.email_service import send_email_to_user
 from scholar_form.models import UserInfo, UserPersonalData
 
 TELEGRAM_STAFF_CHAT_IDS = config.TELEGRAM_STAFF_CHAT_IDS
@@ -25,6 +28,9 @@ TELEGRAM_CHAT_IDS = app_config.TELEGRAM_STAFF_CHAT_IDS
 BASE_URL = config.BASE_URL
 
 logger = logging.getLogger(__name__)
+
+
+
 
 
 @receiver(post_save, sender=MotivationLetter)
@@ -78,6 +84,20 @@ def notify_on_rating_change(sender, instance, created, **kwargs):
             user_url,
             button_text="📄 Посмотреть письмо"
         )
+
+        send_email_to_user(
+            subject="Ваше мотивационное письмо оценено",
+            user=instance.user,
+            text=(
+                "Ваше мотивационное письмо оценено.\n"
+                f"Открыть письмо: {user_url}\n"
+            ),
+            html=(
+                "✅ <b>Ваше мотивационное письмо оценено!</b><br>"
+                f"Открыть письмо: <a href='{user_url}'>перейти к письму</a>"
+            )
+        )
+
         logger.info(f"TG: уведомление об оценке письма {instance.pk} отправлено пользователю {instance.user}")
     except Exception as e:
         logger.warning(e)

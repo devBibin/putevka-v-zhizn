@@ -42,6 +42,7 @@ class PersonalForm(forms.ModelForm):
         input_formats=['%Y-%m-%d'],
         label='Дата рождения',
         required=True,
+        help_text="От рождества Христова"
     )
 
     class Meta:

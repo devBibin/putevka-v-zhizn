@@ -8,6 +8,7 @@ from telebot import TeleBot
 import config
 from core.bot import send_tg_notification_to_user
 from core.models import UserNotification
+from core.services.email_service import send_email_to_user
 from .models import Document
 
 TG_TOKEN_ADMIN = config.TG_TOKEN_ADMIN
@@ -95,6 +96,9 @@ def notify_telegram_on_status_change(sender, instance: Document, **kwargs):
         old_display = old.status
         new_display = instance.status
 
+    document_name = old.caption or os.path.basename(old.file.name)
+    full_url = f"{BASE_URL}{document_url}"
+
     message_text = (
         f"Изменён статус документа:\n"
         f"Документ: '{old.caption or os.path.basename(old.file.name)}'\n"
@@ -104,6 +108,23 @@ def notify_telegram_on_status_change(sender, instance: Document, **kwargs):
 
     send_tg_notification_to_user(message_text, instance.user, url=f"{BASE_URL}{document_url}",
                                  button_text="Открыть документ")
+
+    send_email_to_user(
+        subject="Изменён статус документа",
+        user=instance.user,
+        text=(
+            "Изменён статус документа.\n\n"
+            f"Документ: {document_name}\n"
+            f"Статус: {old_display} → {new_display}\n"
+            f"Открыть: {full_url}\n"
+        ),
+        html=(
+            "<b>Изменён статус документа</b><br><br>"
+            f"Документ: <b>{document_name}</b><br>"
+            f"Статус: {old_display} → <b>{new_display}</b><br>"
+            f"<a href='{full_url}'>Открыть документ</a>"
+        ),
+    )
 
     logger.info(
         f"Статус документа ID={instance.pk} изменён: {old.status} -> {instance.status}"
@@ -119,20 +140,44 @@ def notify_telegram_on_notification(sender, instance, created, **kwargs):
     user = instance.recipient
 
     msg = (
-        f"📬 <b>Новое уведомление!</b>\n\n"
+        "📬 <b>Новое уведомление!</b>\n\n"
         f"{notif.message}\n\n"
         f"👤 <b>Отправитель:</b> {notif.sender}\n"
         f"🕒 <b>Время:</b> {notif.created_at:%d.%m.%Y %H:%M}"
     )
 
+    site_url = f"{BASE_URL}"
+
     def _send():
         send_tg_notification_to_user(
             user,
             msg,
-            url=f"{BASE_URL}",
-            button_text="🌐 Открыть сайт"
+            url=site_url,
+            button_text="🌐 Открыть сайт",
         )
-        logger.debug(f"TG уведомление (through) отправлено {user.username} по Notification(id={notif.pk})")
+        logger.debug(
+            f"TG уведомление (through) отправлено {user.username} "
+            f"по Notification(id={notif.pk})"
+        )
+
+        send_email_to_user(
+            subject="Новое уведомление",
+            user=user,
+            text=(
+                "У вас новое уведомление.\n\n"
+                f"{notif.message}\n\n"
+                f"Отправитель: {notif.sender}\n"
+                f"Время: {notif.created_at:%d.%m.%Y %H:%M}\n\n"
+                f"Открыть сайт: {site_url}"
+            ),
+            html=(
+                "<b>📬 Новое уведомление!</b><br><br>"
+                f"{notif.message}<br><br>"
+                f"<b>Отправитель:</b> {notif.sender}<br>"
+                f"<b>Время:</b> {notif.created_at:%d.%m.%Y %H:%M}<br><br>"
+                f"<a href='{site_url}'>🌐 Открыть сайт</a>"
+            ),
+        )
 
     from django.db import transaction
     transaction.on_commit(_send)
