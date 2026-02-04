@@ -28,7 +28,7 @@ class ProfileChangeForm(forms.ModelForm):
 class MotivationLetterStaffForm(forms.ModelForm):
     class Meta:
         model = MotivationLetter
-        fields = ["admin_score", "admin_rating", "is_done"]
+        fields = ["admin_score", "admin_rating",]
         widgets = {
             "admin_rating": forms.Textarea(attrs={
                 "rows": 6,
@@ -39,7 +39,6 @@ class MotivationLetterStaffForm(forms.ModelForm):
         labels = {
             "admin_score": "Оценка администратора",
             "admin_rating": "Фидбэк администратора",
-            "is_done": "Письмо принято",
         }
 
 
@@ -199,3 +198,67 @@ class LetterRevisionForm(forms.Form):
         widget=forms.Textarea(attrs={"rows": 4}),
         required=True
     )
+
+
+from django import forms
+from core.models import MotivationLetterRubricReview
+
+
+class MotivationLetterRubricReviewStaffForm(forms.ModelForm):
+    class Meta:
+        model = MotivationLetterRubricReview
+        fields = [
+            # computed/meta
+            "total_score",
+            "word_count",
+
+            # content
+            "specialty_choice",
+            "university_choice",
+            "current_preparation",
+            "next_year_plan",
+            "higher_ed_value",
+            "support_criticality",
+
+            # rhetoric
+            "composition",
+            "style_precision",
+
+            # literacy
+            "orthography",
+            "syntax",
+
+            # extractions
+            "family",
+            "hobbies",
+            "achievements",
+            "traits",
+            "school_teachers",
+            "prep_subjects",
+            "specialty",
+            "preferred_universities",
+            "relocation",
+            "olympiads",
+            "motivation",
+            "help_criticality",
+            "extra",
+
+            # justification
+            "justification",
+        ]
+        widgets = {
+            "justification": forms.Textarea(attrs={"rows": 6}),
+            "family": forms.Textarea(attrs={"rows": 2}),
+            "hobbies": forms.Textarea(attrs={"rows": 2}),
+            "achievements": forms.Textarea(attrs={"rows": 2}),
+            "traits": forms.Textarea(attrs={"rows": 2}),
+            "school_teachers": forms.Textarea(attrs={"rows": 2}),
+            "prep_subjects": forms.Textarea(attrs={"rows": 2}),
+            "specialty": forms.Textarea(attrs={"rows": 2}),
+            "preferred_universities": forms.Textarea(attrs={"rows": 2}),
+            "relocation": forms.Textarea(attrs={"rows": 2}),
+            "olympiads": forms.Textarea(attrs={"rows": 2}),
+            "motivation": forms.Textarea(attrs={"rows": 2}),
+            "help_criticality": forms.Textarea(attrs={"rows": 2}),
+            "extra": forms.Textarea(attrs={"rows": 2}),
+        }

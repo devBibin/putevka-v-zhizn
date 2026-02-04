@@ -166,120 +166,271 @@
                     </div>
                 </div>
 
-                {# --- GPT: Детали рубрики --- #}
-                {% if readonly %}
-                    {% if readonly.gpt_json %}
-                        {% with j=readonly.gpt_json c=readonly.gpt_json.content r=readonly.gpt_json.rhetoric l=readonly.gpt_json.literacy e=readonly.gpt_json.extractions %}
-                            <div class="card shadow-sm mb-4 h-100">
-                                <div class="card-header">Детали рубрики</div>
-                                <div class="card-body">
-                                    <div class="row g-3 row-cols-1 row-cols-lg-3 align-items-start">
-                                        <div class="col">
-                                            <div class="fw-semibold mb-2">Содержание (6 пунктов)</div>
-                                            <ul class="list-unstyled mb-0 small">
-                                                <li class="mb-1">Специальность:
-                                                    <span class="text-wrap-anywhere">{{ c.specialty_choice|default:"—" }}</span>
-                                                </li>
-                                                <li class="mb-1">ВУЗ:
-                                                    <span class="text-wrap-anywhere">{{ c.university_choice|default:"—" }}</span>
-                                                </li>
-                                                <li class="mb-1">Подготовка сейчас:
-                                                    <span class="text-wrap-anywhere">{{ c.current_preparation|default:"—" }}</span>
-                                                </li>
-                                                <li class="mb-1">Планы на год:
-                                                    <span class="text-wrap-anywhere">{{ c.next_year_plan|default:"—" }}</span>
-                                                </li>
-                                                <li class="mb-1">Ценность высшего:
-                                                    <span class="text-wrap-anywhere">{{ c.higher_ed_value|default:"—" }}</span>
-                                                </li>
-                                                <li class="mb-0">Критичность поддержки:
-                                                    <span class="text-wrap-anywhere">{{ c.support_criticality|default:"—" }}</span>
-                                                </li>
-                                            </ul>
-                                        </div>
+                {% if rubric_review %}
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header d-flex align-items-center">
+                            <div class="fw-semibold">Редактирование рубрики</div>
+                            <div class="ms-auto small text-muted">
+                                {{ rubric_review.model_name|default:"—" }}
+                                • {{ rubric_review.schema_version|default:"—" }}
+                            </div>
+                        </div>
 
-                                        <div class="col">
-                                            <div class="fw-semibold mb-2">Речь</div>
-                                            <ul class="list-unstyled mb-3 small">
-                                                <li class="mb-1">Композиция:
-                                                    <span class="text-wrap-anywhere">{{ r.composition|default:"—" }}</span>
-                                                </li>
-                                                <li class="mb-0">Точность стиля:
-                                                    <span class="text-wrap-anywhere">{{ r.style_precision|default:"—" }}</span>
-                                                </li>
-                                            </ul>
+                        <div class="card-body">
+                            {% if rubric_form %}
+                                <form method="post">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="action_rubric_save" value="1">
 
-                                            <div class="fw-semibold mb-2">Грамотность</div>
-                                            <ul class="list-unstyled mb-0 small">
-                                                <li class="mb-1">Орфография:
-                                                    <span class="text-wrap-anywhere">{{ l.orthography|default:"—" }}</span>
-                                                </li>
-                                                <li class="mb-0">Синтаксис:
-                                                    <span class="text-wrap-anywhere">{{ l.syntax|default:"—" }}</span>
-                                                </li>
-                                            </ul>
-                                        </div>
+                                    {# Верхняя панель: главное + кнопка #}
+                                    <div class="p-3 border rounded mb-3 bg-body-tertiary">
+                                        <div class="row g-2 align-items-end">
+                                            <div class="col-12 col-lg-3">
+                                                <label class="form-label mb-1">{{ rubric_form.total_score.label }}</label>
+                                                {{ rubric_form.total_score|add_class:"form-control" }}
+                                                {% if rubric_form.total_score.errors %}
+                                                    <div class="text-danger small mt-1">{{ rubric_form.total_score.errors }}</div>
+                                                {% endif %}
+                                            </div>
 
-                                        <div class="col">
-                                            <div class="fw-semibold mb-2">Сжатые сведения</div>
-                                            <div class="small text-muted mb-2">для профиля/анкеты</div>
-                                            <ul class="list-unstyled mb-0 small">
-                                                <li class="mb-1">Семья: <span
-                                                        class="text-wrap-anywhere">{{ e.family|default:"—" }}</span>
-                                                </li>
-                                                <li class="mb-1">Хобби: <span
-                                                        class="text-wrap-anywhere">{{ e.hobbies|default:"—" }}</span>
-                                                </li>
-                                                <li class="mb-1">Достижения: <span
-                                                        class="text-wrap-anywhere">{{ e.achievements|default:"—" }}</span>
-                                                </li>
-                                                <li class="mb-1">Черты: <span
-                                                        class="text-wrap-anywhere">{{ e.traits|default:"—" }}</span>
-                                                </li>
-                                                <li class="mb-1">Учителя: <span
-                                                        class="text-wrap-anywhere">{{ e.school_teachers|default:"—" }}</span>
-                                                </li>
-                                                <li class="mb-1">Предметы: <span
-                                                        class="text-wrap-anywhere">{{ e.prep_subjects|default:"—" }}</span>
-                                                </li>
-                                                <li class="mb-1">Специальность: <span
-                                                        class="text-wrap-anywhere">{{ e.specialty|default:"—" }}</span>
-                                                </li>
-                                                <li class="mb-1">ВУЗы: <span
-                                                        class="text-wrap-anywhere">{{ e.preferred_universities|default:"—" }}</span>
-                                                </li>
-                                                <li class="mb-1">Переезд: <span
-                                                        class="text-wrap-anywhere">{{ e.relocation|default:"—" }}</span>
-                                                </li>
-                                                <li class="mb-1">Олимпиады: <span
-                                                        class="text-wrap-anywhere">{{ e.olympiads|default:"—" }}</span>
-                                                </li>
-                                                <li class="mb-1">Мотивация: <span
-                                                        class="text-wrap-anywhere">{{ e.motivation|default:"—" }}</span>
-                                                </li>
-                                                <li class="mb-1">Критичность помощи: <span
-                                                        class="text-wrap-anywhere">{{ e.help_criticality|default:"—" }}</span>
-                                                </li>
-                                                <li class="mb-0">Дополнительно: <span
-                                                        class="text-wrap-anywhere">{{ e.extra|default:"—" }}</span></li>
-                                            </ul>
+                                            <div class="col-12 col-lg-3">
+                                                <label class="form-label mb-1">{{ rubric_form.word_count.label }}</label>
+                                                {{ rubric_form.word_count|add_class:"form-control" }}
+                                                {% if rubric_form.word_count.errors %}
+                                                    <div class="text-danger small mt-1">{{ rubric_form.word_count.errors }}</div>
+                                                {% endif %}
+                                            </div>
+
+                                            <div class="col-12 col-lg-3">
+                                                <label class="form-label mb-1">{{ rubric_form.model_name.label }}</label>
+                                                {{ rubric_form.model_name|add_class:"form-control" }}
+                                            </div>
+
+                                            <div class="col-12 col-lg-3">
+                                                <label class="form-label mb-1">{{ rubric_form.schema_version.label }}</label>
+                                                {{ rubric_form.schema_version|add_class:"form-control" }}
+                                            </div>
+
+                                            <div class="col-12 d-flex gap-2 mt-2">
+                                                <button class="btn btn-primary" type="submit" name="action_rubric_save">
+                                                    <i class="bi bi-save me-1"></i> Сохранить
+                                                </button>
+                                                <a class="btn btn-outline-secondary" href="">
+                                                    Отменить
+                                                </a>
+                                            </div>
                                         </div>
                                     </div>
 
-                                    {% if j.justification %}
-                                        <hr class="my-3">
-                                        <div class="fw-semibold mb-2">Пояснение</div>
-                                        <pre class="mb-0 json-pre overflow-auto">{{ j.justification }}</pre>
-                                    {% endif %}
-                                </div>
-                            </div>
-                        {% endwith %}
-                    {% endif %}
-                {% endif %}
+                                    {# Аккордеон: секции #}
+                                    <div class="accordion" id="rubricAccordion">
 
+                                        {# 1) Содержание #}
+                                        <div class="accordion-item">
+                                            <h2 class="accordion-header" id="rubricHeadContent">
+                                                <button class="accordion-button" type="button" data-bs-toggle="collapse"
+                                                        data-bs-target="#rubricContent" aria-expanded="true"
+                                                        aria-controls="rubricContent">
+                                                    Содержание (6 пунктов)
+                                                </button>
+                                            </h2>
+                                            <div id="rubricContent"
+                                                 class="accordion-collapse collapse show"
+                                                 aria-labelledby="rubricHeadContent">
+                                                <div class="accordion-body">
+                                                    <div class="row g-3">
+                                                        <div class="col-12 col-lg-6">
+                                                            <label class="form-label">{{ rubric_form.specialty_choice.label }}</label>
+                                                            {{ rubric_form.specialty_choice|add_class:"form-select" }}
+                                                        </div>
+                                                        <div class="col-12 col-lg-6">
+                                                            <label class="form-label">{{ rubric_form.university_choice.label }}</label>
+                                                            {{ rubric_form.university_choice|add_class:"form-select" }}
+                                                        </div>
+                                                        <div class="col-12 col-lg-6">
+                                                            <label class="form-label">{{ rubric_form.current_preparation.label }}</label>
+                                                            {{ rubric_form.current_preparation|add_class:"form-select" }}
+                                                        </div>
+                                                        <div class="col-12 col-lg-6">
+                                                            <label class="form-label">{{ rubric_form.next_year_plan.label }}</label>
+                                                            {{ rubric_form.next_year_plan|add_class:"form-select" }}
+                                                        </div>
+                                                        <div class="col-12 col-lg-6">
+                                                            <label class="form-label">{{ rubric_form.higher_ed_value.label }}</label>
+                                                            {{ rubric_form.higher_ed_value|add_class:"form-select" }}
+                                                        </div>
+                                                        <div class="col-12 col-lg-6">
+                                                            <label class="form-label">{{ rubric_form.support_criticality.label }}</label>
+                                                            {{ rubric_form.support_criticality|add_class:"form-select" }}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {# 2) Речь и грамотность #}
+                                        <div class="accordion-item">
+                                            <h2 class="accordion-header" id="rubricHeadLang">
+                                                <button class="accordion-button collapsed" type="button"
+                                                        data-bs-toggle="collapse"
+                                                        data-bs-target="#rubricLang" aria-expanded="false"
+                                                        aria-controls="rubricLang">
+                                                    Речь и грамотность
+                                                </button>
+                                            </h2>
+                                            <div id="rubricLang" class="accordion-collapse collapse"
+                                                 aria-labelledby="rubricHeadLang">
+                                                <div class="accordion-body">
+                                                    <div class="row g-3">
+                                                        <div class="col-12 col-lg-6">
+                                                            <div class="fw-semibold mb-2">Речь</div>
+                                                            <label class="form-label">{{ rubric_form.composition.label }}</label>
+                                                            {{ rubric_form.composition|add_class:"form-select" }}
+
+                                                            <div class="mt-3">
+                                                                <label class="form-label">{{ rubric_form.style_precision.label }}</label>
+                                                                {{ rubric_form.style_precision|add_class:"form-select" }}
+                                                            </div>
+                                                        </div>
+
+                                                        <div class="col-12 col-lg-6">
+                                                            <div class="fw-semibold mb-2">Грамотность</div>
+                                                            <label class="form-label">{{ rubric_form.orthography.label }}</label>
+                                                            {{ rubric_form.orthography|add_class:"form-select" }}
+
+                                                            <div class="mt-3">
+                                                                <label class="form-label">{{ rubric_form.syntax.label }}</label>
+                                                                {{ rubric_form.syntax|add_class:"form-select" }}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {# 3) Экстракции #}
+                                        <div class="accordion-item">
+                                            <h2 class="accordion-header" id="rubricHeadExtract">
+                                                <button class="accordion-button collapsed" type="button"
+                                                        data-bs-toggle="collapse"
+                                                        data-bs-target="#rubricExtract" aria-expanded="false"
+                                                        aria-controls="rubricExtract">
+                                                    Сжатые сведения (для профиля)
+                                                </button>
+                                            </h2>
+                                            <div id="rubricExtract" class="accordion-collapse collapse"
+                                                 aria-labelledby="rubricHeadExtract">
+                                                <div class="accordion-body">
+                                                    <div class="row g-2">
+                                                        <div class="col-12 col-lg-6">
+                                                            <label class="form-label">{{ rubric_form.family.label }}</label>
+                                                            {{ rubric_form.family|add_class:"form-control" }}
+                                                        </div>
+                                                        <div class="col-12 col-lg-6">
+                                                            <label class="form-label">{{ rubric_form.hobbies.label }}</label>
+                                                            {{ rubric_form.hobbies|add_class:"form-control" }}
+                                                        </div>
+
+                                                        <div class="col-12 col-lg-6">
+                                                            <label class="form-label">{{ rubric_form.achievements.label }}</label>
+                                                            {{ rubric_form.achievements|add_class:"form-control" }}
+                                                        </div>
+                                                        <div class="col-12 col-lg-6">
+                                                            <label class="form-label">{{ rubric_form.traits.label }}</label>
+                                                            {{ rubric_form.traits|add_class:"form-control" }}
+                                                        </div>
+
+                                                        <div class="col-12 col-lg-6">
+                                                            <label class="form-label">{{ rubric_form.school_teachers.label }}</label>
+                                                            {{ rubric_form.school_teachers|add_class:"form-control" }}
+                                                        </div>
+                                                        <div class="col-12 col-lg-6">
+                                                            <label class="form-label">{{ rubric_form.prep_subjects.label }}</label>
+                                                            {{ rubric_form.prep_subjects|add_class:"form-control" }}
+                                                        </div>
+
+                                                        <div class="col-12 col-lg-6">
+                                                            <label class="form-label">{{ rubric_form.specialty.label }}</label>
+                                                            {{ rubric_form.specialty|add_class:"form-control" }}
+                                                        </div>
+                                                        <div class="col-12 col-lg-6">
+                                                            <label class="form-label">{{ rubric_form.preferred_universities.label }}</label>
+                                                            {{ rubric_form.preferred_universities|add_class:"form-control" }}
+                                                        </div>
+
+                                                        <div class="col-12 col-lg-6">
+                                                            <label class="form-label">{{ rubric_form.relocation.label }}</label>
+                                                            {{ rubric_form.relocation|add_class:"form-control" }}
+                                                        </div>
+                                                        <div class="col-12 col-lg-6">
+                                                            <label class="form-label">{{ rubric_form.olympiads.label }}</label>
+                                                            {{ rubric_form.olympiads|add_class:"form-control" }}
+                                                        </div>
+
+                                                        <div class="col-12 col-lg-6">
+                                                            <label class="form-label">{{ rubric_form.motivation.label }}</label>
+                                                            {{ rubric_form.motivation|add_class:"form-control" }}
+                                                        </div>
+                                                        <div class="col-12 col-lg-6">
+                                                            <label class="form-label">{{ rubric_form.help_criticality.label }}</label>
+                                                            {{ rubric_form.help_criticality|add_class:"form-control" }}
+                                                        </div>
+
+                                                        <div class="col-12">
+                                                            <label class="form-label">{{ rubric_form.extra.label }}</label>
+                                                            {{ rubric_form.extra|add_class:"form-control" }}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {# 4) Пояснение #}
+                                        <div class="accordion-item">
+                                            <h2 class="accordion-header" id="rubricHeadJust">
+                                                <button class="accordion-button collapsed" type="button"
+                                                        data-bs-toggle="collapse"
+                                                        data-bs-target="#rubricJust" aria-expanded="false"
+                                                        aria-controls="rubricJust">
+                                                    Пояснение / комментарий
+                                                </button>
+                                            </h2>
+                                            <div id="rubricJust" class="accordion-collapse collapse"
+                                                 aria-labelledby="rubricHeadJust">
+                                                <div class="accordion-body">
+                                                    <label class="form-label">{{ rubric_form.justification.label }}</label>
+                                                    {{ rubric_form.justification|add_class:"form-control" }}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                    </div>
+
+                                    {# Нижняя панель: ещё одна кнопка, чтобы не скроллить наверх #}
+                                    <div class="d-flex gap-2 mt-3">
+                                        <button class="btn btn-primary" type="submit" name="action_rubric_save">
+                                            <i class="bi bi-save me-1"></i> Сохранить
+                                        </button>
+                                    </div>
+
+                                </form>
+                            {% else %}
+                                <div class="alert alert-info mb-0">Форма рубрики недоступна.</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% else %}
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header">Рубрика (автооценка)</div>
+                        <div class="card-body">
+                            <div class="alert alert-info mb-0">
+                                Авторазбор по рубрике пока не сформирован (или ещё не сохранён воркером).
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
 
             </div>
         </div>
-    </div>
     </div>
 {% endblock %}

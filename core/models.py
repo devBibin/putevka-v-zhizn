@@ -196,50 +196,6 @@ class MotivationLetter(models.Model):
         blank=True,
     )
 
-    gpt_review = models.TextField(
-        verbose_name="Обзор от ChatGPT",
-        null=True,
-        blank=True,
-        help_text="Краткая сводка оценки (для интерфейса)."
-    )
-    gpt_score = models.IntegerField(
-        null=True,
-        blank=True,
-        verbose_name="Итоговый балл GPT (0–60)"
-    )
-    gpt_word_count = models.IntegerField(
-        null=True,
-        blank=True,
-        verbose_name="Количество слов по версии GPT"
-    )
-    gpt_json = models.JSONField(
-        null=True,
-        blank=True,
-        verbose_name="Структурированный разбор GPT"
-    )
-    gpt_flags = models.JSONField(
-        null=True,
-        blank=True,
-        verbose_name="Флаги автооценки"
-    )
-    gpt_model = models.CharField(
-        max_length=64,
-        null=True,
-        blank=True,
-        verbose_name="Модель GPT"
-    )
-    gpt_version = models.CharField(
-        max_length=32,
-        null=True,
-        blank=True,
-        verbose_name="Версия рубрики/скрипта"
-    )
-    gpt_scored_at = models.DateTimeField(
-        null=True,
-        blank=True,
-        verbose_name="Время автооценки"
-    )
-
     revision_comment = models.TextField(
         null=True, blank=True,
         verbose_name="Комментарий на доработку (видит соискатель)"
@@ -341,6 +297,153 @@ class MotivationLetter(models.Model):
     def __str__(self):
         return f"Письмо от {self.user.username} - {self.created_at.strftime('%Y-%m-%d')}"
 
+
+class MotivationLetterRubricReview(models.Model):
+    class ContentGrade(models.TextChoices):
+        FULL = "full", "Полное раскрытие"
+        PARTIAL = "partial", "Частично"
+        NONE = "none", "Не раскрыто"
+
+    class CompositionGrade(models.TextChoices):
+        GOOD = "good", "Хорошая"
+        MINOR = "minor_issue", "Незначительные проблемы"
+        MAJOR = "major_issue", "Серьёзные проблемы"
+
+    class StylePrecisionGrade(models.TextChoices):
+        GOOD = "good", "Точный стиль"
+        ONE_DIM = "one_dimensional_or_imprecise", "Однообразный / неточный"
+        POOR = "poor", "Плохой стиль"
+
+    class OrthographyGrade(models.TextChoices):
+        NONE = "none", "Ошибок нет"
+        ONE_TWO = "one_two", "1–2 ошибки"
+        THREE_PLUS = "three_plus", "3 и более ошибок"
+
+    class SyntaxGrade(models.TextChoices):
+        NONE = "none", "Ошибок нет"
+        ONE = "one", "1 ошибка"
+        TWO_PLUS = "two_plus", "2 и более ошибок"
+
+    letter = models.OneToOneField(
+        MotivationLetter,
+        on_delete=models.CASCADE,
+        related_name="rubric_review",
+        verbose_name="Мотивационное письмо",
+    )
+
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Дата оценки",
+    )
+
+    model_name = models.CharField(
+        max_length=64,
+        blank=True,
+        default="",
+        verbose_name="Модель ИИ",
+    )
+
+    schema_version = models.CharField(
+        max_length=32,
+        blank=True,
+        default="v1",
+        verbose_name="Версия рубрики",
+    )
+
+    word_count = models.PositiveIntegerField(
+        default=0,
+        verbose_name="Количество слов",
+    )
+
+    total_score = models.IntegerField(
+        default=0,
+        verbose_name="Итоговый балл",
+    )
+
+    specialty_choice = models.CharField(
+        max_length=16,
+        choices=ContentGrade.choices,
+        verbose_name="Выбор специальности",
+    )
+    university_choice = models.CharField(
+        max_length=16,
+        choices=ContentGrade.choices,
+        verbose_name="Выбор университета",
+    )
+    current_preparation = models.CharField(
+        max_length=16,
+        choices=ContentGrade.choices,
+        verbose_name="Текущая подготовка",
+    )
+    next_year_plan = models.CharField(
+        max_length=16,
+        choices=ContentGrade.choices,
+        verbose_name="План на следующий год",
+    )
+    higher_ed_value = models.CharField(
+        max_length=16,
+        choices=ContentGrade.choices,
+        verbose_name="Ценность высшего образования",
+    )
+    support_criticality = models.CharField(
+        max_length=16,
+        choices=ContentGrade.choices,
+        verbose_name="Критичность поддержки",
+    )
+
+    composition = models.CharField(
+        max_length=16,
+        choices=CompositionGrade.choices,
+        verbose_name="Композиция текста",
+    )
+    style_precision = models.CharField(
+        max_length=32,
+        choices=StylePrecisionGrade.choices,
+        verbose_name="Точность стиля",
+    )
+
+    orthography = models.CharField(
+        max_length=16,
+        choices=OrthographyGrade.choices,
+        verbose_name="Орфография",
+    )
+    syntax = models.CharField(
+        max_length=16,
+        choices=SyntaxGrade.choices,
+        verbose_name="Синтаксис",
+    )
+
+    family = models.TextField(blank=True, default="", verbose_name="Семья")
+    hobbies = models.TextField(blank=True, default="", verbose_name="Хобби")
+    achievements = models.TextField(blank=True, default="", verbose_name="Достижения")
+    traits = models.TextField(blank=True, default="", verbose_name="Личные качества")
+    school_teachers = models.TextField(blank=True, default="", verbose_name="Учителя")
+    prep_subjects = models.TextField(blank=True, default="", verbose_name="Предметы подготовки")
+    specialty = models.TextField(blank=True, default="", verbose_name="Предполагаемая специальность")
+    preferred_universities = models.TextField(blank=True, default="", verbose_name="Предпочтительные вузы")
+    relocation = models.TextField(blank=True, default="", verbose_name="Готовность к переезду")
+    olympiads = models.TextField(blank=True, default="", verbose_name="Олимпиады")
+    motivation = models.TextField(blank=True, default="", verbose_name="Мотивация")
+    help_criticality = models.TextField(blank=True, default="", verbose_name="Критичность помощи")
+    extra = models.TextField(blank=True, default="", verbose_name="Дополнительная информация")
+
+    justification = models.TextField(
+        blank=True,
+        default="",
+        verbose_name="Пояснение эксперта",
+    )
+
+    class Meta:
+        verbose_name = "Оценка мотивационного письма по рубрике"
+        verbose_name_plural = "Оценки мотивационных писем по рубрике"
+        indexes = [
+            models.Index(fields=["total_score"]),
+            models.Index(fields=["created_at"]),
+            models.Index(fields=["schema_version"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"Рубрика: письмо #{self.letter_id}, {self.total_score} баллов"
 
 
 class MotivationLetterInstruction(models.Model):

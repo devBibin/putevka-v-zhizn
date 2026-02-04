@@ -134,8 +134,6 @@ class MotivationLetterAdmin(admin.ModelAdmin):
         "user",
         "status",
         "is_done",
-        "gpt_score",
-        "admin_score",
         "submitted_at",
         "updated_at",
     )
@@ -151,18 +149,6 @@ class MotivationLetterAdmin(admin.ModelAdmin):
         ("Текст и оценка администратора", {
             "fields": ("letter_text", "admin_rating", "admin_score")
         }),
-        ("Автооценка GPT (только для просмотра)", {
-            "fields": (
-                "gpt_review",
-                "gpt_score",
-                "gpt_word_count",
-                "gpt_json",
-                "gpt_flags",
-                "gpt_model",
-                "gpt_version",
-                "gpt_scored_at",
-            )
-        }),
         ("Служебное", {
             "fields": ("created_at", "updated_at")
         }),
@@ -172,14 +158,6 @@ class MotivationLetterAdmin(admin.ModelAdmin):
         "created_at",
         "updated_at",
         "submitted_at",
-        "gpt_review",
-        "gpt_score",
-        "gpt_word_count",
-        "gpt_json",
-        "gpt_flags",
-        "gpt_model",
-        "gpt_version",
-        "gpt_scored_at",
     )
 
 

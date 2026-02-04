@@ -1,30 +1,45 @@
-import json
 import logging
 import os
 import time
+
 import django
 from dotenv import load_dotenv
-from django.db import models
-
+from django.db import models, transaction
 from openai import OpenAI
 
 import config
-from core.llm_safe import parse_llm_json, compute_score
+from core.llm_safe import parse_llm_json
 
 load_dotenv()
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'Putevka.settings')
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "Putevka.settings")
 django.setup()
 
 logger = logging.getLogger(__name__)
 
-from core.models import MotivationLetter
+from core.models import MotivationLetter, MotivationLetterRubricReview  # <-- новая модель здесь
 
 OPENAI_API_KEY = config.GPT_TOKEN
-OPENAI_MODEL = "gpt-4o-mini"
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 client = OpenAI(api_key=OPENAI_API_KEY)
 
 POLLING_INTERVAL = int(os.getenv("SHADOW_POLLING_INTERVAL", 60))
+BATCH_LIMIT = int(os.getenv("SHADOW_BATCH_LIMIT", 10))
+
+RUBRIC_VERSION = "v1.0-2025-10-05"
+
+SYSTEM_PROMPT = (
+    "Ты — эксперт-проверяющий мотивационные письма фонда. "
+    "Строго оцени письмо по рубрике и верни только JSON по заданной схеме."
+)
+
+USER_INSTRUCTIONS = (
+    "Оцени по рубрике. Баллы: содержательные 6 пунктов full/partial/none → 10/5/0; "
+    "речевое: composition 0/-2/-5, style_precision 0/-2/-5; "
+    "грамотность: orthography 0/-2/-5, syntax 0/-2/-5. "
+    "Если <150 слов — итог 0. Если 150–250 и получилось 60 — снизь до 59. "
+    "В extractions выпиши тезисно сведения для профиля."
+)
 
 RUBRIC_SCHEMA = {
     "type": "object",
@@ -48,7 +63,7 @@ RUBRIC_SCHEMA = {
                 "current_preparation",
                 "next_year_plan",
                 "higher_ed_value",
-                "support_criticality"
+                "support_criticality",
             ],
         },
         "rhetoric": {
@@ -100,34 +115,13 @@ RUBRIC_SCHEMA = {
                 "olympiads",
                 "motivation",
                 "help_criticality",
-                "extra"
+                "extra",
             ],
         },
         "justification": {"type": "string"},
     },
-    "required": [
-        "word_count",
-        "content",
-        "rhetoric",
-        "literacy",
-        "extractions",
-        "justification"
-    ],
+    "required": ["word_count", "content", "rhetoric", "literacy", "extractions", "justification"],
 }
-
-
-SYSTEM_PROMPT = (
-    "Ты — эксперт-проверяющий мотивационные письма фонда. "
-    "Строго оцени письмо по рубрике и верни только JSON по заданной схеме."
-)
-
-USER_INSTRUCTIONS = (
-    "Оцени по рубрике. Баллы: содержательные 6 пунктов full/partial/none → 10/5/0; "
-    "речевое: composition 0/-2/-5, style_precision 0/-2/-5; "
-    "грамотность: orthography 0/-2/-5, syntax 0/-2/-5. "
-    "Если <150 слов — итог 0. Если 150–250 и получилось 60 — снизь до 59. "
-    "В extractions выпиши тезисно сведения для профиля."
-)
 
 CONTENT_POINTS = {"full": 10, "partial": 5, "none": 0}
 COMPOSITION_PENALTY = {"good": 0, "minor_issue": -2, "major_issue": -5}
@@ -135,21 +129,32 @@ STYLE_PENALTY = {"good": 0, "one_dimensional_or_imprecise": -2, "poor": -5}
 ORTHO_PENALTY = {"none": 0, "one_two": -2, "three_plus": -5}
 SYNTAX_PENALTY = {"none": 0, "one": -2, "two_plus": -5}
 
-def _score_from_json(j):
+
+def _score_from_json(j: dict) -> tuple[int, str]:
     c = j["content"]
-    base = sum(CONTENT_POINTS[c[k]] for k in [
-        "specialty_choice","university_choice","current_preparation",
-        "next_year_plan","higher_ed_value","support_criticality"
-    ])
-    r = j["rhetoric"]; l = j["literacy"]
-    penalties = (
-        COMPOSITION_PENALTY[r["composition"]] +
-        STYLE_PENALTY[r["style_precision"]] +
-        ORTHO_PENALTY[l["orthography"]] +
-        SYNTAX_PENALTY[l["syntax"]]
+    base = sum(
+        CONTENT_POINTS[c[k]]
+        for k in [
+            "specialty_choice",
+            "university_choice",
+            "current_preparation",
+            "next_year_plan",
+            "higher_ed_value",
+            "support_criticality",
+        ]
     )
+
+    r = j["rhetoric"]
+    l = j["literacy"]
+    penalties = (
+        COMPOSITION_PENALTY[r["composition"]]
+        + STYLE_PENALTY[r["style_precision"]]
+        + ORTHO_PENALTY[l["orthography"]]
+        + SYNTAX_PENALTY[l["syntax"]]
+    )
+
     total = base + penalties
-    wc = j["word_count"]
+    wc = int(j.get("word_count") or 0)
 
     if wc < 150:
         return 0, "Менее 150 слов — работа не засчитывается."
@@ -160,12 +165,10 @@ def _score_from_json(j):
     if total < 0:
         total = 0
 
-    return total, ""
+    return int(total), ""
 
 
-RUBRIC_VERSION = "v1.0-2025-10-05"
-
-def evaluate_with_openai(letter_text: str):
+def evaluate_with_openai(letter_text: str) -> dict:
     if not OPENAI_API_KEY:
         raise RuntimeError("OPENAI_API_KEY/GPT_TOKEN не установлен.")
 
@@ -178,7 +181,6 @@ def evaluate_with_openai(letter_text: str):
     raw = None
     last_err = None
 
-    # 1) строгая схема
     try:
         resp = client.chat.completions.create(
             model=OPENAI_MODEL,
@@ -197,7 +199,6 @@ def evaluate_with_openai(letter_text: str):
     except Exception as e:
         last_err = f"schema mode: {e}"
 
-    # 2) json_object
     if raw is None:
         try:
             resp = client.chat.completions.create(
@@ -210,7 +211,6 @@ def evaluate_with_openai(letter_text: str):
         except Exception as e:
             last_err = f"{last_err} | json_object: {e}"
 
-    # 3) plain с просьбой «Только JSON»
     if raw is None:
         strict_messages = [
             {"role": "system", "content": SYSTEM_PROMPT + " Верни ТОЛЬКО JSON по схеме, без текста вокруг."},
@@ -226,117 +226,136 @@ def evaluate_with_openai(letter_text: str):
 
     payload, flags = parse_llm_json(raw)
     if not flags.get("ok"):
-        # поднимаем контролируемую ошибку с фрагментом сырого ответа
-        short = raw[:500].replace("\n", " ")
+        short = (raw or "")[:500].replace("\n", " ")
         raise RuntimeError(f"LLM payload invalid: {flags.get('error')} | raw: {short}")
 
-    score, note = compute_score(payload)
+    if hasattr(payload, "dict"):
+        j = payload.dict()
+    else:
+        j = payload
 
-    summary_parts = []
-    if note:
-        summary_parts.append(note)
-    base = sum([
-        0,  # placeholder, ниже пересчёт для читаемости
-    ])
-    # разворачиваем значения (текстовая сводка для staff)
-    from core.llm_safe import (CONTENT_POINTS, COMPOSITION_PENALTY, STYLE_PENALTY, ORTHO_PENALTY, SYNTAX_PENALTY)
-    c = payload.content
-    content_score = (
-        CONTENT_POINTS[c.specialty_choice] + CONTENT_POINTS[c.university_choice] +
-        CONTENT_POINTS[c.current_preparation] + CONTENT_POINTS[c.next_year_plan] +
-        CONTENT_POINTS[c.higher_ed_value] + CONTENT_POINTS[c.support_criticality]
-    )
-    penalties = (
-        COMPOSITION_PENALTY[payload.rhetoric.composition] +
-        STYLE_PENALTY[payload.rhetoric.style_precision] +
-        ORTHO_PENALTY[payload.literacy.orthography] +
-        SYNTAX_PENALTY[payload.literacy.syntax]
-    )
-    summary_parts.append(
-        f"Итог: {score}/60. Содержание: {content_score} баллов; штрафы: "
-        f"{COMPOSITION_PENALTY[payload.rhetoric.composition]:+d}"
-        f"{STYLE_PENALTY[payload.rhetoric.style_precision]:+d}"
-        f"{ORTHO_PENALTY[payload.literacy.orthography]:+d}"
-        f"{SYNTAX_PENALTY[payload.literacy.syntax]:+d}. "
-        f"Слов: {payload.word_count}."
-    )
-    summary = " ".join(summary_parts)
+    score, note = _score_from_json(j)
 
-    # Возвращаем то, что пойдёт в модель
     return {
-        "json": payload.dict(),
+        "json": j,
         "score": score,
-        "summary": summary,
+        "note": note,
         "flags": flags,
         "model_name": OPENAI_MODEL,
         "rubric_version": RUBRIC_VERSION,
-        "word_count": payload.word_count,
+        "word_count": int(j.get("word_count") or 0),
     }
 
+
+def _to_review_kwargs(j: dict, *, score: int, model_name: str, rubric_version: str) -> dict:
+    c = j["content"]
+    r = j["rhetoric"]
+    l = j["literacy"]
+    e = j["extractions"]
+
+    return {
+        "word_count": int(j.get("word_count") or 0),
+        "total_score": int(score),
+        "model_name": model_name or "",
+        "schema_version": rubric_version or "",
+
+        "specialty_choice": c["specialty_choice"],
+        "university_choice": c["university_choice"],
+        "current_preparation": c["current_preparation"],
+        "next_year_plan": c["next_year_plan"],
+        "higher_ed_value": c["higher_ed_value"],
+        "support_criticality": c["support_criticality"],
+
+        "composition": r["composition"],
+        "style_precision": r["style_precision"],
+
+        "orthography": l["orthography"],
+        "syntax": l["syntax"],
+
+        "family": e["family"],
+        "hobbies": e["hobbies"],
+        "achievements": e["achievements"],
+        "traits": e["traits"],
+        "school_teachers": e["school_teachers"],
+        "prep_subjects": e["prep_subjects"],
+        "specialty": e["specialty"],
+        "preferred_universities": e["preferred_universities"],
+        "relocation": e["relocation"],
+        "olympiads": e["olympiads"],
+        "motivation": e["motivation"],
+        "help_criticality": e["help_criticality"],
+        "extra": e["extra"],
+
+        "justification": j.get("justification", "") or "",
+    }
+
+
 def review_unreviewed_letters():
-    logger.info("Проверка непроанализированных писем...")
+    logger.info("Проверка непроанализированных писем (rubric_review)...")
 
-    letters_to_review = MotivationLetter.objects.filter(
-        models.Q(gpt_review__isnull=True) | models.Q(gpt_review__exact=''),
-        models.Q(admin_rating__isnull=True) | models.Q(admin_rating__exact=''),
-        status=MotivationLetter.Status.SUBMITTED
-    ).exclude(letter_text__exact='')
+    qs = (
+        MotivationLetter.objects
+        .filter(status=MotivationLetter.Status.SUBMITTED)
+        .exclude(letter_text__exact="")
+        .filter(
+            models.Q(is_done=False),
+        )
+        .order_by("id")
+    )[:BATCH_LIMIT]
 
-    if not letters_to_review.exists():
+    if not qs:
         logger.info("Нет писем, требующих анализа.")
         return
 
-    logger.info(f"Найдено {letters_to_review.count()} писем для анализа.")
+    logger.info(f"Найдено {len(qs)} писем для анализа.")
 
-    for letter in letters_to_review:
+    for letter in qs:
         logger.info(f"Анализ письма ID: {letter.id} от пользователя: {letter.user.username[:20]}...")
+
         try:
             result = evaluate_with_openai(letter.letter_text)
+            j = result["json"]
+            score = result["score"]
 
-            letter.apply_gpt_result(
-                score=result["score"],
-                word_count=result["word_count"],
-                payload_json=result["json"],
-                summary=result["summary"],
-                flags=result.get("flags"),
+            review_kwargs = _to_review_kwargs(
+                j,
+                score=score,
                 model_name=result.get("model_name"),
                 rubric_version=result.get("rubric_version"),
             )
-            letter.save(update_fields=[
-                "gpt_review", "gpt_score", "gpt_word_count", "gpt_json", "gpt_flags",
-                "gpt_model", "gpt_version", "gpt_scored_at", "updated_at"
-            ])
+
+            with transaction.atomic():
+                letter_locked = (
+                    MotivationLetter.objects
+                    .select_for_update()
+                    .get(pk=letter.pk)
+                )
+
+                MotivationLetterRubricReview.objects.update_or_create(
+                    letter=letter_locked,
+                    defaults=review_kwargs,
+                )
+
+                if not letter_locked.is_done:
+                    letter_locked.is_done = True
+                    letter_locked.save(update_fields=["is_done", "updated_at"])
+
+            logger.info(f"  -> RubricReview сохранён для письма ID {letter.id}: {score}/60")
 
         except Exception as e:
             logger.error(f"Ошибка генерации для письма {letter.id}: {e}")
             continue
 
-        letter.gpt_review = result["summary"]
-
-        if hasattr(letter, "gpt_score"):
-            setattr(letter, "gpt_score", result["score"])
-        if hasattr(letter, "gpt_word_count"):
-            setattr(letter, "gpt_word_count", int(result["json"].get("word_count", 0)))
-        if hasattr(letter, "gpt_json"):
-            import json as _json
-            try:
-                setattr(letter, "gpt_json", result["json"])
-            except Exception:
-                setattr(letter, "gpt_json", _json.dumps(result["json"], ensure_ascii=False))
-
-        letter.save(update_fields=[f for f in ["gpt_review","gpt_score","gpt_word_count","gpt_json","updated_at"]
-                                   if hasattr(letter, f)])
-        logger.info(f"  -> Оценка для письма ID {letter.id}: {result['score']}/60")
 
 def main():
-    logger.info("Запуск фонового скрипта GPT Reviewer...")
+    logger.info("Запуск фонового скрипта GPT Rubric Reviewer...")
     while True:
         try:
             review_unreviewed_letters()
         except Exception as e:
             logger.error(f"Критическая ошибка в главном цикле: {e}")
             time.sleep(30)
-        logger.info(f"Следующая проверка через {POLLING_INTERVAL} секунд...")
+
         time.sleep(POLLING_INTERVAL)
 
 
