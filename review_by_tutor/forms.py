@@ -2,7 +2,7 @@ from django import forms
 
 from core.models import MotivationLetter
 from documents.models import Document
-from review_by_tutor.models import Interview, TestAssignment
+from review_by_tutor.models import Interview, TestAssignment, InterviewResult
 from scholar_form.models import UserInfo, ScholarVideo
 
 
@@ -161,10 +161,7 @@ class DocumentCommentForm(forms.ModelForm):
 class InterviewForm(forms.ModelForm):
     class Meta:
         model = Interview
-        fields = ["notes", "filled_form", "video"]
-        widgets = {
-            "filled_form": forms.FileInput(),
-        }
+        fields = ["notes", "video"]
 
 
 class TestAssignmentCreateForm(forms.ModelForm):
@@ -283,3 +280,20 @@ class MotivationLetterRubricReviewStaffForm(forms.ModelForm):
             "help_criticality": forms.Textarea(attrs={"rows": 2}),
             "extra": forms.Textarea(attrs={"rows": 2}),
         }
+
+
+class InterviewResultForm(forms.ModelForm):
+    class Meta:
+        model = InterviewResult
+        exclude = ("created_at", "updated_at", "interview", "status")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        for name, field in self.fields.items():
+            widget = field.widget
+            classes = widget.attrs.get("class", "")
+            widget.attrs["class"] = (classes + " form-control").strip()
+
+            if isinstance(widget, forms.Textarea) and "rows" not in widget.attrs:
+                widget.attrs["rows"] = 1
