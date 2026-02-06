@@ -114,11 +114,21 @@ class Interview(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="interview")
     notes = models.TextField("Заметки интервьюера", blank=True)
 
-    filled_form = models.FileField("Заполненный шаблон", upload_to="interview/filled/", blank=True, null=True)
-    filled_uploaded_by = models.ForeignKey(
-        User, on_delete=models.SET_NULL, null=True, blank=True, related_name="interview_filled_uploaded"
+    class AiFillStatus(models.TextChoices):
+        PENDING = "PENDING"
+        PROCESSING = "PROCESSING"
+        DONE = "DONE"
+        FAILED = "FAILED"
+
+    ai_fill_status = models.CharField(
+        max_length=16,
+        choices=AiFillStatus.choices,
+        default=AiFillStatus.PENDING,
     )
+    #TODO: удалить это поле
     filled_uploaded_at = models.DateTimeField(null=True, blank=True)
+    ai_filled_at = models.DateTimeField(null=True, blank=True)
+    ai_fill_error = models.TextField(blank=True)
 
     video = models.FileField(
         "Видео собеседования",

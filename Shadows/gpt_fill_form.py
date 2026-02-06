@@ -31,11 +31,6 @@ BATCH_LIMIT = int(os.getenv("INTERVIEW_RESULT_FILL_BATCH_LIMIT", "2"))
 
 client = OpenAI(api_key=OPENAI_API_KEY)
 
-
-# ------------------------------------------------------------
-# Helpers: model fields discovery
-# ------------------------------------------------------------
-
 SKIP_FIELDS = {
     "id",
     "pk",
@@ -55,13 +50,8 @@ def _is_empty_value(v: Any) -> bool:
     return False
 
 def _iter_fillable_model_fields() -> List[models.Field]:
-    """
-    Возвращает только реальные поля таблицы (concrete),
-    без M2M/related, и без служебных.
-    """
     out: List[models.Field] = []
     for f in InterviewResult._meta.get_fields():
-        # пропускаем связи и обратные поля
         if not getattr(f, "concrete", False):
             continue
         if getattr(f, "many_to_many", False):
@@ -77,11 +67,6 @@ def _iter_fillable_model_fields() -> List[models.Field]:
     return out
 
 def build_llm_schema_from_model() -> Tuple[Dict[str, str], List[models.Field]]:
-    """
-    Делает словарь:
-      field_name -> человеческое описание (verbose_name + тип)
-    и параллельно список Field-объектов для типизации.
-    """
     fields = _iter_fillable_model_fields()
 
     schema: Dict[str, str] = {}
@@ -147,7 +132,6 @@ def _normalize_int(v: Any) -> Any:
     s = str(v).strip()
     if s == "":
         return None
-    # вытащим первое целое из строки
     digits = []
     sign = 1
     for ch in s:
@@ -170,7 +154,6 @@ def _normalize_decimal(v: Any) -> Any:
     s = str(v).strip().replace(",", ".")
     if s == "":
         return None
-    # уберём лишние символы кроме цифр, точки и минуса
     allowed = set("0123456789.-")
     s2 = "".join(ch for ch in s if ch in allowed)
     if s2 in {"", "-", ".", "-."}:
@@ -184,7 +167,6 @@ def _normalize_date(v: Any) -> Any:
     if v is None:
         return None
     if hasattr(v, "year") and hasattr(v, "month") and hasattr(v, "day"):
-        # date/datetime
         return v.date() if hasattr(v, "hour") else v
     s = str(v).strip()
     if s == "":
@@ -204,60 +186,40 @@ def _normalize_datetime(v: Any) -> Any:
     return dt
 
 def normalize_value_for_field(field: models.Field, raw: Any) -> Any:
-    """
-    Приведение ответа LLM под тип поля.
-    Если не получается — возвращаем None/"" (и тогда просто не пишем).
-    """
     if raw is None:
         return None
 
-    # пустые строки считаем "нет данных"
     if isinstance(raw, str) and raw.strip() == "":
         return ""
 
-    # BooleanField
     if isinstance(field, models.BooleanField):
         b = _normalize_bool(raw)
         return b
 
-    # Integer-like
     if isinstance(field, (models.IntegerField, models.PositiveIntegerField, models.BigIntegerField, models.SmallIntegerField)):
         return _normalize_int(raw)
 
-    # Decimal
     if isinstance(field, models.DecimalField):
         return _normalize_decimal(raw)
 
-    # Date/DateTime
     if isinstance(field, models.DateField) and not isinstance(field, models.DateTimeField):
         return _normalize_date(raw)
 
     if isinstance(field, models.DateTimeField):
         return _normalize_datetime(raw)
 
-    # Text/Char/etc -> строка
     if isinstance(raw, (dict, list)):
         return json.dumps(raw, ensure_ascii=False)
 
     return str(raw).strip()
 
 
-# ------------------------------------------------------------
-# Selecting + filling
-# ------------------------------------------------------------
-
 def pick_interviews_to_fill(limit: int) -> models.QuerySet:
-    """
-    Берём интервью с готовым транскриптом.
-    Можно дополнительно фильтровать по наличию "пустых полей" в result,
-    но это дороже. Ниже — простой вариант.
-    """
     return (
-        Interview.objects
-        .filter(transcript_status="DONE")
-        .exclude(transcript__isnull=True)
-        .exclude(transcript__exact="")
-        .order_by("updated_at")[:limit]
+        Interview.objects.filter(
+            transcript_status="DONE",
+            ai_fill_status__in=["PENDING", "FAILED"],
+        )
     )
 
 def has_any_empty_fillable_fields(result_obj: InterviewResult, fillable_fields: List[models.Field]) -> bool:
@@ -266,31 +228,40 @@ def has_any_empty_fillable_fields(result_obj: InterviewResult, fillable_fields: 
             return True
     return False
 
-def apply_answers_to_result(result_obj: InterviewResult, fields: List[models.Field], answers: Dict[str, Any]) -> List[str]:
-    """
-    Записывает только в пустые поля.
-    Возвращает список update_fields.
-    """
+def apply_answers_to_result(
+    result_obj: InterviewResult,
+    fields: List[models.Field],
+    answers: Dict[str, Any],
+) -> List[str]:
     update_fields: List[str] = []
 
     for field in fields:
         name = field.name
 
-        # Если LLM вообще не вернул ключ — пропускаем (не домысливаем)
         if name not in answers:
             continue
 
         old_val = getattr(result_obj, name, None)
-        if not _is_empty_value(old_val):
-            continue  # НЕ трогаем уже заполненное
-
         new_raw = answers.get(name)
         new_val = normalize_value_for_field(field, new_raw)
 
-        # если после нормализации "ничего" — не пишем
         if new_val is None:
             continue
-        if isinstance(new_val, str) and new_val.strip() == "":
+        if isinstance(new_val, str) and not new_val.strip():
+            continue
+
+        if isinstance(field, (models.CharField, models.TextField)):
+            if _is_empty_value(old_val):
+                setattr(result_obj, name, new_val)
+                update_fields.append(name)
+            else:
+                combined = f"Заметка куратора: {old_val.rstrip()}\n\nВариант нейронки: \n{new_val.strip()}"
+                setattr(result_obj, name, combined)
+                update_fields.append(name)
+
+            continue
+
+        if not _is_empty_value(old_val):
             continue
 
         setattr(result_obj, name, new_val)
@@ -298,10 +269,13 @@ def apply_answers_to_result(result_obj: InterviewResult, fields: List[models.Fie
 
     return update_fields
 
+
+from django.utils import timezone
+from django.db import transaction
+
 def process_one(interview_id: int) -> None:
     fields_schema, fillable_fields = build_llm_schema_from_model()
 
-    # блокировка интервью (чтобы не схватили два воркера)
     with transaction.atomic():
         interview = Interview.objects.select_for_update().get(pk=interview_id)
 
@@ -310,31 +284,49 @@ def process_one(interview_id: int) -> None:
 
         result_obj, _ = InterviewResult.objects.get_or_create(interview=interview)
 
-        # если уже всё заполнено — можно пропустить
         if not has_any_empty_fillable_fields(result_obj, fillable_fields):
+            if interview.ai_fill_status != Interview.AiFillStatus.DONE:
+                interview.ai_fill_status = Interview.AiFillStatus.DONE
+                interview.ai_filled_at = timezone.now()
+                interview.ai_fill_error = ""
+                interview.save(update_fields=["ai_fill_status", "ai_filled_at", "ai_fill_error"])
             return
+
+        interview.ai_fill_status = Interview.AiFillStatus.PROCESSING
+        interview.ai_fill_error = ""
+        interview.save(update_fields=["ai_fill_status", "ai_fill_error"])
 
         transcript = interview.transcript.strip()
 
-    # LLM вызов вне транзакции (не держим блокировку БД)
-    answers = ask_openai_fill(fields_schema, transcript)
+    try:
+        answers = ask_openai_fill(fields_schema, transcript)
+    except Exception as e:
+        with transaction.atomic():
+            interview = Interview.objects.select_for_update().get(pk=interview_id)
+            interview.ai_fill_status = Interview.AiFillStatus.FAILED
+            interview.ai_fill_error = str(e)
+            interview.save(update_fields=["ai_fill_status", "ai_fill_error"])
+        raise
 
     with transaction.atomic():
-        # повторно лочим и проверяем актуальность
         interview = Interview.objects.select_for_update().get(pk=interview_id)
         result_obj, _ = InterviewResult.objects.get_or_create(interview=interview)
 
         update_fields = apply_answers_to_result(result_obj, fillable_fields, answers)
         if not update_fields:
+            interview.ai_fill_status = Interview.AiFillStatus.FAILED
+            interview.ai_fill_error = "LLM returned no applicable updates"
+            interview.save(update_fields=["ai_fill_status", "ai_fill_error"])
             return
 
-        # updated_at автообновится если save() без update_fields,
-        # но нам лучше точечно + вручную добавить updated_at
         result_obj.updated_at = timezone.now()
         update_fields.append("updated_at")
-
         result_obj.save(update_fields=update_fields)
 
+        interview.ai_fill_status = Interview.AiFillStatus.DONE
+        interview.ai_filled_at = timezone.now()
+        interview.ai_fill_error = ""
+        interview.save(update_fields=["ai_fill_status", "ai_filled_at", "ai_fill_error"])
 
 def fill_pending_interviews():
     interviews = pick_interviews_to_fill(BATCH_LIMIT)
