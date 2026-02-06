@@ -10,6 +10,7 @@ from django.db import transaction
 from django.db.models import Q, Subquery, OuterRef, Count, Exists
 from django.http import Http404, FileResponse
 from django.shortcuts import render, get_object_or_404, redirect
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.encoding import smart_str
 from django.views.decorators.http import require_POST
@@ -21,8 +22,9 @@ from my_study.models import CourseSelection, UniversityPriority, AssessmentResul
 from review_by_tutor.forms import MotivationLetterStaffForm, UserInfoStaffForm, ScholarVideoStaffForm, \
     DocumentStaffUploadForm, DocumentCommentForm, \
     DocumentStatusForm, InterviewForm, TestAssignmentCreateForm, TestAssignmentEditForm, TestResultForm, \
-    LetterRevisionForm, MotivationLetterRubricReviewStaffForm, LetterDeadlineForm, ScholarVideoDeadlineForm
-from review_by_tutor.models import Interview, TestAssignment, InterviewPreparation, InterviewTemplate
+    LetterRevisionForm, MotivationLetterRubricReviewStaffForm, LetterDeadlineForm, ScholarVideoDeadlineForm, \
+    InterviewResultForm
+from review_by_tutor.models import Interview, TestAssignment, InterviewPreparation, InterviewTemplate, InterviewResult
 from scholar_form.models import UserInfo, ScholarVideo, StaffNote
 
 logger = logging.getLogger(__name__)
@@ -44,6 +46,9 @@ def staff_letter_detail(request, user_id: int):
         .filter(user_id=user_id)
         .first()
     )
+
+    if letter is None:
+        letter = MotivationLetter.objects.create(user_id=user_id)
 
     revision_form = LetterRevisionForm(request.POST or None)
     deadline_form = LetterDeadlineForm(request.POST or None)
@@ -227,6 +232,7 @@ def staff_video_detail(request, user_id: int):
         "active": "my_video_page",
     })
 
+
 @login_required
 @user_passes_test(_staff_check)
 @transaction.atomic
@@ -327,6 +333,18 @@ def staff_study_detail(request, user_id: int):
     })
 
 
+@require_POST
+@login_required
+@user_passes_test(_staff_check)
+def staff_note_delete(request, user_id: int, note_id: int):
+    note = get_object_or_404(StaffNote, pk=note_id, target_user_id=user_id)
+    note.delete()
+    messages.success(request, "Заметка удалена.")
+    page = (request.POST.get("page") or request.GET.get("page") or "1").strip()
+    url = reverse("staff_notes", kwargs={"user_id": user_id})
+    return redirect(f"{url}?page={page}")
+
+
 @login_required
 @user_passes_test(_staff_check)
 def staff_notes_by_user(request, user_id: int):
@@ -340,10 +358,12 @@ def staff_notes_by_user(request, user_id: int):
             return redirect("staff_notes", user_id=user_id)
         messages.error(request, "Текст записи обязателен.")
 
-    notes_qs = (StaffNote.objects
-                .select_related("author")
-                .filter(target_user=user_obj)
-                .order_by("-created_at"))
+    notes_qs = (
+        StaffNote.objects
+        .select_related("author")
+        .filter(target_user=user_obj)
+        .order_by("-is_favorite", "-created_at")
+    )
 
     page = request.GET.get("page", 1)
     paginator = Paginator(notes_qs, 5)
@@ -376,8 +396,23 @@ def staff_notes_by_user(request, user_id: int):
         "documents": documents,
         "video": video,
         "active": "notes",
+        "is_candidate": user_obj.user_info.status == "CANDIDATE"
     }
     return render(request, "staff_templates/staff_notes_by_user.html", ctx)
+
+
+@require_POST
+@login_required
+@user_passes_test(_staff_check)
+def staff_note_toggle_favorite(request, user_id: int, note_id: int):
+    note = get_object_or_404(StaffNote, pk=note_id, target_user_id=user_id)
+
+    note.is_favorite = not note.is_favorite
+    note.save(update_fields=["is_favorite"])
+
+    page = (request.POST.get("page") or request.GET.get("page") or "1").strip()
+    url = reverse("staff_notes", kwargs={"user_id": user_id})
+    return redirect(f"{url}?page={page}")
 
 
 @login_required
@@ -498,31 +533,130 @@ def interview_detail(request, user_id: int):
     user_obj = get_object_or_404(User, pk=user_id)
     interview, _ = Interview.objects.get_or_create(user=user_obj)
 
+    sections = [
+        ("school", "1. Школа", [
+            "school_number", "school_type", "school_distance_km", "school_distance_minutes",
+            "school_specialization", "school_students_total", "school_left_after_9_est",
+            "school_students_11", "class_profile", "has_ege_teachers_all",
+            "teach_quality_ru", "teach_quality_math", "teach_quality_phys", "teach_quality_chem",
+            "teach_quality_bio", "teach_quality_inf", "teach_quality_geo", "teach_quality_soc",
+            "teach_quality_lit", "teach_quality_hist", "teach_quality_lang",
+            "triples_reason", "favorite_teacher", "favorite_subject",
+            "has_computer_lab", "olympiads_frequency",
+            "clubs_info", "olympiad_support_by_school", "other_school_notes",
+        ]),
+        ("prep", "2. Необходимая подготовка", [
+            "aims_medal", "admission_way", "ege_subjects", "mock_ru", "mock_math_base", "mock_math_prof",
+            "mock_phys", "mock_chem", "mock_bio", "mock_inf", "mock_geo", "mock_soc", "mock_lit",
+            "mock_hist", "mock_lang", "target_ru", "target_math_base", "target_math_prof", "target_phys",
+            "target_chem", "target_bio", "target_inf", "target_geo", "target_soc", "target_lit", "target_hist",
+            "target_lang", "had_tutor", "tutor_details", "had_online_courses", "online_courses_details",
+            "olympiad_experience", "olympiads_planned", "need_olympiad_prep", "specialties", "need_career_guidance",
+            "universities", "need_university_help", "why_higher_education", "prep_9_10",
+            "prep_10_11", "ready_to_move", "discussed_with_parents", "other_support_needed",
+        ]),
+        ("family", "3. Состав семьи", [
+            "family_structure", "family_many_children", "family_people_count",
+            "siblings_info", "grandparents_info", "dependents_info",
+            "has_disabled_need_care", "candidate_orphan", "candidate_disabled",
+            "breadwinner_loss", "family_other_circumstances",
+        ]),
+        ("income", "4. Работа родителей, доход", [
+            "mother_job", "mother_has_he",
+            "father_job", "father_has_he",
+            "step_parent_job", "step_parent_has_he",
+            "parents_self_employed_details", "other_relatives_jobs",
+            "parent_on_pension_or_care", "why_parent_not_working",
+            "alimony_paid", "benefits_received", "low_income_recognized",
+            "family_other_notes", "parents_involved_in_study",
+            "siblings_interfere_study", "household_load",
+        ]),
+        ("housing", "5. Условия проживания", [
+            "settlement_status", "distance_to_reg_center_km",
+            "housing_type", "utilities",
+            "own_room", "own_workdesk",
+            "own_computer", "own_phone", "supports_whatsapp_telegram",
+            "has_printer", "home_internet", "phone_internet",
+            "family_has_car", "relatives_in_big_cities", "pets",
+            "has_bank_card", "summer_holidays", "financial_notes",
+        ]),
+        ("interests", "6. Интересы и личные качества", [
+            "weekday_routine", "weekend_routine",
+            "clubs_hobbies", "volunteering",
+            "gto_passed", "sport_info",
+            "studies_extra_resources_frequency", "self_study_example",
+            "other_resources", "reads_books_frequency", "favorite_book",
+            "favorite_games", "favorite_movies", "favorite_socials",
+            "friends_count_info", "friends_admission_discussion",
+            "part_time_job", "other_achievements",
+            "success_qualities", "success_definition",
+            "unfinished_cases", "asks_for_help_how",
+        ]),
+        ("fund", "7. Работа с фондом", [
+            "heard_about_fund", "parents_know_and_agree",
+            "selection_experience", "knows_support_program", "most_useful_expected",
+            "would_participate_without_stipend", "understands_group_courses",
+            "knows_our_schools", "understands_homework_need",
+            "plan_to_combine", "ready_regular_contact", "will_inform_if_absent",
+            "preferred_contact_method", "ready_for_chats_webinars",
+            "interesting_topics", "ready_additional_tests", "helpful_materials",
+            "ready_tell_school", "ready_mentor_next",
+            "fund_questions", "understands_next_steps",
+        ]),
+        ("final", "8. Прочее / выводы", [
+            "other_notes",
+            "interviewer_summary", "interviewer_risks", "interviewer_recommendations",
+            "interviewer_score",
+        ]),
+    ]
+
     template_obj = (
         InterviewTemplate.objects.filter(is_active=True).order_by("-uploaded_at").first()
     )
 
+    result_obj, _ = InterviewResult.objects.get_or_create(interview=interview)
+
+    form = InterviewForm(instance=interview)
+    result_form = InterviewResultForm(instance=result_obj)
+
     if request.method == "POST":
-        form = InterviewForm(request.POST, request.FILES, instance=interview)
-        if form.is_valid():
-            obj = form.save(commit=False)
+        action = request.POST.get("op")
 
-            if "filled_form" in request.FILES:
-                obj.filled_uploaded_by = request.user
-                obj.filled_uploaded_at = timezone.now()
+        if action == "save_interview_files":
+            form = InterviewForm(request.POST, request.FILES, instance=interview)
+            if form.is_valid():
+                obj = form.save(commit=False)
 
-            if "video" in request.FILES:
-                obj.video_uploaded_by = request.user
-                obj.video_uploaded_at = timezone.now()
-                obj.transcript_status = "PENDING"
-                obj.transcript_error = ""
-                obj.transcript = ""
+                if "filled_form" in request.FILES:
+                    obj.filled_uploaded_by = request.user
+                    obj.filled_uploaded_at = timezone.now()
 
-            obj.save()
-            messages.success(request, "Изменения сохранены.")
-            return redirect("interview_detail", user_id=user_id)
+                if "video" in request.FILES:
+                    obj.video_uploaded_by = request.user
+                    obj.video_uploaded_at = timezone.now()
+                    obj.transcript_status = "PENDING"
+                    obj.transcript_error = ""
+                    obj.transcript = ""
+
+                obj.save()
+                messages.success(request, "Файлы собеседования сохранены.")
+                return redirect("interview_detail", user_id=user_id)
+
+        elif action == "save_interview_result":
+            result_form = InterviewResultForm(request.POST, instance=result_obj)
+            if result_form.is_valid():
+                result_form.save()
+                messages.success(request, "Результаты интервью сохранены.")
+                return redirect("interview_detail", user_id=user_id)
+            else:
+                messages.error(request, "Ошибка сохранения результатов интервью.")
+
+        else:
+            messages.error(request, "Неизвестное действие.")
+
     else:
         form = InterviewForm(instance=interview)
+        result_form = InterviewResultForm(instance=result_obj)
 
     ctx = {
         "user_obj": user_obj,
@@ -530,8 +664,11 @@ def interview_detail(request, user_id: int):
         "interview": interview,
         "template_obj": template_obj,
         "active": "interview",
+        "result_form": result_form,
+        "interview_sections": sections,
     }
     return render(request, "staff_templates/interview_detail.html", ctx)
+
 
 @login_required
 @user_passes_test(_staff_check)
@@ -559,6 +696,7 @@ def download_interview_template(request, user_id: int):
         filename=smart_str(filename),
     )
     return response
+
 
 @login_required
 def testing_list_for_candidate(request):

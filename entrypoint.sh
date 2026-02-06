@@ -34,7 +34,7 @@ print("DB did not become ready in time"); sys.exit(3)
 PY
 
 # Create migrations
-python manage.py makemigrations
+python manage.py makemigrations --noinput
 
 # Apply migrations
 python manage.py migrate
