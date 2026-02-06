@@ -10,6 +10,7 @@ from django.db import transaction
 from django.db.models import Q, Subquery, OuterRef, Count, Exists
 from django.http import Http404, FileResponse
 from django.shortcuts import render, get_object_or_404, redirect
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.encoding import smart_str
 from django.views.decorators.http import require_POST
@@ -44,6 +45,9 @@ def staff_letter_detail(request, user_id: int):
         .filter(user_id=user_id)
         .first()
     )
+
+    if letter is None:
+        letter = MotivationLetter.objects.create(user_id=user_id)
 
     revision_form = LetterRevisionForm(request.POST or None)
     deadline_form = LetterDeadlineForm(request.POST or None)
@@ -327,6 +331,19 @@ def staff_study_detail(request, user_id: int):
     })
 
 
+
+@require_POST
+@login_required
+@user_passes_test(_staff_check)
+def staff_note_delete(request, user_id: int, note_id: int):
+    note = get_object_or_404(StaffNote, pk=note_id, target_user_id=user_id)
+    note.delete()
+    messages.success(request, "Заметка удалена.")
+    page = (request.POST.get("page") or request.GET.get("page") or "1").strip()
+    url = reverse("staff_notes", kwargs={"user_id": user_id})
+    return redirect(f"{url}?page={page}")
+
+
 @login_required
 @user_passes_test(_staff_check)
 def staff_notes_by_user(request, user_id: int):
@@ -340,10 +357,12 @@ def staff_notes_by_user(request, user_id: int):
             return redirect("staff_notes", user_id=user_id)
         messages.error(request, "Текст записи обязателен.")
 
-    notes_qs = (StaffNote.objects
-                .select_related("author")
-                .filter(target_user=user_obj)
-                .order_by("-created_at"))
+    notes_qs = (
+        StaffNote.objects
+        .select_related("author")
+        .filter(target_user=user_obj)
+        .order_by("-is_favorite", "-created_at")
+    )
 
     page = request.GET.get("page", 1)
     paginator = Paginator(notes_qs, 5)
@@ -376,8 +395,23 @@ def staff_notes_by_user(request, user_id: int):
         "documents": documents,
         "video": video,
         "active": "notes",
+        "is_candidate": user_obj.user_info.status == "CANDIDATE"
     }
     return render(request, "staff_templates/staff_notes_by_user.html", ctx)
+
+
+@require_POST
+@login_required
+@user_passes_test(_staff_check)
+def staff_note_toggle_favorite(request, user_id: int, note_id: int):
+    note = get_object_or_404(StaffNote, pk=note_id, target_user_id=user_id)
+
+    note.is_favorite = not note.is_favorite
+    note.save(update_fields=["is_favorite"])
+
+    page = (request.POST.get("page") or request.GET.get("page") or "1").strip()
+    url = reverse("staff_notes", kwargs={"user_id": user_id})
+    return redirect(f"{url}?page={page}")
 
 
 @login_required

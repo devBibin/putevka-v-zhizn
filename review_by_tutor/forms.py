@@ -33,12 +33,12 @@ class MotivationLetterStaffForm(forms.ModelForm):
             "admin_rating": forms.Textarea(attrs={
                 "rows": 6,
                 "class": "form-control",
-                "placeholder": "Ваши комментарии/оценка для соискателя"
+                "placeholder": "Ваши комментарии/оценка"
             }),
         }
         labels = {
             "admin_score": "Оценка администратора",
-            "admin_rating": "Фидбэк администратора",
+            "admin_rating": "Внутрення заметка по мотивационному письму",
         }
 
 

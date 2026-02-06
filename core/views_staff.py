@@ -12,7 +12,7 @@ from django.views.generic import TemplateView
 from core.models import UserNotification, Notification
 from documents.models import Document
 from review_by_tutor.forms import StatusChangeForm, ProfileChangeForm
-from scholar_form.models import UserInfo
+from scholar_form.models import UserInfo, StaffNote
 
 User = get_user_model()
 
@@ -46,6 +46,11 @@ class StaffScholarDossierView(TemplateView):
         uinfo = UserInfo.objects.get_or_create(user=user)[0]
         video = getattr(user, "scholar_video", None)
         ml = getattr(user, "motivation_letter", None)
+
+        favorite_notes = (StaffNote.objects
+                          .select_related("author")
+                          .filter(target_user=user, is_favorite=True)
+                          .order_by("-created_at")[:5])
 
         video_score = getattr(video, "score", None) if video else None
         ml_score = getattr(ml, "admin_score", None) if ml else None
@@ -119,6 +124,7 @@ class StaffScholarDossierView(TemplateView):
             'active': 'dossier',
             "status_form": status_form,
             "profile_form": profile_form,
+            "favorite_notes": favorite_notes,
         })
         return ctx
 

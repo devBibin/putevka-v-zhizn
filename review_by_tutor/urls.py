@@ -28,4 +28,8 @@ urlpatterns = [
         views.download_interview_template,
         name="download_interview_template",
     ),
+
+    path("staff/notes/<int:user_id>/favorite/<int:note_id>/", views.staff_note_toggle_favorite,
+         name="staff_note_toggle_favorite"),
+    path("staff/notes/<int:user_id>/delete/<int:note_id>/", views.staff_note_delete, name="staff_note_delete"),
 ]

@@ -55,7 +55,6 @@
                                 {% if form.admin_rating.errors %}
                                     <div class="text-danger small mt-1">{{ form.admin_rating.errors }}</div>
                                 {% endif %}
-                                <div class="form-text">Это увидит соискатель.</div>
                             </div>
 
                             <div class="form-check mb-3">
@@ -166,60 +165,62 @@
                     </div>
                 </div>
 
-            {# --- Дедлайн письма --- #}
-<div class="card shadow-sm mb-4">
-    <div class="card-header">Дедлайн письма</div>
-    <div class="card-body">
-        {% if not letter %}
-            <div class="alert alert-info mb-0">Действие недоступно: нет мотивационного письма.</div>
-        {% else %}
+                {# --- Дедлайн письма --- #}
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header">Дедлайн письма</div>
+                    <div class="card-body">
+                        {% if not letter %}
+                            <div class="alert alert-info mb-0">Действие недоступно: нет мотивационного письма.</div>
+                        {% else %}
 
-            {# текущий дедлайн #}
-            <div class="mb-3">
-                <div class="small text-muted">Текущий дедлайн:</div>
-                <div class="fw-semibold">
-                    {% if letter.deadline_at %}
-                        {{ letter.deadline_at|date:"d.m.Y H:i" }}
-                    {% else %}
-                        —
-                    {% endif %}
-                </div>
-            </div>
+                            {# текущий дедлайн #}
+                            <div class="mb-3">
+                                <div class="small text-muted">Текущий дедлайн:</div>
+                                <div class="fw-semibold">
+                                    {% if letter.deadline_at %}
+                                        {{ letter.deadline_at|date:"d.m.Y H:i" }}
+                                    {% else %}
+                                        —
+                                    {% endif %}
+                                </div>
+                            </div>
 
-            <form method="post">
-                {% csrf_token %}
-                <input type="hidden" name="action_deadline_save" value="1">
+                            <form method="post">
+                                {% csrf_token %}
+                                <input type="hidden" name="action_deadline_save" value="1">
 
-                <div class="mb-3">
-                    <label class="form-label">{{ deadline_form.deadline_at.label }}</label>
+                                <div class="mb-3">
+                                    <label class="form-label">{{ deadline_form.deadline_at.label }}</label>
 
-                    {% render_field deadline_form.deadline_at class+="form-control" type="datetime-local"%}
+                                    {% render_field deadline_form.deadline_at class+="form-control" type="datetime-local" %}
 
-                    {% if deadline_form.deadline_at.errors %}
-                        <div class="text-danger small mt-1">{{ deadline_form.deadline_at.errors }}</div>
-                    {% endif %}
+                                    {% if deadline_form.deadline_at.errors %}
+                                        <div class="text-danger small mt-1">{{ deadline_form.deadline_at.errors }}</div>
+                                    {% endif %}
 
-                    <div class="form-text">
-                        Соискатель увидит дедлайн (если ты его показываешь в кабинете). Можно оставить пустым — дедлайна не будет.
+                                    <div class="form-text">
+                                        Соискатель увидит дедлайн (если ты его показываешь в кабинете). Можно оставить
+                                        пустым — дедлайна не будет.
+                                    </div>
+                                </div>
+
+                                <div class="d-flex gap-2">
+                                    <button class="btn btn-outline-primary" type="submit" name="action_deadline_save">
+                                        Сохранить дедлайн
+                                    </button>
+
+                                    {% if letter.deadline_at %}
+                                        <button class="btn btn-outline-secondary" type="submit"
+                                                name="action_deadline_clear" value="1">
+                                            Убрать дедлайн
+                                        </button>
+                                    {% endif %}
+                                </div>
+                            </form>
+
+                        {% endif %}
                     </div>
                 </div>
-
-                <div class="d-flex gap-2">
-                    <button class="btn btn-outline-primary" type="submit" name="action_deadline_save">
-                        Сохранить дедлайн
-                    </button>
-
-                    {% if letter.deadline_at %}
-                        <button class="btn btn-outline-secondary" type="submit" name="action_deadline_clear" value="1">
-                            Убрать дедлайн
-                        </button>
-                    {% endif %}
-                </div>
-            </form>
-
-        {% endif %}
-    </div>
-</div>
 
                 {% if rubric_review %}
                     <div class="card shadow-sm mb-4">

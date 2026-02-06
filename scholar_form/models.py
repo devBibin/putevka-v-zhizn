@@ -10,8 +10,6 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
 from django.utils import timezone
-from importlib.resources._common import _
-
 
 class StaffNote(models.Model):
     target_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="staff_notes")
@@ -24,6 +22,8 @@ class StaffNote(models.Model):
                                related_name="staff_notes_authored")
 
     text = models.TextField()
+
+    is_favorite = models.BooleanField(default=False, db_index=True)
 
     created_at = models.DateTimeField(default=timezone.now, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)
