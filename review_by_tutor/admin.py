@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from review_by_tutor.models import Interview, TestAssignment, InterviewPreparation, InterviewTemplate
+from review_by_tutor.models import Interview, TestAssignment, InterviewPreparation, InterviewTemplate, GoogleOAuthToken
 
 
 @admin.register(Interview)
