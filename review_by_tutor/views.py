@@ -21,7 +21,7 @@ from my_study.models import CourseSelection, UniversityPriority, AssessmentResul
 from review_by_tutor.forms import MotivationLetterStaffForm, UserInfoStaffForm, ScholarVideoStaffForm, \
     DocumentStaffUploadForm, DocumentCommentForm, \
     DocumentStatusForm, InterviewForm, TestAssignmentCreateForm, TestAssignmentEditForm, TestResultForm, \
-    LetterRevisionForm
+    LetterRevisionForm, MotivationLetterRubricReviewStaffForm, LetterDeadlineForm, ScholarVideoDeadlineForm
 from review_by_tutor.models import Interview, TestAssignment, InterviewPreparation, InterviewTemplate
 from scholar_form.models import UserInfo, ScholarVideo, StaffNote
 
@@ -40,41 +40,69 @@ def staff_letter_detail(request, user_id: int):
     user = get_object_or_404(User, pk=user_id)
 
     letter = (
-        MotivationLetter.objects.select_related("user")
+        MotivationLetter.objects.select_related("user", "rubric_review")
         .filter(user_id=user_id)
         .first()
     )
 
     revision_form = LetterRevisionForm(request.POST or None)
+    deadline_form = LetterDeadlineForm(request.POST or None)
+
+    rubric_review = getattr(letter, "rubric_review", None) if letter else None
+    rubric_form = MotivationLetterRubricReviewStaffForm(
+        request.POST or None,
+        instance=rubric_review
+    ) if rubric_review else None
 
     if request.method == "POST":
         if letter is None:
             messages.error(request, "У пользователя ещё нет мотивационного письма — сохранять нечего.")
             return redirect("staff_letter_detail", user_id=user_id)
 
-        if "action_revision" in request.POST:
-            if revision_form.is_valid():
-                comment = revision_form.cleaned_data["revision_comment"].strip()
+        if "action_rubric_save" in request.POST:
+            if rubric_review is None:
+                messages.error(request, "Нет авторазбора по рубрике — редактировать нечего.")
+                return redirect("staff_letter_detail", user_id=user_id)
 
+            if rubric_form and rubric_form.is_valid():
+                saved = rubric_form.save(commit=False)
+                saved.save()
+                messages.success(request, "Рубрика сохранена.")
+                return redirect("staff_letter_detail", user_id=user_id)
+            else:
+                messages.error(request, "Исправьте ошибки в форме рубрики.")
+
+        elif "action_revision" in request.POST:
+            if revision_form.is_valid():
+                letter.is_done = False
+                comment = revision_form.cleaned_data["revision_comment"].strip()
                 letter.status = MotivationLetter.Status.REVISION
                 letter.revision_comment = comment
                 letter.revision_requested_at = timezone.now()
                 letter.revision_requested_by = request.user
-
                 letter.is_done = False
-
                 letter.save(update_fields=[
-                    "status",
-                    "revision_comment",
-                    "revision_requested_at",
-                    "revision_requested_by",
-                    "is_done",
-                    "updated_at",
+                    "status", "revision_comment", "revision_requested_at",
+                    "revision_requested_by", "is_done", "updated_at",
                 ])
                 messages.success(request, "Письмо отправлено на дописывание.")
                 return redirect("staff_letter_detail", user_id=user_id)
             else:
                 messages.error(request, "Укажите комментарий для доработки.")
+
+        elif "action_deadline_save" in request.POST:
+            if deadline_form.is_valid():
+                letter.deadline_at = deadline_form.cleaned_data["deadline_at"]
+                letter.save(update_fields=["deadline_at"])
+                messages.success(request, "Дедлайн обновлён")
+                return redirect(request.path)
+            else:
+                messages.error(request, "Укажите корректный дедлайн.")
+
+        elif "action_deadline_clear" in request.POST:
+            letter.deadline_at = None
+            letter.save(update_fields=["deadline_at"])
+            messages.success(request, "Дедлайна больше нет.")
 
         else:
             form = MotivationLetterStaffForm(request.POST, instance=letter)
@@ -85,17 +113,13 @@ def staff_letter_detail(request, user_id: int):
                 return redirect("staff_letter_detail", user_id=user_id)
             else:
                 messages.error(request, "Исправьте ошибки в форме.")
+
     else:
         form = MotivationLetterStaffForm(instance=letter) if letter else None
 
     readonly_ctx = {
         "status": getattr(letter, "status", None),
         "submitted_at": getattr(letter, "submitted_at", None),
-        "gpt_review": getattr(letter, "gpt_review", None),
-        "gpt_score": getattr(letter, "gpt_score", None),
-        "gpt_word_count": getattr(letter, "gpt_word_count", None) or (letter.word_count() if letter else None),
-        "gpt_json": letter.gpt_json if letter and letter.gpt_json else None,
-
         "revision_comment": getattr(letter, "revision_comment", None),
         "revision_requested_at": getattr(letter, "revision_requested_at", None),
     }
@@ -104,7 +128,12 @@ def staff_letter_detail(request, user_id: int):
         "user_obj": user,
         "letter": letter,
         "form": form,
-        "revision_form": revision_form,   # ✅ важно
+        "revision_form": revision_form,
+        "deadline_form": deadline_form,
+
+        "rubric_review": rubric_review,
+        "rubric_form": rubric_form,
+
         "active": "motivation_letter",
         "readonly": readonly_ctx,
     }
@@ -148,21 +177,37 @@ def staff_video_detail(request, user_id: int):
              .filter(user_id=user_id)
              .first())
 
+    staff_form = ScholarVideoStaffForm(instance=video) if video else None
+    deadline_form = ScholarVideoDeadlineForm(instance=video)
+
     if request.method == "POST":
-        if not video:
-            messages.error(request, "У пользователя ещё нет загруженного видео — нечего оценивать.")
+        if "action_deadline_save" in request.POST:
+            if not video:
+                video = ScholarVideo.objects.create(user=user_obj)
+            deadline_form = ScholarVideoDeadlineForm(request.POST, instance=video)
+            if deadline_form.is_valid():
+                deadline_form.save()
+                messages.success(request, "Дедлайн обновлён.")
+                return redirect("staff_video_detail", user_id=user_id)
+            messages.error(request, "Исправьте ошибки в форме дедлайна.")
+
+        elif "action_deadline_clear" in request.POST:
+            if video:
+                video.deadline_at = None
+                video.save(update_fields=["deadline_at"])
+                messages.success(request, "Дедлайн удалён.")
+            else:
+                messages.info(request, "Дедлайн не задан — удалять нечего.")
             return redirect("staff_video_detail", user_id=user_id)
 
-        form = ScholarVideoStaffForm(request.POST, instance=video)
-        if form.is_valid():
-            form.save()
-            messages.success(request, "Отзыв/оценка по видео сохранены.")
-            logger.info("Staff %s updated ScholarVideo for user_id=%s", request.user.pk, user_id)
-            return redirect("staff_video_detail", user_id=user_id)
         else:
+            staff_form = ScholarVideoStaffForm(request.POST, instance=video)
+            if staff_form.is_valid():
+                staff_form.save()
+                messages.success(request, "Отзыв/оценка по видео сохранены.")
+                logger.info("Staff %s updated ScholarVideo for user_id=%s", request.user.pk, user_id)
+                return redirect("staff_video_detail", user_id=user_id)
             messages.error(request, "Исправьте ошибки в форме.")
-    else:
-        form = ScholarVideoStaffForm(instance=video) if video else None
 
     mime = None
     if video:
@@ -177,10 +222,10 @@ def staff_video_detail(request, user_id: int):
         "user_obj": user_obj,
         "video": video,
         "video_mime": mime,
-        "form": form,
+        "form": staff_form,
+        "deadline_form": deadline_form,
         "active": "my_video_page",
     })
-
 
 @login_required
 @user_passes_test(_staff_check)

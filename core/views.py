@@ -350,7 +350,7 @@ def motivation_letter(request):
         letter = MotivationLetter.objects.get(user=user)
         is_new_letter = False
     except MotivationLetter.DoesNotExist:
-        pass
+        letter = MotivationLetter.objects.create(user=user)
 
     if request.method == 'POST':
         if letter and letter.status == MotivationLetter.Status.SUBMITTED:

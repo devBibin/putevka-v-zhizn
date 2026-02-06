@@ -32,6 +32,36 @@
                     {% endif %}
                 </p>
 
+            {% if letter and letter.deadline_at %}
+    <div class="alert alert-light border shadow-sm mb-4" role="alert">
+        <div class="d-flex align-items-start justify-content-between flex-wrap gap-2">
+            <div>
+                <div class="fw-semibold">
+                    <i class="bi bi-hourglass-split me-2"></i>Дедлайн сдачи
+                </div>
+                <div class="mt-1">
+                    <span class="fw-semibold">{{ letter.deadline_at|date:"d.m.Y H:i" }}</span>
+                    <span class="text-muted">({{ letter.deadline_at|timeuntil }} осталось)</span>
+                </div>
+            </div>
+
+            {% if letter.deadline_at < now and letter.status != 'submitted' %}
+                <span class="badge text-bg-danger align-self-start">Срок истёк</span>
+            {% elif letter.status != 'submitted' %}
+                <span class="badge text-bg-warning align-self-start">Успейте отправить</span>
+            {% else %}
+                <span class="badge text-bg-success align-self-start">Отправлено</span>
+            {% endif %}
+        </div>
+
+        {% if letter.deadline_at < now and letter.status != 'submitted' %}
+            <div class="small text-muted mt-2">
+                После дедлайна отправка недоступна. Черновик можно сохранить (если вы это разрешаете).
+            </div>
+        {% endif %}
+    </div>
+{% endif %}
+
                 {% if instruction %}
                     <div class="alert alert-info">
                         <strong>{{ instruction.title }}</strong><br>

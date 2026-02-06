@@ -70,6 +70,51 @@
 
     <!-- Правая колонка: редактирование отзыва/оценки -->
     <div class="col-lg-5">
+
+    <div class="card shadow-sm mb-4">
+  <div class="card-header">Дедлайн</div>
+  <div class="card-body">
+
+    {% if video and video.deadline_at %}
+      <div class="small mb-2">
+        <strong>Текущий дедлайн:</strong> {{ video.deadline_at|date:"d.m.Y H:i" }}
+      </div>
+    {% else %}
+      <div class="text-muted small mb-2">Дедлайн не задан.</div>
+    {% endif %}
+
+    {% if deadline_form %}
+      <form method="post" novalidate class="d-grid gap-2">
+        {% csrf_token %}
+
+        <div>
+          <label class="form-label">{{ deadline_form.deadline_at.label }}</label>
+          {{ deadline_form.deadline_at }}
+          {% if deadline_form.deadline_at.errors %}
+            <div class="text-danger small mt-1">{{ deadline_form.deadline_at.errors }}</div>
+          {% endif %}
+          {% if deadline_form.deadline_at.help_text %}
+            <div class="form-text">{{ deadline_form.deadline_at.help_text }}</div>
+          {% endif %}
+        </div>
+
+        <div class="d-flex gap-2 justify-content-end">
+          <button name="action_deadline_clear" value="1" class="btn btn-outline-danger"
+                  {% if not video or not video.deadline_at %}disabled{% endif %}>
+            Удалить дедлайн
+          </button>
+          <button name="action_deadline_save" value="1" class="btn btn-primary">
+            Сохранить дедлайн
+          </button>
+        </div>
+      </form>
+    {% endif %}
+
+  </div>
+</div>
+
+
+
       <div class="card shadow-sm">
         <div class="card-header">Модерация</div>
         <div class="card-body">

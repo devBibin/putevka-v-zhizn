@@ -42,6 +42,7 @@ class PersonalForm(forms.ModelForm):
         input_formats=['%Y-%m-%d'],
         label='Дата рождения',
         required=True,
+        help_text="От рождества Христова"
     )
 
     class Meta:
@@ -301,6 +302,12 @@ class ScholarVideoForm(forms.ModelForm):
     class Meta:
         model = ScholarVideo
         fields = ["file"]
+
+    def clean_file(self):
+        f = self.cleaned_data.get("file")
+        if not f:
+            raise forms.ValidationError("Нужно выбрать видеофайл.")
+        return f
 
 class UserPersonalDataForm(forms.ModelForm):
     class Meta:

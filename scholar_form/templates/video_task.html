@@ -13,33 +13,64 @@
                 </div>
             {% endif %}
 
+            {% if video and video.deadline_at %}
+                <div class="alert
+        {% if video.deadline_at < now %}
+            alert-danger
+        {% elif video.deadline_at|timeuntil|slice:":2" == "0 " %}
+            alert-warning
+        {% else %}
+            alert-info
+        {% endif %}
+        mb-0"
+                >
+                    <strong>Дедлайн сдачи видеовизитки:</strong>
+                    {{ video.deadline_at|date:"d.m.Y H:i" }}
+                    <br>
+                    <small class="text-muted">
+                        Осталось времени: {{ video.deadline_at|timeuntil }}
+                    </small>
+                </div>
+            {% endif %}
+
             <div class="row g-3 g-md-4">
                 {% if video %}
-                    <div class="col-12 col-lg-6">
-                        <div class="card h-100">
-                            <div class="card-body">
-                                <h5 class="card-title mb-1">Видеовизитка</h5>
-                                <p class="text-muted mb-3">Рассказ о себе</p>
+    <div class="col-12 col-lg-6">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title mb-1">Видеовизитка</h5>
+                <p class="text-muted mb-3">Рассказ о себе</p>
 
-                                <!-- Адаптивный контейнер видео -->
-                                <div class="ratio ratio-16x9 rounded overflow-hidden bg-black">
-                                    <video controls preload="metadata" class="w-100 h-100">
-                                        <source src="{{ video.file.url }}" type="video/mp4">
-                                        <source src="{{ video.file.url }}" type="video/webm">
-                                        Ваш браузер не поддерживает видео.
-                                    </video>
-                                </div>
+                {% if video.file %}
+                    <div class="ratio ratio-16x9 rounded overflow-hidden bg-black">
+                        <video controls preload="metadata" class="w-100 h-100">
+                            <source src="{{ video.file.url }}" type="video/mp4">
+                            <source src="{{ video.file.url }}" type="video/webm">
+                            Ваш браузер не поддерживает видео.
+                        </video>
+                    </div>
 
-                                <p class="text-muted mt-2 small">Обновлено: {{ video.updated_at|date:"d.m.Y H:i" }}</p>
+                    <p class="text-muted mt-2 small">
+                        Обновлено: {{ video.updated_at|date:"d.m.Y H:i" }}
+                    </p>
 
-                                <div class="d-grid d-md-inline-flex gap-2 mt-2">
-                                    <a class="btn btn-outline-secondary"
-                                       href="{{ video.file.url }}" download>Скачать текущий файл</a>
-                                </div>
-                            </div>
-                        </div>
+                    <div class="d-grid d-md-inline-flex gap-2 mt-2">
+                        <a class="btn btn-outline-secondary"
+                           href="{{ video.file.url }}" download>
+                            Скачать текущий файл
+                        </a>
+                    </div>
+
+                {% else %}
+                    <div class="alert alert-warning mb-0">
+                        Файл ещё не загружен.
                     </div>
                 {% endif %}
+            </div>
+        </div>
+    </div>
+{% endif %}
+
 
                 <div class="col-12 {% if video %}col-lg-6{% else %}col-lg-8 col-xl-7{% endif %}">
                     <form id="video-form" method="post" enctype="multipart/form-data" class="card">
