@@ -19,29 +19,18 @@
         <div class="card shadow-sm mb-4">
             <div class="card-header bg-white d-flex align-items-center justify-content-between">
                 <strong>Шаблон интервью</strong>
+                {% if template_obj %}
+                    <a
+                            href="{% url 'download_interview_template' user_obj.id %}"
+                            class="btn btn-sm btn-outline-primary"
+                    >
+                        Скачать шаблон
+                    </a>
 
-                <div class="d-flex align-items-center gap-2">
-                    {% if interview.sheet_fill_status == "PROCESSING" %}
-                        <span class="badge text-bg-warning">Заполнение в обработке</span>
-                    {% elif interview.sheet_fill_status == "DONE" %}
-                        <span class="badge text-bg-success">Заполнено</span>
-                    {% elif interview.sheet_fill_status == "FAILED" %}
-                        <span class="badge text-bg-danger">Ошибка заполнения</span>
-                    {% else %}
-                        <span class="badge text-bg-secondary">Ожидает заполнения</span>
-                    {% endif %}
-
-                    {% if template_obj %}
-                        <a href="{% url 'download_interview_template' user_obj.id %}"
-                           class="btn btn-sm btn-outline-primary">
-                            Скачать шаблон
-                        </a>
-                    {% else %}
-                        <span class="small text-muted">Шаблон не загружен</span>
-                    {% endif %}
-                </div>
+                {% else %}
+                    <span class="small text-muted">Шаблон не загружен</span>
+                {% endif %}
             </div>
-
             <div class="card-body">
                 {% if interview.filled_form %}
                     <div class="d-flex flex-wrap align-items-center gap-2">
@@ -57,25 +46,6 @@
                     </div>
                 {% else %}
                     <div class="text-muted">Заполненный файл ещё не загружен.</div>
-                {% endif %}
-                {% if interview.google_sheet_url %}
-                    <a class="btn btn-outline-primary btn-sm" target="_blank" href="{{ interview.google_sheet_url }}">
-                        Открыть Google-таблицу
-                    </a>
-                {% endif %}
-                {% if interview.sheet_fill_status == "DONE" and interview.sheet_filled_at %}
-                    <div class="text-muted small mt-2">
-                        Заполнено: {{ interview.sheet_filled_at|date:"d.m.Y H:i" }}
-                    </div>
-                {% elif interview.sheet_fill_status == "FAILED" and interview.sheet_fill_error %}
-                    <div class="alert alert-danger small mt-2 mb-0">
-                        Не удалось заполнить Google-таблицу.
-                        <br><code>{{ interview.sheet_fill_error }}</code>
-                    </div>
-                {% elif interview.sheet_fill_status == "PROCESSING" %}
-                    <div class="text-muted small mt-2">
-                        Заполнение выполняется в фоне. Обнови страницу через минуту.
-                    </div>
                 {% endif %}
             </div>
         </div>

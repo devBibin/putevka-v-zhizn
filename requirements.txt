@@ -17,7 +17,3 @@ jinja2
 num2words
 docxtpl
 openpyxl
-google
-google-api-python-client
-google-auth
-google-auth-oauthlib

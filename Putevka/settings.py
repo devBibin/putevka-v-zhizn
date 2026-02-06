@@ -20,8 +20,6 @@ import dj_database_url, os
 
 
 
-
-
 load_dotenv()
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -164,9 +162,6 @@ EMAIL_HOST_PASSWORD = os.getenv("YC_EMAIL_PASSWORD")
 
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL")
 
-GOOGLE_SA_JSON_PATH = BASE_DIR / "secrets" / "google-sa.json"
-GOOGLE_OAUTH_CLIENT_SECRETS = BASE_DIR / "secrets" / "google-oauth-client.json"
-
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/'
 
@@ -280,6 +275,3 @@ if not os.path.exists(LOG_DIR):
 ALLOWED_VIDEO_MIME = {
     "video/mp4", "video/quicktime", "video/x-matroska", "video/webm", "application/octet-stream"
 }
-
-if DEBUG:
-    os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"

@@ -28,7 +28,4 @@ urlpatterns = [
         views.download_interview_template,
         name="download_interview_template",
     ),
-
-    path("google/connect/", views.google_connect, name="google_connect"),
-    path("google/callback/", views.google_callback, name="google_callback"),
 ]
