@@ -1,28 +1,27 @@
 import mimetypes
-import os
-import uuid
+from datetime import timedelta
 from pathlib import Path
 
 from django.conf import settings
+from django.contrib.auth.models import User
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.contenttypes.models import ContentType
-from django.core.validators import MinValueValidator, MaxValueValidator
-from importlib.resources._common import _
-from django.utils import timezone
-
-from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
+from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
+from django.utils import timezone
+from importlib.resources._common import _
 
 
 class StaffNote(models.Model):
     target_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="staff_notes")
 
     content_type = models.ForeignKey(ContentType, null=True, blank=True, on_delete=models.SET_NULL)
-    object_id    = models.PositiveIntegerField(null=True, blank=True)
+    object_id = models.PositiveIntegerField(null=True, blank=True)
     content_object = GenericForeignKey("content_type", "object_id")
 
-    author = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL, related_name="staff_notes_authored")
+    author = models.ForeignKey(User, null=True, blank=True, on_delete=models.SET_NULL,
+                               related_name="staff_notes_authored")
 
     text = models.TextField()
 
@@ -45,7 +44,8 @@ class StaffNote(models.Model):
 
 class UserInfo(models.Model):
     GENDERS = [('MAN', 'Мужчина'), ('WOMAN', 'Женщина')]
-    STATUSES = [('CANDIDATE', 'Кандидат'), ('ALTERNATIVE', 'Альтернативный трек'), ('SCHOLAR', 'Участник'), ('ALUMNUS', 'Выпускник')]
+    STATUSES = [('CANDIDATE', 'Кандидат'), ('ALTERNATIVE', 'Альтернативный трек'), ('SCHOLAR', 'Участник'),
+                ('ALUMNUS', 'Выпускник')]
     PROFILES = [
         ("humanities", "Гуманитарный профиль"),
         ("chem_bio", "Химико-биологический профиль"),
@@ -79,13 +79,14 @@ class UserInfo(models.Model):
     school_address = models.CharField(max_length=1000, verbose_name="Адрес школы", blank=True)
     class_teacher = models.CharField(max_length=1000, verbose_name="Классный руководитель", blank=True)
 
-    #TODO: оставим, чтобы не удалять бд, потом удалить
+    # TODO: оставим, чтобы не удалять бд, потом удалить
     next_year_class = models.CharField(max_length=10, verbose_name="Класс в следующем учебном году", blank=True)
 
-    next_year_class_digit = models.IntegerField(verbose_name="Класс в следующем учебном году", blank=True, null=True, validators=[
-            MinValueValidator(1),
-            MaxValueValidator(11)
-        ])
+    next_year_class_digit = models.IntegerField(verbose_name="Класс в следующем учебном году", blank=True, null=True,
+                                                validators=[
+                                                    MinValueValidator(1),
+                                                    MaxValueValidator(11)
+                                                ])
 
     class_profile = models.CharField(max_length=255, blank=True, verbose_name="Профиль класса")
     planned_exams = models.CharField(max_length=1000, verbose_name="Планируемые экзамены", blank=True)
@@ -134,10 +135,12 @@ class UserInfo(models.Model):
 def video_upload_to(instance, filename):
     return f"videos/visits/{instance.user_id}/{filename}"
 
+
 def validate_video_size(f):
     max_mb = 200
     if f.size > max_mb * 1024 * 1024:
         raise ValidationError(f"Файл больше {max_mb} МБ.")
+
 
 def validate_video_ext(f):
     allowed_ext = {".mp4", ".webm"}
@@ -147,15 +150,31 @@ def validate_video_ext(f):
     if ext not in allowed_ext and ctype not in {"video/mp4", "video/webm"}:
         raise ValidationError("Допустимы только MP4 или WebM.")
 
+
+def default_video_deadline():
+    return timezone.now() + timedelta(days=30)
+
+
 class ScholarVideo(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="scholar_video")
     review = models.TextField(verbose_name="Отзыв", blank=True, null=True)
     score = models.PositiveIntegerField(verbose_name="Оценка в баллах", blank=True, null=True)
+
+    deadline_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Дедлайн сдачи видеовизитки",
+        default=None,
+        db_index=True,
+    )
+
     file = models.FileField(
         "Видео",
         upload_to=video_upload_to,
         validators=[validate_video_size, validate_video_ext],
-        help_text="MP4/WebM, до 200 МБ"
+        help_text="MP4/WebM, до 200 МБ",
+        blank=True,
+        null=True,
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

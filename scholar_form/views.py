@@ -6,7 +6,7 @@ from django.urls import reverse
 from core.decorators import ensure_registration_gate
 from review_by_tutor.models import TestAssignment
 from scholar_form.forms import UserProfileForm, ScholarVideoForm, UserPersonalDataForm
-from scholar_form.models import UserInfo, UserPersonalData
+from scholar_form.models import UserInfo, UserPersonalData, ScholarVideo
 
 
 @ensure_registration_gate('protected')
@@ -41,7 +41,7 @@ def personal_info(request):
 @ensure_registration_gate('protected')
 @login_required
 def my_video_page(request):
-    instance = getattr(request.user, "scholar_video", None)
+    instance, _ = ScholarVideo.objects.get_or_create(user=request.user)
     if request.method == "POST":
         form = ScholarVideoForm(request.POST, request.FILES, instance=instance)
         if form.is_valid():

@@ -203,10 +203,26 @@ class LetterRevisionForm(forms.Form):
 from django import forms
 from core.models import MotivationLetterRubricReview
 
-class DeadlineForm(forms.ModelForm):
+class LetterDeadlineForm(forms.ModelForm):
     class Meta:
         model = MotivationLetter
         fields = ("deadline_at",)
+
+
+class ScholarVideoDeadlineForm(forms.ModelForm):
+    deadline_at = forms.DateTimeField(
+        required=False,
+        widget=forms.DateTimeInput(attrs={"type": "datetime-local", "class": "form-control"}),
+        label="Дедлайн",
+        help_text="Оставьте пустым, чтобы не задавать дедлайн.",
+    )
+
+    class Meta:
+        model = ScholarVideo
+        fields = ["deadline_at"]
+
+    def clean_deadline_at(self):
+        return self.cleaned_data.get("deadline_at") or None
 
 
 class MotivationLetterRubricReviewStaffForm(forms.ModelForm):

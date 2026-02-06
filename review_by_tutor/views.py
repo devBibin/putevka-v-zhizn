@@ -21,7 +21,7 @@ from my_study.models import CourseSelection, UniversityPriority, AssessmentResul
 from review_by_tutor.forms import MotivationLetterStaffForm, UserInfoStaffForm, ScholarVideoStaffForm, \
     DocumentStaffUploadForm, DocumentCommentForm, \
     DocumentStatusForm, InterviewForm, TestAssignmentCreateForm, TestAssignmentEditForm, TestResultForm, \
-    LetterRevisionForm, MotivationLetterRubricReviewStaffForm, DeadlineForm
+    LetterRevisionForm, MotivationLetterRubricReviewStaffForm, LetterDeadlineForm, ScholarVideoDeadlineForm
 from review_by_tutor.models import Interview, TestAssignment, InterviewPreparation, InterviewTemplate
 from scholar_form.models import UserInfo, ScholarVideo, StaffNote
 
@@ -46,7 +46,7 @@ def staff_letter_detail(request, user_id: int):
     )
 
     revision_form = LetterRevisionForm(request.POST or None)
-    deadline_form = DeadlineForm(request.POST or None)
+    deadline_form = LetterDeadlineForm(request.POST or None)
 
     rubric_review = getattr(letter, "rubric_review", None) if letter else None
     rubric_form = MotivationLetterRubricReviewStaffForm(
@@ -177,21 +177,37 @@ def staff_video_detail(request, user_id: int):
              .filter(user_id=user_id)
              .first())
 
+    staff_form = ScholarVideoStaffForm(instance=video) if video else None
+    deadline_form = ScholarVideoDeadlineForm(instance=video)
+
     if request.method == "POST":
-        if not video:
-            messages.error(request, "У пользователя ещё нет загруженного видео — нечего оценивать.")
+        if "action_deadline_save" in request.POST:
+            if not video:
+                video = ScholarVideo.objects.create(user=user_obj)
+            deadline_form = ScholarVideoDeadlineForm(request.POST, instance=video)
+            if deadline_form.is_valid():
+                deadline_form.save()
+                messages.success(request, "Дедлайн обновлён.")
+                return redirect("staff_video_detail", user_id=user_id)
+            messages.error(request, "Исправьте ошибки в форме дедлайна.")
+
+        elif "action_deadline_clear" in request.POST:
+            if video:
+                video.deadline_at = None
+                video.save(update_fields=["deadline_at"])
+                messages.success(request, "Дедлайн удалён.")
+            else:
+                messages.info(request, "Дедлайн не задан — удалять нечего.")
             return redirect("staff_video_detail", user_id=user_id)
 
-        form = ScholarVideoStaffForm(request.POST, instance=video)
-        if form.is_valid():
-            form.save()
-            messages.success(request, "Отзыв/оценка по видео сохранены.")
-            logger.info("Staff %s updated ScholarVideo for user_id=%s", request.user.pk, user_id)
-            return redirect("staff_video_detail", user_id=user_id)
         else:
+            staff_form = ScholarVideoStaffForm(request.POST, instance=video)
+            if staff_form.is_valid():
+                staff_form.save()
+                messages.success(request, "Отзыв/оценка по видео сохранены.")
+                logger.info("Staff %s updated ScholarVideo for user_id=%s", request.user.pk, user_id)
+                return redirect("staff_video_detail", user_id=user_id)
             messages.error(request, "Исправьте ошибки в форме.")
-    else:
-        form = ScholarVideoStaffForm(instance=video) if video else None
 
     mime = None
     if video:
@@ -206,10 +222,10 @@ def staff_video_detail(request, user_id: int):
         "user_obj": user_obj,
         "video": video,
         "video_mime": mime,
-        "form": form,
+        "form": staff_form,
+        "deadline_form": deadline_form,
         "active": "my_video_page",
     })
-
 
 @login_required
 @user_passes_test(_staff_check)

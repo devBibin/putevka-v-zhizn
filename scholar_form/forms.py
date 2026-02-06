@@ -303,6 +303,12 @@ class ScholarVideoForm(forms.ModelForm):
         model = ScholarVideo
         fields = ["file"]
 
+    def clean_file(self):
+        f = self.cleaned_data.get("file")
+        if not f:
+            raise forms.ValidationError("Нужно выбрать видеофайл.")
+        return f
+
 class UserPersonalDataForm(forms.ModelForm):
     class Meta:
         model = UserPersonalData

@@ -261,11 +261,6 @@ class MotivationLetter(models.Model):
             raise ValidationError("Нельзя отправить пустое письмо.")
 
     def save(self, *args, **kwargs):
-        is_new = self.pk is None
-
-        if is_new and self.deadline_at is None:
-            self.deadline_at = timezone.now() + timedelta(days=30)
-
         if self.status == self.Status.SUBMITTED and self.submitted_at is None:
             self.submitted_at = timezone.now()
             self.is_done = True
