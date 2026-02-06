@@ -169,6 +169,13 @@ class MotivationLetter(models.Model):
 
     is_done = models.BooleanField(default=False, verbose_name='Мотивационное письмо принято')
 
+    deadline_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Дедлайн сдачи мотивационного письма",
+        db_index=True,
+    )
+
     user = models.OneToOneField(
         User,
         on_delete=models.CASCADE,
@@ -254,6 +261,11 @@ class MotivationLetter(models.Model):
             raise ValidationError("Нельзя отправить пустое письмо.")
 
     def save(self, *args, **kwargs):
+        is_new = self.pk is None
+
+        if is_new and self.deadline_at is None:
+            self.deadline_at = timezone.now() + timedelta(days=30)
+
         if self.status == self.Status.SUBMITTED and self.submitted_at is None:
             self.submitted_at = timezone.now()
             self.is_done = True
@@ -293,6 +305,15 @@ class MotivationLetter(models.Model):
         self.revision_requested_at = timezone.now()
         self.revision_requested_by = by_user
         self.is_done = False
+
+    def is_deadline_passed(self) -> bool:
+        return bool(self.deadline_at and timezone.now() > self.deadline_at)
+
+    def days_left(self) -> int | None:
+        if not self.deadline_at:
+            return None
+        delta = self.deadline_at.date() - timezone.now().date()
+        return max(delta.days, 0)
 
     def __str__(self):
         return f"Письмо от {self.user.username} - {self.created_at.strftime('%Y-%m-%d')}"

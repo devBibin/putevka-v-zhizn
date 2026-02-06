@@ -203,6 +203,11 @@ class LetterRevisionForm(forms.Form):
 from django import forms
 from core.models import MotivationLetterRubricReview
 
+class DeadlineForm(forms.ModelForm):
+    class Meta:
+        model = MotivationLetter
+        fields = ("deadline_at",)
+
 
 class MotivationLetterRubricReviewStaffForm(forms.ModelForm):
     class Meta:

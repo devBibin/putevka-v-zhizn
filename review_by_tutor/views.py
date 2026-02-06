@@ -21,7 +21,7 @@ from my_study.models import CourseSelection, UniversityPriority, AssessmentResul
 from review_by_tutor.forms import MotivationLetterStaffForm, UserInfoStaffForm, ScholarVideoStaffForm, \
     DocumentStaffUploadForm, DocumentCommentForm, \
     DocumentStatusForm, InterviewForm, TestAssignmentCreateForm, TestAssignmentEditForm, TestResultForm, \
-    LetterRevisionForm, MotivationLetterRubricReviewStaffForm
+    LetterRevisionForm, MotivationLetterRubricReviewStaffForm, DeadlineForm
 from review_by_tutor.models import Interview, TestAssignment, InterviewPreparation, InterviewTemplate
 from scholar_form.models import UserInfo, ScholarVideo, StaffNote
 
@@ -46,6 +46,7 @@ def staff_letter_detail(request, user_id: int):
     )
 
     revision_form = LetterRevisionForm(request.POST or None)
+    deadline_form = DeadlineForm(request.POST or None)
 
     rubric_review = getattr(letter, "rubric_review", None) if letter else None
     rubric_form = MotivationLetterRubricReviewStaffForm(
@@ -89,6 +90,20 @@ def staff_letter_detail(request, user_id: int):
             else:
                 messages.error(request, "Укажите комментарий для доработки.")
 
+        elif "action_deadline_save" in request.POST:
+            if deadline_form.is_valid():
+                letter.deadline_at = deadline_form.cleaned_data["deadline_at"]
+                letter.save(update_fields=["deadline_at"])
+                messages.success(request, "Дедлайн обновлён")
+                return redirect(request.path)
+            else:
+                messages.error(request, "Укажите корректный дедлайн.")
+
+        elif "action_deadline_clear" in request.POST:
+            letter.deadline_at = None
+            letter.save(update_fields=["deadline_at"])
+            messages.success(request, "Дедлайна больше нет.")
+
         else:
             form = MotivationLetterStaffForm(request.POST, instance=letter)
             if form.is_valid():
@@ -114,6 +129,7 @@ def staff_letter_detail(request, user_id: int):
         "letter": letter,
         "form": form,
         "revision_form": revision_form,
+        "deadline_form": deadline_form,
 
         "rubric_review": rubric_review,
         "rubric_form": rubric_form,
