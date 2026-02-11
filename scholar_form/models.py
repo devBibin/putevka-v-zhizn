@@ -44,7 +44,7 @@ class StaffNote(models.Model):
 
 class UserInfo(models.Model):
     GENDERS = [('MAN', 'Мужчина'), ('WOMAN', 'Женщина')]
-    STATUSES = [('CANDIDATE', 'Кандидат'), ('ALTERNATIVE', 'Альтернативный трек'), ('SCHOLAR', 'Участник'),
+    STATUSES = [('CANDIDATE', 'Кандидат'), ('ALTERNATIVE', 'Альтернативный трек'), ('FINAL STAGE', 'Финалист'), ('SCHOLAR', 'Участник'),
                 ('ALUMNUS', 'Выпускник')]
     PROFILES = [
         ("humanities", "Гуманитарный профиль"),
