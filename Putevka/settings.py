@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'widget_tweaks',
     'my_study',
     'review_by_tutor',
+    'subscriber',
 ]
 
 MIDDLEWARE = [
