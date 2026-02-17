@@ -56,6 +56,7 @@ class UserInfo(models.Model):
     class FormStatus(models.TextChoices):
         DRAFT = "draft", "Не отправлена"
         SUBMITTED = "submitted", "Отправлена"
+        REVISION = "revision", "На дописывание"
         APPROVED = "approved", "Принята"
 
     form_status = models.CharField(
@@ -64,6 +65,17 @@ class UserInfo(models.Model):
         default=FormStatus.DRAFT,
         verbose_name="Статус анкеты",
         db_index=True,
+    )
+
+    revision_comment = models.TextField(
+        verbose_name="Комментарий к доработке анкеты",
+        blank=True,
+        null=True,
+    )
+    revision_requested_at = models.DateTimeField(
+        verbose_name="Запрошена доработка",
+        blank=True,
+        null=True,
     )
 
     avatar = models.ImageField(upload_to="avatars/", null=True, blank=True, verbose_name="Аватар")

@@ -5,6 +5,7 @@ from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required, user_passes_test
+from django.core.mail import send_mail
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.db import transaction
 from django.db.models import Q, Subquery, OuterRef, Count, Exists
@@ -15,6 +16,9 @@ from django.utils import timezone
 from django.utils.encoding import smart_str
 from django.views.decorators.http import require_POST
 
+from Putevka import settings
+from config import BASE_URL
+from core.bot import send_tg_notification_to_user
 from core.decorators import ensure_registration_gate
 from core.models import MotivationLetter, Notification, UserNotification
 from documents.models import Document
@@ -153,12 +157,116 @@ def staff_profile_detail(request, user_id: int):
     profile = get_object_or_404(UserInfo.objects.select_related("user"), user_id=user_id)
 
     if request.method == "POST":
-        form = UserInfoStaffForm(request.POST, instance=profile)
+        form = UserInfoStaffForm(request.POST, request.FILES, instance=profile)
+
         if form.is_valid():
+            if "action_save" in request.POST:
+                form.save()
+                messages.success(request, "Изменения сохранены.")
+                return redirect("staff_profile_detail", user_id=user_id)
+
+            if "action_revision" in request.POST:
+                obj = form.save(commit=False)
+                obj.form_status = "revision"
+                obj.revision_requested_at = timezone.now()
+                obj.save()
+                form.save_m2m()
+
+                comment = (obj.revision_comment or "").strip()
+                if not comment:
+                    messages.error(request, "Нужно указать причину доработки (revision_comment).")
+                    return redirect("staff_profile_detail", user_id=user_id)
+
+                def _notify():
+                    send_tg_notification_to_user(
+                        obj.user,
+                        (
+                            "✏️ Анкета отправлена на доработку.\n\n"
+                            f"Причина:\n{comment}\n\n"
+                            "Открой анкету и внеси правки."
+                        ),
+                        url=f"{BASE_URL}/apply/",
+                        button_text="📝 Открыть анкету"
+                    )
+
+                    user_email = obj.user.email or obj.email
+
+                    if user_email:
+                        try:
+                            send_mail(
+                                subject="Анкета отправлена на доработку",
+                                message=(
+                                    "Здравствуйте!\n\n"
+                                    "Ваша анкета отправлена на доработку.\n\n"
+                                    f"Причина:\n{comment}\n\n"
+                                    f"Перейдите по ссылке для редактирования:\n{BASE_URL}/apply/\n\n"
+                                    "С уважением,\nКоманда программы"
+                                ),
+                                from_email=settings.DEFAULT_FROM_EMAIL,
+                                recipient_list=[user_email],
+                                fail_silently=False,
+                            )
+                        except Exception as e:
+                            logger.exception("Ошибка отправки Email уведомления: %s", e)
+
+
+                transaction.on_commit(_notify)
+
+                messages.success(request, "Анкета отправлена на дописывание, уведомление будет отправлено в Telegram.")
+                return redirect("staff_profile_detail", user_id=user_id)
+
+            if "action_approve" in request.POST:
+                obj = form.save(commit=False)
+                obj.form_status = "approved"
+                obj.save()
+                form.save_m2m()
+
+                def _notify():
+                    message_text = (
+                        "🎉 Анкета успешно принята!\n\n"
+                        "Поздравляем! Ваша анкета прошла проверку.\n\n"
+                        "Ожидайте дальнейшей информации."
+                    )
+
+                    try:
+                        send_tg_notification_to_user(
+                            obj.user,
+                            message_text,
+                            url=f"{BASE_URL}/apply/",
+                            button_text="📄 Открыть анкету"
+                        )
+                    except Exception as e:
+                        logger.exception("Ошибка отправки Telegram уведомления (approve): %s", e)
+
+                    user_email = obj.user.email or obj.email
+
+                    if user_email:
+                        try:
+                            send_mail(
+                                subject="Ваша анкета принята 🎉",
+                                message=(
+                                    "Здравствуйте!\n\n"
+                                    "Ваша анкета успешно прошла проверку и принята.\n\n"
+                                    "Мы свяжемся с вами для дальнейших шагов.\n\n"
+                                    f"Просмотреть анкету можно здесь:\n{BASE_URL}/apply/\n\n"
+                                    "С уважением,\nКоманда программы"
+                                ),
+                                from_email=settings.DEFAULT_FROM_EMAIL,
+                                recipient_list=[user_email],
+                                fail_silently=False,
+                            )
+                        except Exception as e:
+                            logger.exception("Ошибка отправки Email уведомления (approve): %s", e)
+
+                transaction.on_commit(_notify)
+
+                messages.success(request, "Анкета принята. Пользователь будет уведомлён.")
+                return redirect("staff_profile_detail", user_id=user_id)
+
             form.save()
-            messages.success(request, "Фидбэк/статус анкеты сохранены.")
-            logger.info("Staff %s updated user_info for user_id=%s", request.user.pk, user_id)
+            messages.success(request, "Сохранено.")
             return redirect("staff_profile_detail", user_id=user_id)
+
         messages.error(request, "Исправьте ошибки в форме.")
     else:
         form = UserInfoStaffForm(instance=profile)

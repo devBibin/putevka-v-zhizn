@@ -347,26 +347,36 @@
                     <div class="card shadow-sm mb-4">
                         <div class="card-header">Статус анкеты</div>
                         <div class="card-body">
-                            <label class="form-label">{{ form.form_status.label }}</label>
-                            {{ form.form_status }}
-                            {% if form.form_status.errors %}
-                                <div class="text-danger small mt-1">{{ form.form_status.errors }}</div>
-                            {% endif %}
 
-                            <div class="form-text">
-                                Не отправлена — можно редактировать. Отправлена/Принята — анкета блокируется.
+                            <div class="mb-3">
+                                <label class="form-label">{{ form.form_status.label }}</label>
+                                {{ form.form_status }}
                             </div>
 
-                            <div class="mt-2">
-      <span class="badge
-        {% if profile.form_status == 'draft' %}text-bg-secondary
-        {% elif profile.form_status == 'submitted' %}text-bg-warning
-        {% else %}text-bg-success{% endif %}">
-        {{ profile.get_form_status_display }}
-      </span>
+                            <div class="mb-3">
+                                <label class="form-label">{{ form.revision_comment.label }}</label>
+                                {{ form.revision_comment|add_class:"form-control" }}
+                                <div class="form-text">
+                                    Заполни причину — она уйдёт пользователю в Telegram.
+                                </div>
                             </div>
+
+                            <div class="d-flex gap-2 flex-wrap">
+                                <button class="btn btn-primary" type="submit" name="action_save" value="1">Сохранить
+                                </button>
+
+                                <button class="btn btn-warning" type="submit" name="action_revision" value="1">
+                                    На дописывание + уведомить
+                                </button>
+
+                                <button class="btn btn-success" type="submit" name="action_approve" value="1">
+                                    Принять
+                                </button>
+                            </div>
+
                         </div>
                     </div>
+
 
                     <div class="card shadow-sm mb-4">
                         <div class="card-header">Фидбэк куратора</div>
@@ -388,6 +398,7 @@
                                     <div class="text-danger small mt-1">{{ form.is_done.errors }}</div>
                                 {% endif %}
                             </div>
+
 
                             <div class="d-flex gap-2">
                                 <button class="btn btn-primary" type="submit">Сохранить</button>
