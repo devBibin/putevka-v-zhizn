@@ -89,7 +89,7 @@ class UserInfo(models.Model):
     last_name = models.CharField(max_length=255, verbose_name="Фамилия", blank=True)
     first_name = models.CharField(max_length=255, verbose_name="Имя", blank=True)
     middle_name = models.CharField(max_length=255, verbose_name="Отчество", blank=True)
-    gender = models.CharField(max_length=10, choices=GENDERS, default='MAN', verbose_name="Пол")
+    gender = models.CharField(max_length=10, choices=GENDERS, verbose_name="Пол", null=True, blank=True)
     birth_date = models.DateField(verbose_name="Дата рождения", null=True, blank=True)
     phone = models.CharField(max_length=20, verbose_name="Телефон", blank=True)
     email = models.EmailField(verbose_name="Email", blank=True)
@@ -113,7 +113,7 @@ class UserInfo(models.Model):
 
     class_profile = models.CharField(max_length=255, blank=True, verbose_name="Профиль класса")
     planned_exams = models.CharField(max_length=1000, verbose_name="Планируемые экзамены", blank=True)
-    subject_grades = models.CharField(max_length=1000, verbose_name="Оценки по предметам", blank=True)
+    subject_grades = models.CharField(max_length=1000, verbose_name="Средние оценки по предметам", blank=True)
 
     # Step 3: Admission Plans
     olympiad_plans = models.CharField(max_length=10000, verbose_name="Планы участия в олимпиадах", blank=True)
@@ -124,24 +124,24 @@ class UserInfo(models.Model):
     # Step 4: Family
     mother = models.CharField(max_length=10000, verbose_name="Мама", blank=True)
     father = models.CharField(max_length=10000, verbose_name="Папа", blank=True)
-    legal_guardian = models.CharField(max_length=10000, blank=True, verbose_name="Опекун")
+    legal_guardian = models.CharField(max_length=10000, blank=True, verbose_name="Иной законный представитель")
     siblings_count = models.IntegerField(verbose_name="Количество братьев и сестёр", null=True, blank=True)
     siblings_info = models.CharField(max_length=10000, verbose_name="Информация о братьях и сёстрах", blank=True)
     family_size = models.IntegerField(verbose_name="Общий состав семьи", null=True, blank=True)
-    income_per_member = models.CharField(max_length=255, verbose_name="Доход на одного члена семьи", blank=True)
-    is_low_income = models.CharField(max_length=10, verbose_name="Малообеспеченная семья", blank=True)
-    receives_subsidy = models.CharField(max_length=255, verbose_name="Получает ли семья пособия", blank=True)
-    other_factors = models.CharField(max_length=10000, blank=True, verbose_name="Другие важные факторы")
+    income_per_member = models.CharField(max_length=255, verbose_name="Среднемесячный доход на 1 члена семьи за последние 12 месяцев (руб.)", blank=True)
+    is_low_income = models.CharField(max_length=10, verbose_name="Имеет ли семья статус малоимущей?", blank=True)
+    receives_subsidy = models.CharField(max_length=255, verbose_name="Получает ли семья субсидии от государства? ", blank=True)
+    other_factors = models.CharField(max_length=10000, blank=True, verbose_name="Есть какие-либо иные обстоятельства, о которых ты хотел(-a) бы сообщить?")
     has_pc_with_internet = models.CharField(max_length=1000, verbose_name="Есть ли дома компьютер с интернетом",
                                             blank=True)
 
     # Step 5: Additional
     vk = models.URLField(max_length=500, verbose_name="Ссылка на вк", blank=True, null=True)
-    achievements = models.CharField(max_length=10000, verbose_name="Достижения", blank=True)
+    achievements = models.CharField(max_length=10000, verbose_name="Кратко опиши свои достижения за последние два года", blank=True)
     preparation_plan = models.CharField(max_length=10000, verbose_name="План подготовки к поступлению", blank=True)
     foundation_help = models.CharField(max_length=10000, verbose_name="Какая помощь от фонда нужна", blank=True)
     heard_about_program = models.CharField(max_length=255, verbose_name="Как узнали о программе", blank=True)
-    willing_to_participate = models.CharField(max_length=10, verbose_name="Готов(а) участвовать в программе",
+    willing_to_participate = models.CharField(max_length=10, verbose_name="Готов(-а) ли ты активно принимать участие в программе Фонда?",
                                               blank=True)
     agree_processing = models.BooleanField(verbose_name="Согласие на обработку данных", null=True)
     agree_documents = models.BooleanField(verbose_name="Согласие на предоставление документов", null=True)

@@ -1,4 +1,5 @@
 from django import forms
+from django.contrib import messages
 from django.db import transaction
 from django.dispatch import Signal
 from django.forms import HiddenInput
@@ -7,8 +8,6 @@ from django.shortcuts import redirect
 from formtools.wizard.views import SessionWizardView
 
 from .models import UserInfo, ScholarVideo, UserPersonalData
-from django.contrib import messages
-
 
 
 def _sync_user_from_userinfo(userinfo: UserInfo):
@@ -57,7 +56,10 @@ class PersonalForm(forms.ModelForm):
             'last_name': forms.TextInput(attrs={'placeholder': 'Иванов'}),
             'first_name': forms.TextInput(attrs={'placeholder': 'Иван'}),
             'middle_name': forms.TextInput(attrs={'placeholder': 'Иванович'}),
-            'gender': forms.Select(attrs={'class': 'form-control'}),
+            'gender': forms.Select(
+                attrs={'class': 'form-control'},
+                choices=[('', '— Выберите пол —')] + UserInfo.GENDERS
+            ),
             'region': forms.TextInput(attrs={'placeholder': 'Московская область'}),
             'city': forms.TextInput(attrs={'placeholder': 'Город N'}),
             'address': forms.TextInput(attrs={'placeholder': 'ул. Ленина, д. 1, кв. 2'}),
@@ -65,6 +67,22 @@ class PersonalForm(forms.ModelForm):
 
 
 class EducationForm(forms.ModelForm):
+    class_teacher = forms.CharField(
+        widget=forms.TextInput(
+            attrs={'placeholder': 'Петрова Мария Ивановна, +7 (999) 123-45-67'}
+        ),
+        label='Классный руководитель',
+        required=True,
+        help_text="ФИО, телефон, email"
+    )
+
+    subject_grades = forms.CharField(
+        widget=forms.Textarea(attrs={'placeholder': 'Математика — 5, Физика — 4'}),
+        help_text="в т.ч.: Русский язык, Алгебра, Геометрия, Биология, Химия, Физика, Иностранный язык, Информатика",
+        required=True,
+        label='Средние оценки по предметам'
+    )
+
     class Meta:
         model = UserInfo
         fields = [
@@ -93,6 +111,12 @@ class AdmissionForm(forms.ModelForm):
             'target_universities': forms.Textarea(attrs={'placeholder': 'МГУ, ВШЭ, МФТИ'}),
             'specializations': forms.Textarea(attrs={'placeholder': 'Прикладная математика, инженерия'}),
         }
+        help_texts = {
+            'specializations': 'Мы не требуем от тебя железного решения уже сейчас. Но наверняка у тебя есть примерный '
+                               'перечень специальностей, о которых ты задумывался. Укажи в заявке те направления, '
+                               'которые тебе были бы интересны.',
+            'target_universities': 'Список наиболее приоритетных ВУЗов, в которые планируешь поступать (не более 5).\nНаименование, город, факультет.\nМы не требуем от тебя железного решения уже сейчас. Укажи те вузы, о которых ты слышал, что они выпускают специалистов твоего направления; те вузы, в которых ты хотел бы учиться.'
+        }
 
 
 class FamilyForm(forms.ModelForm):
@@ -115,6 +139,13 @@ class FamilyForm(forms.ModelForm):
             'receives_subsidy': forms.TextInput(attrs={'placeholder': 'Пособие на ребёнка'}),
             'other_factors': forms.Textarea(attrs={'placeholder': 'Семья арендует жильё, инвалидность'}),
             'has_pc_with_internet': forms.TextInput(attrs={'placeholder': 'Да / Нет'}),
+        }
+        help_texts = {
+            'mother': "ФИО, телефон, e-mail, место работы",
+            'father': "ФИО, телефон, e-mail, место работы",
+            'legal_guardian': "ФИО, телефон, e-mail, место работы. Если твоими законными представителями являются родители, оставь это поле пустым. В иных случаях укажи человека, который за тебя отвечает: бабушка, тетя, директор детского учреждения.",
+            'receives_subsidy': 'Если да, то на каком основании?',
+            'income_per_member': 'Сложи годовой доход «на руки» каждого из родителей, живущих с тобой, раздели на 12, а потом раздели на число членов семьи, проживающих вместе /финансово зависимых от родителей.  Если среднемесячный доход на одного члена твоей семьи больше 15 000 р., ты можешь принять участие в отборе, но мы попросим объяснить, почему ты считаешь, что помощь для тебя критична.'
         }
 
 
@@ -228,7 +259,7 @@ class ApplicationWizard(SessionWizardView):
             for field, value in form.cleaned_data.items():
                 if field in model_fields:
                     setattr(instance, field, value)
-        instance.form_status =  "submitted"
+        instance.form_status = "submitted"
         wizard_done.send(sender=self.__class__, instance=instance, forms=form_list)
         instance.save()
 
@@ -364,6 +395,7 @@ class ScholarVideoForm(forms.ModelForm):
         if not f:
             raise forms.ValidationError("Нужно выбрать видеофайл.")
         return f
+
 
 class UserPersonalDataForm(forms.ModelForm):
     class Meta:
