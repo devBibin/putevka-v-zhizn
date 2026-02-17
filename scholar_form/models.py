@@ -53,9 +53,20 @@ class UserInfo(models.Model):
         ("creative", "Творческий профиль"),
     ]
 
-    avatar = models.ImageField(upload_to="avatars/", null=True, blank=True, verbose_name="Аватар")
+    class FormStatus(models.TextChoices):
+        DRAFT = "draft", "Не отправлена"
+        SUBMITTED = "submitted", "Отправлена"
+        APPROVED = "approved", "Принята"
 
-    is_done = models.BooleanField(default=False, verbose_name='Анкета уже отправлена')
+    form_status = models.CharField(
+        max_length=20,
+        choices=FormStatus.choices,
+        default=FormStatus.DRAFT,
+        verbose_name="Статус анкеты",
+        db_index=True,
+    )
+
+    avatar = models.ImageField(upload_to="avatars/", null=True, blank=True, verbose_name="Аватар")
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, null=True, related_name='user_info')
     status = models.CharField(max_length=100, choices=STATUSES, default='CANDIDATE', verbose_name='Статус в программе')
@@ -126,6 +137,10 @@ class UserInfo(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата заполнения анкеты")
 
     tutor_summary = models.TextField(verbose_name="Заметки куратора", blank=True, null=True)
+
+    @property
+    def is_locked(self) -> bool:
+        return self.form_status in {self.FormStatus.SUBMITTED, self.FormStatus.APPROVED}
 
     class Meta:
         verbose_name = "Анкета участника"

@@ -2,10 +2,13 @@ from django import forms
 from django.db import transaction
 from django.dispatch import Signal
 from django.forms import HiddenInput
+from django.http import HttpResponseForbidden
 from django.shortcuts import redirect
 from formtools.wizard.views import SessionWizardView
 
 from .models import UserInfo, ScholarVideo, UserPersonalData
+from django.contrib import messages
+
 
 
 def _sync_user_from_userinfo(userinfo: UserInfo):
@@ -167,8 +170,21 @@ class ApplicationWizard(SessionWizardView):
     def get_form(self, step=None, data=None, files=None):
         form = super().get_form(step, data, files)
 
-        required_false_list = ['legal_guardian', 'vk']
+        instance = self.get_form_instance(step or self.steps.current)
 
+        locked = getattr(instance, "form_status", "draft") in {"submitted", "approved"}
+
+        if locked:
+            for name, field in form.fields.items():
+                if isinstance(field.widget, HiddenInput):
+                    continue
+                field.disabled = True
+                field.required = False
+                if hasattr(field.widget, "attrs"):
+                    field.widget.attrs.pop("required", None)
+            return form
+
+        required_false_list = ['legal_guardian', 'vk']
         for name, field in form.fields.items():
             if name in required_false_list:
                 field.required = False
@@ -177,7 +193,6 @@ class ApplicationWizard(SessionWizardView):
                 continue
 
             field.required = True
-
             if hasattr(field.widget, 'attrs') and not isinstance(field.widget, HiddenInput):
                 field.widget.attrs['required'] = ''
 
@@ -213,7 +228,7 @@ class ApplicationWizard(SessionWizardView):
             for field, value in form.cleaned_data.items():
                 if field in model_fields:
                     setattr(instance, field, value)
-        instance.is_done = True
+        instance.form_status =  "submitted"
         wizard_done.send(sender=self.__class__, instance=instance, forms=form_list)
         instance.save()
 
@@ -249,9 +264,50 @@ class ApplicationWizard(SessionWizardView):
 
         return super().post(*args, **kwargs)
 
+    def get(self, request, *args, **kwargs):
+        response = super().get(request, *args, **kwargs)
+
+        instance = self.get_form_instance(self.steps.current)
+        locked = instance.form_status in {"submitted", "approved"}
+
+        step = request.GET.get("step")
+        if locked and step:
+            all_steps = list(self.get_form_list().keys())
+            if step in all_steps:
+                self.storage.current_step = step
+                return self.render(self.get_form(step=step))
+
+        return response
+
     def get_context_data(self, form, **kwargs):
         context = super().get_context_data(form=form, **kwargs)
         context["active"] = "apply"
+        return context
+
+    def is_locked(self) -> bool:
+        instance = self.get_form_instance(self.steps.current)
+        return getattr(instance, "form_status", "draft") in {"submitted", "approved"}
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.method in ("POST", "PUT", "PATCH", "DELETE"):
+            instance = self.get_form_instance(getattr(self, "steps", None).current if hasattr(self, "steps") else None)
+
+            locked = getattr(instance, "form_status", "draft") in {"submitted", "approved"}
+
+            if locked:
+                if request.POST.get("_autosave") == "1":
+                    return HttpResponseForbidden()
+
+                messages.error(request, "Анкета уже отправлена и не может быть изменена.")
+                return redirect("thank_you")
+
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, form, **kwargs):
+        context = super().get_context_data(form=form, **kwargs)
+        instance = self.get_form_instance(self.steps.current)
+        context["active"] = "apply"
+        context["is_locked"] = getattr(instance, "form_status", "draft") in {"submitted", "approved"}
         return context
 
 
