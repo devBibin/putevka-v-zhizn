@@ -2,17 +2,27 @@
 {% block content %}
     <script src="https://unpkg.com/htmx.org@1.9.12"></script>
     {% load widget_tweaks %}
+
     <div class="container mt-5 mb-5">
         <div class="card shadow">
             <div class="card-body">
                 <h1 class="h4 mb-4 text-center">Шаг {{ wizard.steps.step1 }} из {{ wizard.steps.count }}</h1>
+
+                {% if is_locked %}
+                    <div class="alert alert-warning">
+                        Анкета уже отправлена и доступна только для просмотра.
+                    </div>
+                {% endif %}
+
                 <form method="post"
                       action=""
+                        {% if not is_locked %}
                       hx-post="{{ request.path }}"
                       hx-trigger="change, input delay:500ms"
                       hx-include="this"
                       hx-vals='{"_autosave":"1"}'
                       hx-swap="none"
+                        {% endif %}
                       novalidate>
                     {% csrf_token %}
                     {{ wizard.management_form }}
@@ -32,14 +42,12 @@
                                             title="{{ field.help_text }}"
                                             style="cursor: help; font-size: 0.9em;"
                                     >
-                                        <i
-                                                class="bi bi-question-circle text-muted"
-                                                data-bs-toggle="tooltip"
-                                                style="cursor: help;"
-                                        ></i>
+                                        <i class="bi bi-question-circle text-muted" data-bs-toggle="tooltip"
+                                           style="cursor: help;"></i>
                                     </span>
                                 {% endif %}
                             </label>
+
                             {% if field.field.widget.input_type == 'checkbox' %}
                                 <div class="form-check">
                                     {{ field|add_class:"form-check-input" }}
@@ -47,6 +55,7 @@
                             {% else %}
                                 {{ field|add_class:"form-control" }}
                             {% endif %}
+
                             {% for error in field.errors %}
                                 <div class="text-danger small">{{ error }}</div>
                             {% endfor %}
@@ -59,23 +68,47 @@
 
                     <div class="d-flex justify-content-between">
                         {% if wizard.steps.prev %}
-                            <button name="wizard_goto_step" type="submit"
-                                    value="{{ wizard.steps.prev }}" class="btn btn-outline-secondary">
-                                Назад
+                            {% if is_locked %}
+                                <a class="btn btn-outline-secondary"
+                                   href="?step={{ wizard.steps.prev }}">Назад</a>
+                            {% else %}
+                                <button name="wizard_goto_step" type="submit"
+                                        value="{{ wizard.steps.prev }}" class="btn btn-outline-secondary">
+                                    Назад
+                                </button>
+                            {% endif %}
+                        {% endif %}
+
+                        {% if is_locked %}
+                            {% if wizard.steps.next %}
+                                <a class="btn btn-primary ms-auto"
+                                   href="?step={{ wizard.steps.next }}">Далее</a>
+                            {% else %}
+                                <a class="btn btn-secondary ms-auto" href="{% url 'thank_you' %}">
+                                    Готово
+                                </a>
+                            {% endif %}
+                        {% else %}
+                            <button type="submit" class="btn btn-primary ms-auto">
+                                {% if wizard.steps.current == wizard.steps.last %}Отправить{% else %}Далее{% endif %}
                             </button>
                         {% endif %}
-                        <button type="submit" class="btn btn-primary ms-auto">
-                            {% if wizard.steps.current == wizard.steps.last %}
-                                Отправить
-                            {% else %}
-                                Далее
-                            {% endif %}
-                        </button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
+
+    {% if is_locked %}
+        <script>
+            document.addEventListener("DOMContentLoaded", function () {
+                document.querySelectorAll("form input, form textarea, form select, form button[type='submit']").forEach(el => {
+                    if (el.type === "hidden") return;
+                    el.disabled = true;
+                });
+            });
+        </script>
+    {% endif %}
 {% endblock %}
 
 {% block extra_js %}

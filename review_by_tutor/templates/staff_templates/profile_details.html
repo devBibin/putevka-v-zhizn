@@ -4,143 +4,412 @@
 {% block title %}Анкета участника — модерация{% endblock %}
 
 {% block content %}
-<div class="container py-4">
-  <h1 class="mb-3">Анкета: {{ user_obj.get_full_name|default:user_obj.username }}</h1>
+    <div class="container py-4">
+        <h1 class="mb-3">Анкета: {{ user_obj.get_full_name|default:user_obj.username }}</h1>
 
-  {% if messages %}
-    {% for message in messages %}
-      <div class="alert alert-{{ message.tags }}">{{ message }}</div>
-    {% endfor %}
-  {% endif %}
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
 
-  <div class="row g-4">
-    <!-- Левая колонка: вся анкета read-only -->
-    <div class="col-lg-7">
-      <div class="card shadow-sm mb-4">
-        <div class="card-header">Личная информация</div>
-        <div class="card-body">
-          <dl class="row mb-0">
-            <dt class="col-sm-5">Фамилия</dt><dd class="col-sm-7">{{ profile.last_name|default:"—" }}</dd>
-            <dt class="col-sm-5">Имя</dt><dd class="col-sm-7">{{ profile.first_name|default:"—" }}</dd>
-            <dt class="col-sm-5">Отчество</dt><dd class="col-sm-7">{{ profile.middle_name|default:"—" }}</dd>
-            <dt class="col-sm-5">Дата рождения</dt><dd class="col-sm-7">{% if profile.birth_date %}{{ profile.birth_date|date:"d.m.Y" }}{% else %}—{% endif %}</dd>
-            <dt class="col-sm-5">Телефон</dt><dd class="col-sm-7">{{ profile.phone|default:"—" }}</dd>
-            <dt class="col-sm-5">Email</dt><dd class="col-sm-7">{{ profile.email|default:user_obj.email|default:"—" }}</dd>
-            <dt class="col-sm-5">Регион</dt><dd class="col-sm-7">{{ profile.region|default:"—" }}</dd>
-            <dt class="col-sm-5">Адрес</dt><dd class="col-sm-7">{{ profile.address|default:"—" }}</dd>
-          </dl>
-        </div>
-      </div>
-
-      <div class="card shadow-sm mb-4">
-        <div class="card-header">Образование</div>
-        <div class="card-body">
-          <dl class="row mb-0">
-            <dt class="col-sm-5">Школа</dt><dd class="col-sm-7">{{ profile.school_name|default:"—" }}</dd>
-            <dt class="col-sm-5">Адрес школы</dt><dd class="col-sm-7">{{ profile.school_address|default:"—" }}</dd>
-            <dt class="col-sm-5">Классный руководитель</dt><dd class="col-sm-7">{{ profile.class_teacher|default:"—" }}</dd>
-            <dt class="col-sm-5">Класс в след. году</dt><dd class="col-sm-7">{{ profile.next_year_class_digit|default:"—" }}</dd>
-            <dt class="col-sm-5">Профиль класса</dt><dd class="col-sm-7">{{ profile.class_profile|default:"—" }}</dd>
-            <dt class="col-sm-5">Планируемые экзамены</dt><dd class="col-sm-7">{{ profile.planned_exams|default:"—" }}</dd>
-            <dt class="col-sm-5">Оценки по предметам</dt><dd class="col-sm-7">{{ profile.subject_grades|default:"—" }}</dd>
-          </dl>
-        </div>
-      </div>
-
-      <div class="card shadow-sm mb-4">
-        <div class="card-header">Планы поступления</div>
-        <div class="card-body">
-          <dl class="row mb-0">
-            <dt class="col-sm-5">Олимпиады</dt><dd class="col-sm-7">{{ profile.olympiad_plans|default:"—" }}</dd>
-            <dt class="col-sm-5">Путь поступления</dt><dd class="col-sm-7">{{ profile.admission_path|default:"—" }}</dd>
-            <dt class="col-sm-5">Целевые вузы</dt><dd class="col-sm-7">{{ profile.target_universities|default:"—" }}</dd>
-            <dt class="col-sm-5">Направления</dt><dd class="col-sm-7">{{ profile.specializations|default:"—" }}</dd>
-          </dl>
-        </div>
-      </div>
-
-      <div class="card shadow-sm mb-4">
-        <div class="card-header">Семья</div>
-        <div class="card-body">
-          <dl class="row mb-0">
-            <dt class="col-sm-5">Мама</dt><dd class="col-sm-7">{{ profile.mother|default:"—" }}</dd>
-            <dt class="col-sm-5">Папа</dt><dd class="col-sm-7">{{ profile.father|default:"—" }}</dd>
-            <dt class="col-sm-5">Опекун</dt><dd class="col-sm-7">{{ profile.legal_guardian|default:"—" }}</dd>
-            <dt class="col-sm-5">Братьев/сестёр</dt><dd class="col-sm-7">{{ profile.siblings_count|default:"—" }}</dd>
-            <dt class="col-sm-5">Инфо о сиблингах</dt><dd class="col-sm-7">{{ profile.siblings_info|default:"—" }}</dd>
-            <dt class="col-sm-5">Состав семьи</dt><dd class="col-sm-7">{{ profile.family_size|default:"—" }}</dd>
-            <dt class="col-sm-5">Доход на члена</dt><dd class="col-sm-7">{{ profile.income_per_member|default:"—" }}</dd>
-            <dt class="col-sm-5">Малообеспеченная семья</dt><dd class="col-sm-7">{{ profile.is_low_income|default:"—" }}</dd>
-            <dt class="col-sm-5">Пособия</dt><dd class="col-sm-7">{{ profile.receives_subsidy|default:"—" }}</dd>
-            <dt class="col-sm-5">Другие факторы</dt><dd class="col-sm-7">{{ profile.other_factors|default:"—" }}</dd>
-            <dt class="col-sm-5">Компьютер с интернетом</dt><dd class="col-sm-7">{{ profile.has_pc_with_internet|default:"—" }}</dd>
-          </dl>
-        </div>
-      </div>
-
-      <div class="card shadow-sm mb-4">
-        <div class="card-header">Дополнительно</div>
-        <div class="card-body">
-          <dl class="row mb-0">
-            <dt class="col-sm-5">Достижения</dt><dd class="col-sm-7">{{ profile.achievements|default:"—" }}</dd>
-            <dt class="col-sm-5">План подготовки</dt><dd class="col-sm-7">{{ profile.preparation_plan|default:"—" }}</dd>
-            <dt class="col-sm-5">Помощь от фонда</dt><dd class="col-sm-7">{{ profile.foundation_help|default:"—" }}</dd>
-            <dt class="col-sm-5">Как узнали</dt><dd class="col-sm-7">{{ profile.heard_about_program|default:"—" }}</dd>
-            <dt class="col-sm-5">Готов участвовать</dt><dd class="col-sm-7">{{ profile.willing_to_participate|default:"—" }}</dd>
-            <dt class="col-sm-5">Согласие на обработку</dt><dd class="col-sm-7">
-              {% if profile.agree_processing == True %}Да{% elif profile.agree_processing == False %}Нет{% else %}—{% endif %}
-            </dd>
-            <dt class="col-sm-5">Согласие на документы</dt><dd class="col-sm-7">
-              {% if profile.agree_documents == True %}Да{% elif profile.agree_documents == False %}Нет{% else %}—{% endif %}
-            </dd>
-          </dl>
-        </div>
-      </div>
-
-      <div class="small text-muted">Создано: {{ profile.created_at|date:"d.m.Y H:i" }}</div>
-    </div>
-
-    <!-- Правая колонка: управление (редактируемые поля) -->
-    <div class="col-lg-5">
-      <div class="card shadow-sm mb-4">
-        <div class="card-header">Аватар</div>
-        <div class="card-body text-center">
-          {% if profile.avatar %}
-            <img src="{{ profile.avatar.url }}" alt="avatar" class="img-fluid rounded" style="max-height: 220px;">
-          {% else %}
-            <em class="text-muted">Нет аватара</em>
-          {% endif %}
-        </div>
-      </div>
-
-      <div class="card shadow-sm">
-        <div class="card-header">Фидбэк куратора</div>
-        <div class="card-body">
-          <form method="post">
+        <form method="post" enctype="multipart/form-data">
             {% csrf_token %}
 
-            <div class="mb-3">
-              <label class="form-label">{{ form.tutor_summary.label }}</label>
-              {{ form.tutor_summary|add_class:"form-control" }}
-              {% if form.tutor_summary.errors %}
-                <div class="text-danger small mt-1">{{ form.tutor_summary.errors }}</div>
-              {% endif %}
-              <div class="form-text">Эти заметки не может видеть участник.</div>
-            </div>
+            <div class="row g-4">
 
-            <div class="form-check mb-3">
-              {{ form.is_done|add_class:"form-check-input" }}
-              <label class="form-check-label" for="{{ form.is_done.id_for_label }}">{{ form.is_done.label }}</label>
-            </div>
+                <!-- Левая колонка: редактируемая анкета -->
+                <div class="col-lg-7">
 
-            <div class="d-flex gap-2">
-              <button class="btn btn-primary" type="submit">Сохранить</button>
-            </div>
-          </form>
-        </div>
-      </div>
+                    <!-- Личная информация -->
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header">Личная информация</div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">{{ form.last_name.label }}</label>
+                                    {{ form.last_name }}
+                                    {% if form.last_name.errors %}
+                                        <div class="text-danger small mt-1">{{ form.last_name.errors }}</div>{% endif %}
+                                </div>
 
+                                <div class="col-md-6">
+                                    <label class="form-label">{{ form.first_name.label }}</label>
+                                    {{ form.first_name }}
+                                    {% if form.first_name.errors %}
+                                        <div class="text-danger small mt-1">{{ form.first_name.errors }}</div>{% endif %}
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label">{{ form.middle_name.label }}</label>
+                                    {{ form.middle_name }}
+                                    {% if form.middle_name.errors %}
+                                        <div class="text-danger small mt-1">{{ form.middle_name.errors }}</div>{% endif %}
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label">{{ form.birth_date.label }}</label>
+                                    {{ form.birth_date }}
+                                    {% if form.birth_date.errors %}
+                                        <div class="text-danger small mt-1">{{ form.birth_date.errors }}</div>{% endif %}
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label">{{ form.phone.label }}</label>
+                                    {{ form.phone }}
+                                    {% if form.phone.errors %}
+                                        <div class="text-danger small mt-1">{{ form.phone.errors }}</div>{% endif %}
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label">{{ form.region.label }}</label>
+                                    {{ form.region }}
+                                    {% if form.region.errors %}
+                                        <div class="text-danger small mt-1">{{ form.region.errors }}</div>{% endif %}
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label">{{ form.city.label }}</label>
+                                    {{ form.city }}
+                                    {% if form.city.errors %}
+                                        <div class="text-danger small mt-1">{{ form.city.errors }}</div>{% endif %}
+                                </div>
+
+                                <div class="col-12">
+                                    <label class="form-label">{{ form.address.label }}</label>
+                                    {{ form.address }}
+                                    {% if form.address.errors %}
+                                        <div class="text-danger small mt-1">{{ form.address.errors }}</div>{% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Образование -->
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header">Образование</div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-12">
+                                    <label class="form-label">{{ form.school_name.label }}</label>
+                                    {{ form.school_name }}
+                                    {% if form.school_name.errors %}
+                                        <div class="text-danger small mt-1">{{ form.school_name.errors }}</div>{% endif %}
+                                </div>
+
+                                <div class="col-12">
+                                    <label class="form-label">{{ form.school_address.label }}</label>
+                                    {{ form.school_address }}
+                                    {% if form.school_address.errors %}
+                                        <div class="text-danger small mt-1">{{ form.school_address.errors }}</div>{% endif %}
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label">{{ form.class_teacher.label }}</label>
+                                    {{ form.class_teacher }}
+                                    {% if form.class_teacher.errors %}
+                                        <div class="text-danger small mt-1">{{ form.class_teacher.errors }}</div>{% endif %}
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label">{{ form.next_year_class_digit.label }}</label>
+                                    {{ form.next_year_class_digit }}
+                                    {% if form.next_year_class_digit.errors %}
+                                        <div class="text-danger small mt-1">{{ form.next_year_class_digit.errors }}</div>{% endif %}
+                                </div>
+
+                                <div class="col-12">
+                                    <label class="form-label">{{ form.class_profile.label }}</label>
+                                    {{ form.class_profile }}
+                                    {% if form.class_profile.errors %}
+                                        <div class="text-danger small mt-1">{{ form.class_profile.errors }}</div>{% endif %}
+                                </div>
+
+                                <div class="col-12">
+                                    <label class="form-label">{{ form.planned_exams.label }}</label>
+                                    {{ form.planned_exams }}
+                                    {% if form.planned_exams.errors %}
+                                        <div class="text-danger small mt-1">{{ form.planned_exams.errors }}</div>{% endif %}
+                                </div>
+
+                                <div class="col-12">
+                                    <label class="form-label">{{ form.subject_grades.label }}</label>
+                                    {{ form.subject_grades }}
+                                    {% if form.subject_grades.errors %}
+                                        <div class="text-danger small mt-1">{{ form.subject_grades.errors }}</div>{% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Планы поступления -->
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header">Планы поступления</div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-12">
+                                    <label class="form-label">{{ form.olympiad_plans.label }}</label>
+                                    {{ form.olympiad_plans }}
+                                    {% if form.olympiad_plans.errors %}
+                                        <div class="text-danger small mt-1">{{ form.olympiad_plans.errors }}</div>{% endif %}
+                                </div>
+
+                                <div class="col-12">
+                                    <label class="form-label">{{ form.admission_path.label }}</label>
+                                    {{ form.admission_path }}
+                                    {% if form.admission_path.errors %}
+                                        <div class="text-danger small mt-1">{{ form.admission_path.errors }}</div>{% endif %}
+                                </div>
+
+                                <div class="col-12">
+                                    <label class="form-label">{{ form.target_universities.label }}</label>
+                                    {{ form.target_universities }}
+                                    {% if form.target_universities.errors %}
+                                        <div class="text-danger small mt-1">{{ form.target_universities.errors }}</div>{% endif %}
+                                </div>
+
+                                <div class="col-12">
+                                    <label class="form-label">{{ form.specializations.label }}</label>
+                                    {{ form.specializations }}
+                                    {% if form.specializations.errors %}
+                                        <div class="text-danger small mt-1">{{ form.specializations.errors }}</div>{% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Семья -->
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header">Семья</div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">{{ form.mother.label }}</label>
+                                    {{ form.mother }}
+                                    {% if form.mother.errors %}
+                                        <div class="text-danger small mt-1">{{ form.mother.errors }}</div>{% endif %}
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label">{{ form.father.label }}</label>
+                                    {{ form.father }}
+                                    {% if form.father.errors %}
+                                        <div class="text-danger small mt-1">{{ form.father.errors }}</div>{% endif %}
+                                </div>
+
+                                <div class="col-12">
+                                    <label class="form-label">{{ form.legal_guardian.label }}</label>
+                                    {{ form.legal_guardian }}
+                                    {% if form.legal_guardian.errors %}
+                                        <div class="text-danger small mt-1">{{ form.legal_guardian.errors }}</div>{% endif %}
+                                </div>
+
+                                <div class="col-md-4">
+                                    <label class="form-label">{{ form.siblings_count.label }}</label>
+                                    {{ form.siblings_count }}
+                                    {% if form.siblings_count.errors %}
+                                        <div class="text-danger small mt-1">{{ form.siblings_count.errors }}</div>{% endif %}
+                                </div>
+
+                                <div class="col-md-8">
+                                    <label class="form-label">{{ form.siblings_info.label }}</label>
+                                    {{ form.siblings_info }}
+                                    {% if form.siblings_info.errors %}
+                                        <div class="text-danger small mt-1">{{ form.siblings_info.errors }}</div>{% endif %}
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label">{{ form.family_size.label }}</label>
+                                    {{ form.family_size }}
+                                    {% if form.family_size.errors %}
+                                        <div class="text-danger small mt-1">{{ form.family_size.errors }}</div>{% endif %}
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label">{{ form.income_per_member.label }}</label>
+                                    {{ form.income_per_member }}
+                                    {% if form.income_per_member.errors %}
+                                        <div class="text-danger small mt-1">{{ form.income_per_member.errors }}</div>{% endif %}
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label">{{ form.is_low_income.label }}</label>
+                                    {{ form.is_low_income }}
+                                    {% if form.is_low_income.errors %}
+                                        <div class="text-danger small mt-1">{{ form.is_low_income.errors }}</div>{% endif %}
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label">{{ form.receives_subsidy.label }}</label>
+                                    {{ form.receives_subsidy }}
+                                    {% if form.receives_subsidy.errors %}
+                                        <div class="text-danger small mt-1">{{ form.receives_subsidy.errors }}</div>{% endif %}
+                                </div>
+
+                                <div class="col-12">
+                                    <label class="form-label">{{ form.other_factors.label }}</label>
+                                    {{ form.other_factors }}
+                                    {% if form.other_factors.errors %}
+                                        <div class="text-danger small mt-1">{{ form.other_factors.errors }}</div>{% endif %}
+                                </div>
+
+                                <div class="col-12">
+                                    <label class="form-label">{{ form.has_pc_with_internet.label }}</label>
+                                    {{ form.has_pc_with_internet }}
+                                    {% if form.has_pc_with_internet.errors %}
+                                        <div class="text-danger small mt-1">{{ form.has_pc_with_internet.errors }}</div>{% endif %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Дополнительно -->
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header">Дополнительно</div>
+                        <div class="card-body">
+                            <div class="row g-3">
+                                <div class="col-12">
+                                    <label class="form-label">{{ form.achievements.label }}</label>
+                                    {{ form.achievements }}
+                                    {% if form.achievements.errors %}
+                                        <div class="text-danger small mt-1">{{ form.achievements.errors }}</div>{% endif %}
+                                </div>
+
+                                <div class="col-12">
+                                    <label class="form-label">{{ form.preparation_plan.label }}</label>
+                                    {{ form.preparation_plan }}
+                                    {% if form.preparation_plan.errors %}
+                                        <div class="text-danger small mt-1">{{ form.preparation_plan.errors }}</div>{% endif %}
+                                </div>
+
+                                <div class="col-12">
+                                    <label class="form-label">{{ form.foundation_help.label }}</label>
+                                    {{ form.foundation_help }}
+                                    {% if form.foundation_help.errors %}
+                                        <div class="text-danger small mt-1">{{ form.foundation_help.errors }}</div>{% endif %}
+                                </div>
+
+                                <div class="col-12">
+                                    <label class="form-label">{{ form.heard_about_program.label }}</label>
+                                    {{ form.heard_about_program }}
+                                    {% if form.heard_about_program.errors %}
+                                        <div class="text-danger small mt-1">{{ form.heard_about_program.errors }}</div>{% endif %}
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label">{{ form.willing_to_participate.label }}</label>
+                                    {{ form.willing_to_participate }}
+                                    {% if form.willing_to_participate.errors %}
+                                        <div class="text-danger small mt-1">{{ form.willing_to_participate.errors }}</div>{% endif %}
+                                </div>
+
+                                <div class="col-md-6">
+                                    <div class="form-check mt-4">
+                                        {{ form.agree_processing }}
+                                        <label class="form-check-label" for="{{ form.agree_processing.id_for_label }}">
+                                            {{ form.agree_processing.label }}
+                                        </label>
+                                        {% if form.agree_processing.errors %}
+                                            <div class="text-danger small mt-1">{{ form.agree_processing.errors }}</div>{% endif %}
+                                    </div>
+
+                                    <div class="form-check mt-2">
+                                        {{ form.agree_documents }}
+                                        <label class="form-check-label" for="{{ form.agree_documents.id_for_label }}">
+                                            {{ form.agree_documents.label }}
+                                        </label>
+                                        {% if form.agree_documents.errors %}
+                                            <div class="text-danger small mt-1">{{ form.agree_documents.errors }}</div>{% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="small text-muted">Создано: {{ profile.created_at|date:"d.m.Y H:i" }}</div>
+                </div>
+
+                <!-- Правая колонка -->
+                <div class="col-lg-5">
+
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header">Аватар</div>
+                        <div class="card-body text-center">
+                            {% if profile.avatar %}
+                                <img src="{{ profile.avatar.url }}" alt="avatar" class="img-fluid rounded"
+                                     style="max-height: 220px;">
+                            {% else %}
+                                <em class="text-muted">Нет аватара</em>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header">Статус анкеты</div>
+                        <div class="card-body">
+
+                            <div class="mb-3">
+                                <label class="form-label">{{ form.form_status.label }}</label>
+                                {{ form.form_status }}
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label">{{ form.revision_comment.label }}</label>
+                                {{ form.revision_comment|add_class:"form-control" }}
+                                <div class="form-text">
+                                    Заполни причину — она уйдёт пользователю в Telegram.
+                                </div>
+                            </div>
+
+                            <div class="d-flex gap-2 flex-wrap">
+                                <button class="btn btn-primary" type="submit" name="action_save" value="1">Сохранить
+                                </button>
+
+                                <button class="btn btn-warning" type="submit" name="action_revision" value="1">
+                                    На дописывание + уведомить
+                                </button>
+
+                                <button class="btn btn-success" type="submit" name="action_approve" value="1">
+                                    Принять
+                                </button>
+                            </div>
+
+                        </div>
+                    </div>
+
+
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header">Фидбэк куратора</div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label class="form-label">{{ form.tutor_summary.label }}</label>
+                                {{ form.tutor_summary }}
+                                {% if form.tutor_summary.errors %}
+                                    <div class="text-danger small mt-1">{{ form.tutor_summary.errors }}</div>
+                                {% endif %}
+                                <div class="form-text">Эти заметки не может видеть участник.</div>
+                            </div>
+
+                            <div class="form-check mb-3">
+                                {{ form.is_done }}
+                                <label class="form-check-label"
+                                       for="{{ form.is_done.id_for_label }}">{{ form.is_done.label }}</label>
+                                {% if form.is_done.errors %}
+                                    <div class="text-danger small mt-1">{{ form.is_done.errors }}</div>
+                                {% endif %}
+                            </div>
+
+
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-primary" type="submit">Сохранить</button>
+                                <a class="btn btn-outline-secondary"
+                                   href="{% url 'staff_profile_detail' user_obj.id %}">Сбросить</a>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </form>
     </div>
-  </div>
-</div>
 {% endblock %}

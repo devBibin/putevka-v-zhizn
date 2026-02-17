@@ -1,7 +1,9 @@
 from django import forms
+from django.contrib import messages
 from django.db import transaction
 from django.dispatch import Signal
 from django.forms import HiddenInput
+from django.http import HttpResponseForbidden
 from django.shortcuts import redirect
 from formtools.wizard.views import SessionWizardView
 
@@ -54,7 +56,10 @@ class PersonalForm(forms.ModelForm):
             'last_name': forms.TextInput(attrs={'placeholder': 'Иванов'}),
             'first_name': forms.TextInput(attrs={'placeholder': 'Иван'}),
             'middle_name': forms.TextInput(attrs={'placeholder': 'Иванович'}),
-            'gender': forms.Select(attrs={'class': 'form-control'}),
+            'gender': forms.Select(
+                attrs={'class': 'form-control'},
+                choices=[('', '— Выберите пол —')] + UserInfo.GENDERS
+            ),
             'region': forms.TextInput(attrs={'placeholder': 'Московская область'}),
             'city': forms.TextInput(attrs={'placeholder': 'Город N'}),
             'address': forms.TextInput(attrs={'placeholder': 'ул. Ленина, д. 1, кв. 2'}),
@@ -62,6 +67,22 @@ class PersonalForm(forms.ModelForm):
 
 
 class EducationForm(forms.ModelForm):
+    class_teacher = forms.CharField(
+        widget=forms.TextInput(
+            attrs={'placeholder': 'Петрова Мария Ивановна, +7 (999) 123-45-67'}
+        ),
+        label='Классный руководитель',
+        required=True,
+        help_text="ФИО, телефон, email"
+    )
+
+    subject_grades = forms.CharField(
+        widget=forms.Textarea(attrs={'placeholder': 'Математика — 5, Физика — 4'}),
+        help_text="в т.ч.: Русский язык, Алгебра, Геометрия, Биология, Химия, Физика, Иностранный язык, Информатика",
+        required=True,
+        label='Средние оценки по предметам'
+    )
+
     class Meta:
         model = UserInfo
         fields = [
@@ -90,6 +111,12 @@ class AdmissionForm(forms.ModelForm):
             'target_universities': forms.Textarea(attrs={'placeholder': 'МГУ, ВШЭ, МФТИ'}),
             'specializations': forms.Textarea(attrs={'placeholder': 'Прикладная математика, инженерия'}),
         }
+        help_texts = {
+            'specializations': 'Мы не требуем от тебя железного решения уже сейчас. Но наверняка у тебя есть примерный '
+                               'перечень специальностей, о которых ты задумывался. Укажи в заявке те направления, '
+                               'которые тебе были бы интересны.',
+            'target_universities': 'Список наиболее приоритетных ВУЗов, в которые планируешь поступать (не более 5).\nНаименование, город, факультет.\nМы не требуем от тебя железного решения уже сейчас. Укажи те вузы, о которых ты слышал, что они выпускают специалистов твоего направления; те вузы, в которых ты хотел бы учиться.'
+        }
 
 
 class FamilyForm(forms.ModelForm):
@@ -112,6 +139,13 @@ class FamilyForm(forms.ModelForm):
             'receives_subsidy': forms.TextInput(attrs={'placeholder': 'Пособие на ребёнка'}),
             'other_factors': forms.Textarea(attrs={'placeholder': 'Семья арендует жильё, инвалидность'}),
             'has_pc_with_internet': forms.TextInput(attrs={'placeholder': 'Да / Нет'}),
+        }
+        help_texts = {
+            'mother': "ФИО, телефон, e-mail, место работы",
+            'father': "ФИО, телефон, e-mail, место работы",
+            'legal_guardian': "ФИО, телефон, e-mail, место работы. Если твоими законными представителями являются родители, оставь это поле пустым. В иных случаях укажи человека, который за тебя отвечает: бабушка, тетя, директор детского учреждения.",
+            'receives_subsidy': 'Если да, то на каком основании?',
+            'income_per_member': 'Сложи годовой доход «на руки» каждого из родителей, живущих с тобой, раздели на 12, а потом раздели на число членов семьи, проживающих вместе /финансово зависимых от родителей.  Если среднемесячный доход на одного члена твоей семьи больше 15 000 р., ты можешь принять участие в отборе, но мы попросим объяснить, почему ты считаешь, что помощь для тебя критична.'
         }
 
 
@@ -167,8 +201,21 @@ class ApplicationWizard(SessionWizardView):
     def get_form(self, step=None, data=None, files=None):
         form = super().get_form(step, data, files)
 
-        required_false_list = ['legal_guardian', 'vk']
+        instance = self.get_form_instance(step or self.steps.current)
 
+        locked = getattr(instance, "form_status", "draft") in {"submitted", "approved"}
+
+        if locked:
+            for name, field in form.fields.items():
+                if isinstance(field.widget, HiddenInput):
+                    continue
+                field.disabled = True
+                field.required = False
+                if hasattr(field.widget, "attrs"):
+                    field.widget.attrs.pop("required", None)
+            return form
+
+        required_false_list = ['legal_guardian', 'vk']
         for name, field in form.fields.items():
             if name in required_false_list:
                 field.required = False
@@ -177,7 +224,6 @@ class ApplicationWizard(SessionWizardView):
                 continue
 
             field.required = True
-
             if hasattr(field.widget, 'attrs') and not isinstance(field.widget, HiddenInput):
                 field.widget.attrs['required'] = ''
 
@@ -213,7 +259,7 @@ class ApplicationWizard(SessionWizardView):
             for field, value in form.cleaned_data.items():
                 if field in model_fields:
                     setattr(instance, field, value)
-        instance.is_done = True
+        instance.form_status = "submitted"
         wizard_done.send(sender=self.__class__, instance=instance, forms=form_list)
         instance.save()
 
@@ -249,9 +295,50 @@ class ApplicationWizard(SessionWizardView):
 
         return super().post(*args, **kwargs)
 
+    def get(self, request, *args, **kwargs):
+        response = super().get(request, *args, **kwargs)
+
+        instance = self.get_form_instance(self.steps.current)
+        locked = instance.form_status in {"submitted", "approved"}
+
+        step = request.GET.get("step")
+        if locked and step:
+            all_steps = list(self.get_form_list().keys())
+            if step in all_steps:
+                self.storage.current_step = step
+                return self.render(self.get_form(step=step))
+
+        return response
+
     def get_context_data(self, form, **kwargs):
         context = super().get_context_data(form=form, **kwargs)
         context["active"] = "apply"
+        return context
+
+    def is_locked(self) -> bool:
+        instance = self.get_form_instance(self.steps.current)
+        return getattr(instance, "form_status", "draft") in {"submitted", "approved"}
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.method in ("POST", "PUT", "PATCH", "DELETE"):
+            instance = self.get_form_instance(getattr(self, "steps", None).current if hasattr(self, "steps") else None)
+
+            locked = getattr(instance, "form_status", "draft") in {"submitted", "approved"}
+
+            if locked:
+                if request.POST.get("_autosave") == "1":
+                    return HttpResponseForbidden()
+
+                messages.error(request, "Анкета уже отправлена и не может быть изменена.")
+                return redirect("thank_you")
+
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, form, **kwargs):
+        context = super().get_context_data(form=form, **kwargs)
+        instance = self.get_form_instance(self.steps.current)
+        context["active"] = "apply"
+        context["is_locked"] = getattr(instance, "form_status", "draft") in {"submitted", "approved"}
         return context
 
 
@@ -308,6 +395,7 @@ class ScholarVideoForm(forms.ModelForm):
         if not f:
             raise forms.ValidationError("Нужно выбрать видеофайл.")
         return f
+
 
 class UserPersonalDataForm(forms.ModelForm):
     class Meta:

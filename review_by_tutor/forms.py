@@ -45,18 +45,64 @@ class MotivationLetterStaffForm(forms.ModelForm):
 class UserInfoStaffForm(forms.ModelForm):
     class Meta:
         model = UserInfo
-        fields = ["tutor_summary", "is_done"]
+        exclude = ("user", "created_at", "updated_at", "avatar", "email")
+
         widgets = {
-            "tutor_summary": forms.Textarea(attrs={
-                "rows": 8,
-                "class": "form-control",
-                "placeholder": "Заметки/фидбэк куратора для участника."
-            }),
+            "address": forms.Textarea(attrs={"rows": 2}),
+            "school_address": forms.Textarea(attrs={"rows": 2}),
+            "planned_exams": forms.Textarea(attrs={"rows": 2}),
+            "subject_grades": forms.Textarea(attrs={"rows": 3}),
+            "olympiad_plans": forms.Textarea(attrs={"rows": 3}),
+            "admission_path": forms.Textarea(attrs={"rows": 2}),
+            "target_universities": forms.Textarea(attrs={"rows": 2}),
+            "specializations": forms.Textarea(attrs={"rows": 2}),
+            "siblings_info": forms.Textarea(attrs={"rows": 2}),
+            "other_factors": forms.Textarea(attrs={"rows": 3}),
+            "achievements": forms.Textarea(attrs={"rows": 3}),
+            "preparation_plan": forms.Textarea(attrs={"rows": 3}),
+            "foundation_help": forms.Textarea(attrs={"rows": 2}),
+            "heard_about_program": forms.Textarea(attrs={"rows": 2}),
+            "tutor_summary": forms.Textarea(attrs={"rows": 4}),
         }
-        labels = {
-            "tutor_summary": "Заметки куратора (фидбэк)",
-            "is_done": "Анкета принята (галочка)",
-        }
+
+    def save(self, commit=True):
+        profile = super().save(commit=False)
+
+        user = profile.user
+        changed = False
+
+        if "first_name" in self.changed_data and hasattr(user, "first_name"):
+            user.first_name = profile.first_name or ""
+            changed = True
+
+        if "last_name" in self.changed_data and hasattr(user, "last_name"):
+            user.last_name = profile.last_name or ""
+            changed = True
+
+        if commit:
+            profile.save()
+            if changed:
+                user.save(update_fields=["first_name", "last_name"])
+
+            self.save_m2m()
+
+        return profile
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        for field in self.fields.values():
+            field.required = False
+
+        for name, field in self.fields.items():
+            w = field.widget
+            if isinstance(w, forms.CheckboxInput):
+                w.attrs["class"] = (w.attrs.get("class", "") + " form-check-input").strip()
+            else:
+                w.attrs["class"] = (w.attrs.get("class", "") + " form-control").strip()
+
+            if isinstance(w, forms.Textarea) and "rows" not in w.attrs:
+                w.attrs["rows"] = 2
 
 
 class ScholarVideoStaffForm(forms.ModelForm):
