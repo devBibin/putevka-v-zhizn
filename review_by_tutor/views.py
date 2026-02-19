@@ -232,7 +232,7 @@ def staff_profile_detail(request, user_id: int):
                         send_tg_notification_to_user(
                             obj.user,
                             message_text,
-                            url=f"{BASE_URL}/apply/",
+                            url=f"{BASE_URL}/form/apply/",
                             button_text="📄 Открыть анкету"
                         )
                     except Exception as e:
