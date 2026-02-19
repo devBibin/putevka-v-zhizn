@@ -7,6 +7,15 @@ from review_by_tutor.models import Interview, TestAssignment, InterviewResult
 from scholar_form.models import UserInfo, ScholarVideo
 
 
+class SelectionStepUpdateForm(forms.ModelForm):
+    class Meta:
+        model = UserInfo
+        fields = ["selection_step"]
+        widgets = {
+            "selection_step": forms.Select(attrs={"class": "form-select"}),
+        }
+
+
 class StatusChangeForm(forms.ModelForm):
     class Meta:
         model = UserInfo

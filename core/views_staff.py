@@ -11,7 +11,7 @@ from django.views.generic import TemplateView
 
 from core.models import UserNotification, Notification
 from documents.models import Document
-from review_by_tutor.forms import StatusChangeForm, ProfileChangeForm
+from review_by_tutor.forms import StatusChangeForm, ProfileChangeForm, SelectionStepUpdateForm
 from scholar_form.models import UserInfo, StaffNote
 
 User = get_user_model()
@@ -41,7 +41,8 @@ class StaffScholarDossierView(TemplateView):
         )
 
         Document = self._get_model_safe("documents", "Document")
-        UserNotification = self._get_model_safe("core", "UserNotification") or self._get_model_safe("notifications", "UserNotification")
+        UserNotification = self._get_model_safe("core", "UserNotification") or self._get_model_safe("notifications",
+                                                                                                    "UserNotification")
 
         uinfo = UserInfo.objects.get_or_create(user=user)[0]
         video = getattr(user, "scholar_video", None)
@@ -61,10 +62,14 @@ class StaffScholarDossierView(TemplateView):
         questionnaire_done = bool(getattr(uinfo, "is_done", False))
 
         video_exists = video is not None
-        video_needs_review = bool(video_exists and not getattr(video, "score", None) and not getattr(video, "review", ""))
+        video_needs_review = bool(
+            video_exists and not getattr(video, "score", None) and not getattr(video, "review", ""))
 
         ml_exists = ml is not None
-        ml_needs_review = bool(ml_exists and getattr(ml, "status", None) in ("submitted", "under_review") and not getattr(ml, "admin_rating", None))
+        ml_needs_review = bool(
+            ml_exists and getattr(ml, "status", None) in ("submitted", "under_review") and not getattr(ml,
+                                                                                                       "admin_rating",
+                                                                                                       None))
 
         documents_qs = Document.objects.filter(user=user, is_deleted=False).order_by("-uploaded_at") if Document else []
 
@@ -124,6 +129,9 @@ class StaffScholarDossierView(TemplateView):
             'active': 'dossier',
             "status_form": status_form,
             "profile_form": profile_form,
+            "selection_step_form": SelectionStepUpdateForm(
+                instance=user.user_info
+            ),
             "favorite_notes": favorite_notes,
         })
         return ctx
@@ -201,6 +209,18 @@ def staff_scholar_action(request, user_id: int):
             messages.success(request, f"Статус обновлён: «{new}».")
         else:
             messages.error(request, "Не удалось обновить профиль. Проверьте данные.")
+
+    elif action == "change_selection_step":
+        uinfo = user.user_info
+        form = SelectionStepUpdateForm(request.POST, instance=uinfo)
+
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Этап отбора обновлён.")
+        else:
+            messages.error(request, "Ошибка обновления этапа.")
+
+        return redirect(request.META.get("HTTP_REFERER", "/"))
 
     else:
         messages.error(request, "Неизвестное действие.")

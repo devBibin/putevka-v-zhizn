@@ -21,6 +21,7 @@ from django.views.decorators.http import require_POST
 
 import config
 from Putevka import settings
+from review_by_tutor.utils.selection_stages import require_selection_step
 from .decorators import ensure_registration_gate
 from .forms import CustomUserCreationForm, RegistrationForm, VerifyEmailForm, PhoneNumberForm, MotivationLetterForm
 from .models import TelegramAccount, RegistrationPersonalData, MotivationLetterInstruction
@@ -333,6 +334,7 @@ def finish_registration(request):
 
     return render(request, 'registration/registration_complete.html', {'user': user})
 
+@require_selection_step(UserInfo.SelectionStep.ML)
 @ensure_registration_gate('protected')
 @login_required
 def motivation_letter(request):

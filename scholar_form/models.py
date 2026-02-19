@@ -60,6 +60,20 @@ class UserInfo(models.Model):
     STATUSES = [('CANDIDATE', 'Кандидат'), ('ALTERNATIVE', 'Альтернативный трек'), ('FINAL STAGE', 'Финалист'), ('SCHOLAR', 'Участник'),
                 ('ALUMNUS', 'Выпускник')]
 
+    class SelectionStep(models.TextChoices):
+        FORM = "form", "Анкета"
+        TEST = "test", "Тестирование"
+        ML = "ml", "Мотивационное письмо"
+        VIDEO = "video", "Видеовизитка"
+        INTERVIEW_PREP = "interview_prep", "Подготовка к собеседованию"
+
+    selection_step = models.CharField(
+        max_length=32,
+        choices=SelectionStep.choices,
+        default=SelectionStep.FORM,
+        db_index=True,
+    )
+
     class FormStatus(models.TextChoices):
         DRAFT = "draft", "Не отправлена"
         SUBMITTED = "submitted", "Отправлена"

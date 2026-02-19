@@ -97,6 +97,7 @@
                             <th>Письмо</th>
                             <th>Анкета</th>
                             <th>Видео</th>
+                            <th>Этап</th>
                         </tr>
                         </thead>
                         <tbody>
@@ -191,7 +192,7 @@
                                         <span class="badge text-bg-secondary">Нет анкеты</span>
                                     {% endif %}
 
-                                {% if u.user_info and u.user_info.tutor_summary %}
+                                    {% if u.user_info and u.user_info.tutor_summary %}
                                         <div class="small text-muted mt-1 text-break"
                                              style="max-width:210px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                                             {{ u.user_info.tutor_summary }}
@@ -204,6 +205,16 @@
                                         <span class="badge text-bg-success">есть</span>
                                     {% else %}
                                         <span class="badge text-bg-secondary">нет</span>
+                                    {% endif %}
+                                </td>
+
+                                <td>
+                                    {% if u.user_info and u.user_info.selection_step %}
+                                        <span class="badge text-bg-light text-dark">
+      {{ u.user_info.get_selection_step_display }}
+    </span>
+                                    {% else %}
+                                        <span class="text-muted">—</span>
                                     {% endif %}
                                 </td>
                             </tr>

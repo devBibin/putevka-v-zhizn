@@ -123,6 +123,36 @@
 
                 <div class="card mb-3">
                     <div class="card-body">
+                        <h6 class="text-uppercase text-muted mb-3">
+                            Этап отбора (внутренний)
+                        </h6>
+
+                        <form method="post"
+                              action="{% url 'staff_scholar_action' user_obj.id %}"
+                              class="row g-2">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="change_selection_step">
+
+                            <div class="col-12 col-sm-8">
+                                {{ selection_step_form.selection_step }}
+                            </div>
+
+                            <div class="col-12 col-sm-4 d-grid">
+                                <button class="btn btn-primary">Сохранить</button>
+                            </div>
+                        </form>
+
+                        <div class="form-text mt-2">
+                            Текущий:
+                            <strong>
+                                {{ user_obj.user_info.get_selection_step_display }}
+                            </strong>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-3">
+                    <div class="card-body">
                         <h6 class="text-uppercase text-muted mb-3">Жизненная ситуация (внутреннее)</h6>
 
                         {% with uinfo=user_obj.user_info %}
