@@ -10,19 +10,19 @@ from scholar_form.models import UserInfo, ScholarVideo
 class StatusChangeForm(forms.ModelForm):
     class Meta:
         model = UserInfo
-        fields = ["status", "profile"]
+        fields = ["status", "internal_study_profile"]
         widgets = {
             "status": forms.Select(attrs={"class": "form-select"}),
-            "profile": forms.Select(attrs={"class": "form-select"}),
+            "internal_study_profile": forms.Select(attrs={"class": "form-select"}),
         }
 
 
 class ProfileChangeForm(forms.ModelForm):
     class Meta:
         model = UserInfo
-        fields = ["profile"]
+        fields = ["internal_study_profile"]
         widgets = {
-            "profile": forms.Select(attrs={"class": "form-select"}),
+            "internal_study_profile": forms.Select(attrs={"class": "form-select"}),
         }
 
 

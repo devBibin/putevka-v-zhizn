@@ -205,6 +205,9 @@ class FamilyForm(forms.ModelForm):
         }
 
         help_texts = {
+            'mother': "ФИО, email, телефон",
+            'father': "ФИО, email, телефон",
+            'legal_guardian': "ФИО, email, телефон",
             'receives_subsidy': 'Если да, то на каком основании?',
             'family_material_status': 'Оцените общее материальное положение вашей семьи.',
             'income_per_member': 'Сложи годовой доход «на руки» каждого родителя, раздели на 12 и затем на число членов семьи.',

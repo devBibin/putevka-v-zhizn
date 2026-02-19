@@ -62,6 +62,17 @@
                                 </div>
 
                                 <div class="col-md-6">
+                                    <label class="form-label">{{ form.vk.label }}</label>
+                                    {{ form.vk }}
+                                    {% if form.vk.errors %}
+                                        <div class="text-danger small mt-1">{{ form.vk.errors }}</div>
+                                    {% endif %}
+                                    {% if form.vk.help_text %}
+                                        <div class="form-text">{{ form.vk.help_text }}</div>
+                                    {% endif %}
+                                </div>
+
+                                <div class="col-md-6">
                                     <label class="form-label">{{ form.region.label }}</label>
                                     {{ form.region }}
                                     {% if form.region.errors %}

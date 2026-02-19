@@ -197,7 +197,7 @@ def staff_scholar_action(request, user_id: int):
         form = ProfileChangeForm(request.POST, instance=uinfo)
         if form.is_valid():
             u = form.save()
-            new = u.get_profile_display()
+            new = u.get_internal_study_profile_display()
             messages.success(request, f"Статус обновлён: «{new}».")
         else:
             messages.error(request, "Не удалось обновить профиль. Проверьте данные.")

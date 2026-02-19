@@ -1,4 +1,5 @@
 import mimetypes
+import re
 from datetime import timedelta
 from pathlib import Path
 
@@ -12,6 +13,15 @@ from django.db import models
 from django.utils import timezone
 
 from my_study.models import Subject
+
+
+def validate_vk_id_url(value):
+    pattern = r'^https://vk\.com/id\d*$'
+
+    if not re.match(pattern, value):
+        raise ValidationError(
+            "Разрешена только ссылка вида https://vk.com/id123456"
+        )
 
 
 class StaffNote(models.Model):
@@ -49,12 +59,6 @@ class UserInfo(models.Model):
     GENDERS = [('MAN', 'Мужчина'), ('WOMAN', 'Женщина')]
     STATUSES = [('CANDIDATE', 'Кандидат'), ('ALTERNATIVE', 'Альтернативный трек'), ('FINAL STAGE', 'Финалист'), ('SCHOLAR', 'Участник'),
                 ('ALUMNUS', 'Выпускник')]
-    PROFILES = [
-        ("humanities", "Гуманитарный профиль"),
-        ("chem_bio", "Химико-биологический профиль"),
-        ("technical", "Технический профиль"),
-        ("creative", "Творческий профиль"),
-    ]
 
     class FormStatus(models.TextChoices):
         DRAFT = "draft", "Не отправлена"
@@ -85,8 +89,6 @@ class UserInfo(models.Model):
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, null=True, related_name='user_info')
     status = models.CharField(max_length=100, choices=STATUSES, default='CANDIDATE', verbose_name='Статус в программе')
-
-    profile = models.CharField(max_length=100, choices=PROFILES, verbose_name='Профиль', blank=True, null=True)
 
     # Step 1: Personal Info
     last_name = models.CharField(max_length=255, verbose_name="Фамилия", blank=True)
@@ -141,7 +143,7 @@ class UserInfo(models.Model):
                                             blank=True)
 
     # Step 5: Additional
-    vk = models.URLField(max_length=500, verbose_name="Ссылка на вк", blank=True, null=True)
+    vk = models.URLField(max_length=500, verbose_name="Ссылка на вк", blank=True, null=True, validators=[validate_vk_id_url], help_text="ВАЖНО: ссылка должна быть в формате https://vk.com/id000000000. Чтобы получить такую ссылку, можно конвертировать её через https://regvk.com/")
     achievements = models.CharField(max_length=10000, verbose_name="Кратко опиши свои достижения за последние два года", blank=True)
     preparation_plan = models.CharField(max_length=10000, verbose_name="План подготовки к поступлению", blank=True)
     foundation_help = models.CharField(max_length=10000, verbose_name="Какая помощь от фонда нужна", blank=True)
@@ -205,7 +207,6 @@ class UserInfo(models.Model):
         blank=True,
         null=True,
         verbose_name="Как бы вы оценили материальное положение вашей семьи?",
-        help_text="Если вопрос о родителе (Sodem4) не задаётся — этот вопрос тоже не показывать.",
         db_index=True,
     )
 
@@ -294,7 +295,6 @@ class UserInfo(models.Model):
     class Meta:
         verbose_name = "Анкета участника"
         verbose_name_plural = "Анкеты участников"
-
 
 def video_upload_to(instance, filename):
     return f"videos/visits/{instance.user_id}/{filename}"

@@ -190,6 +190,13 @@
                                     {% else %}
                                         <span class="badge text-bg-secondary">Нет анкеты</span>
                                     {% endif %}
+
+                                {% if u.user_info and u.user_info.tutor_summary %}
+                                        <div class="small text-muted mt-1 text-break"
+                                             style="max-width:210px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                                            {{ u.user_info.tutor_summary }}
+                                        </div>
+                                    {% endif %}
                                 </td>
 
                                 <td>
