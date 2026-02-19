@@ -34,41 +34,54 @@
                             {% if uinfo and uinfo.phone %}
                                 <div class="text-muted small break-anywhere">{{ uinfo.phone }}</div>
                             {% endif %}
+                            {% if user_obj.telegram_account and user_obj.telegram_account.username %}
+                                <div class="text-muted small break-anywhere">
+                                    Telegram:
+                                    <a href="https://t.me/{{ user_obj.telegram_account.username }}"
+                                       target="_blank"
+                                       class="link-secondary text-decoration-none">
+                                        @{{ user_obj.telegram_account.username }}
+                                    </a>
+                                    {% if user_obj.telegram_account.telegram_verified %}
+                                        <span class="badge text-bg-success ms-1">активирован</span>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
                         {% endwith %}
                     </div>
                 </div>
 
-            {% if favorite_notes %}
-  <div class="card mb-3 border-warning">
-    <div class="card-body">
-      <div class="d-flex align-items-center justify-content-between mb-2">
-        <h6 class="text-uppercase text-muted mb-0">Избранные заметки</h6>
-      </div>
+                {% if favorite_notes %}
+                    <div class="card mb-3 border-warning">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                <h6 class="text-uppercase text-muted mb-0">Избранные заметки</h6>
+                            </div>
 
-      <div class="vstack gap-2">
-        {% for n in favorite_notes %}
-          <div class="p-2 border rounded">
-            <div class="d-flex justify-content-between align-items-start small text-muted mb-1">
-              <div>
-                {% if n.author %}
-                  {{ n.author.get_full_name|default:n.author.username }}
-                {% else %}
-                  —
+                            <div class="vstack gap-2">
+                                {% for n in favorite_notes %}
+                                    <div class="p-2 border rounded">
+                                        <div class="d-flex justify-content-between align-items-start small text-muted mb-1">
+                                            <div>
+                                                {% if n.author %}
+                                                    {{ n.author.get_full_name|default:n.author.username }}
+                                                {% else %}
+                                                    —
+                                                {% endif %}
+                                                • {{ n.created_at|date:"d.m.Y H:i" }}
+                                            </div>
+                                            <span title="Избранное">⭐</span>
+                                        </div>
+                                        <div class="small" style="white-space: pre-wrap; word-break: break-word;">
+                                            {{ n.text|truncatechars:400 }}
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+
+                        </div>
+                    </div>
                 {% endif %}
-                • {{ n.created_at|date:"d.m.Y H:i" }}
-              </div>
-              <span title="Избранное">⭐</span>
-            </div>
-            <div class="small" style="white-space: pre-wrap; word-break: break-word;">
-              {{ n.text|truncatechars:400 }}
-            </div>
-          </div>
-        {% endfor %}
-      </div>
-
-    </div>
-  </div>
-{% endif %}
                 <div class="card mb-3">
                     <div class="card-body">
                         <h6 class="text-uppercase text-muted mb-3">Статус участника</h6>
@@ -95,7 +108,7 @@
                             {% csrf_token %}
                             <input type="hidden" name="action" value="change_profile">
                             <div class="col-12 col-sm-8">
-                                {% render_field profile_form.profile class+="form-select" %}
+                                {% render_field profile_form.internal_study_profile class+="form-select" %}
                             </div>
                             <div class="col-12 col-sm-4 d-grid">
                                 <button class="btn btn-primary">Сохранить</button>
@@ -103,8 +116,62 @@
                         </form>
                         <div class="form-text mt-2">
                             Текущий:
-                            <strong>{{ user_obj.user_info.get_profile_display|default:"Не установлен" }}</strong>
+                            <strong>{{ user_obj.user_info.get_internal_study_profile_display|default:"Не установлен" }}</strong>
                         </div>
+                    </div>
+                </div>
+
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <h6 class="text-uppercase text-muted mb-3">Жизненная ситуация (внутреннее)</h6>
+
+                        {% with uinfo=user_obj.user_info %}
+                            {% if uinfo %}
+
+                                <div class="mb-3">
+                                    <div class="small text-muted">Тип населённого пункта</div>
+                                    <div class="fw-semibold">
+                                        {{ uinfo.get_settlement_type_display|default:"Не указан" }}
+                                    </div>
+                                </div>
+
+                                <div class="mb-2 small text-muted">Социальные статусы</div>
+                                <div class="d-flex flex-wrap gap-2">
+
+                                    {% if uinfo.is_large_family %}
+                                        <span class="badge text-bg-secondary">Многодетность</span>{% endif %}
+                                    {% if uinfo.is_single_parent_family %}
+                                        <span class="badge text-bg-secondary">Неполная семья</span>{% endif %}
+                                    {% if uinfo.has_candidate_disability %}
+                                        <span class="badge text-bg-secondary">Инвалидность кандидата</span>{% endif %}
+                                    {% if uinfo.is_orphan_or_under_guardianship %}
+                                        <span class="badge text-bg-secondary">Сирота / под опекой</span>{% endif %}
+                                    {% if uinfo.has_breadwinner_loss %}
+                                        <span class="badge text-bg-secondary">Потеря кормильца</span>{% endif %}
+                                    {% if uinfo.has_relative_disability %}
+                                        <span class="badge text-bg-secondary">Инвалидность близкого</span>{% endif %}
+                                    {% if uinfo.is_parent_pensioner %}
+                                        <span class="badge text-bg-secondary">Родитель пенсионер</span>{% endif %}
+                                    {% if uinfo.is_parent_in_svo %}
+                                        <span class="badge text-bg-secondary">Родитель на СВО</span>{% endif %}
+                                    {% if uinfo.has_alumni_sibling %}
+                                        <span class="badge text-bg-secondary">Сиблинг выпускника</span>{% endif %}
+
+                                </div>
+
+                                {% if uinfo.life_situation_notes %}
+                                    <hr>
+                                    <div class="small text-muted mb-1">Комментарий</div>
+                                    <div class="small" style="white-space: pre-wrap;">
+                                        {{ uinfo.life_situation_notes }}
+                                    </div>
+                                {% endif %}
+
+                            {% else %}
+                                <div class="text-muted">Нет данных</div>
+                            {% endif %}
+                        {% endwith %}
+
                     </div>
                 </div>
 

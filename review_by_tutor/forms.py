@@ -2,6 +2,7 @@ from django import forms
 
 from core.models import MotivationLetter
 from documents.models import Document
+from my_study.models import Subject
 from review_by_tutor.models import Interview, TestAssignment, InterviewResult
 from scholar_form.models import UserInfo, ScholarVideo
 
@@ -9,19 +10,19 @@ from scholar_form.models import UserInfo, ScholarVideo
 class StatusChangeForm(forms.ModelForm):
     class Meta:
         model = UserInfo
-        fields = ["status", "profile"]
+        fields = ["status", "internal_study_profile"]
         widgets = {
             "status": forms.Select(attrs={"class": "form-select"}),
-            "profile": forms.Select(attrs={"class": "form-select"}),
+            "internal_study_profile": forms.Select(attrs={"class": "form-select"}),
         }
 
 
 class ProfileChangeForm(forms.ModelForm):
     class Meta:
         model = UserInfo
-        fields = ["profile"]
+        fields = ["internal_study_profile"]
         widgets = {
-            "profile": forms.Select(attrs={"class": "form-select"}),
+            "internal_study_profile": forms.Select(attrs={"class": "form-select"}),
         }
 
 
@@ -43,6 +44,13 @@ class MotivationLetterStaffForm(forms.ModelForm):
 
 
 class UserInfoStaffForm(forms.ModelForm):
+    planned_exams = forms.ModelMultipleChoiceField(
+        queryset=Subject.objects.all(),
+        required=False,
+        widget=forms.SelectMultiple(attrs={"class": "form-select"}),
+        label="Планируемые экзамены",
+    )
+
     class Meta:
         model = UserInfo
         exclude = ("user", "created_at", "updated_at", "avatar", "email")
@@ -50,7 +58,6 @@ class UserInfoStaffForm(forms.ModelForm):
         widgets = {
             "address": forms.Textarea(attrs={"rows": 2}),
             "school_address": forms.Textarea(attrs={"rows": 2}),
-            "planned_exams": forms.Textarea(attrs={"rows": 2}),
             "subject_grades": forms.Textarea(attrs={"rows": 3}),
             "olympiad_plans": forms.Textarea(attrs={"rows": 3}),
             "admission_path": forms.Textarea(attrs={"rows": 2}),
@@ -63,6 +70,8 @@ class UserInfoStaffForm(forms.ModelForm):
             "foundation_help": forms.Textarea(attrs={"rows": 2}),
             "heard_about_program": forms.Textarea(attrs={"rows": 2}),
             "tutor_summary": forms.Textarea(attrs={"rows": 4}),
+
+            "life_situation_notes": forms.Textarea(attrs={"rows": 3}),
         }
 
     def save(self, commit=True):

@@ -52,6 +52,13 @@
                                 <div class="form-check">
                                     {{ field|add_class:"form-check-input" }}
                                 </div>
+
+                            {% elif field.field.widget.attrs.multiple or field.field.widget.allow_multiple_selected %}
+                                {{ field|add_class:"form-select" }}
+
+                            {% elif field.field.widget.input_type == 'select' %}
+                                {{ field|add_class:"form-select" }}
+
                             {% else %}
                                 {{ field|add_class:"form-control" }}
                             {% endif %}
@@ -119,6 +126,18 @@
             );
             tooltipTriggerList.forEach(function (el) {
                 new bootstrap.Tooltip(el);
+            });
+        });
+        document.addEventListener("DOMContentLoaded", function () {
+            document.querySelectorAll("select[multiple]").forEach((el) => {
+                new Choices(el, {
+                    removeItemButton: true,
+                    searchEnabled: true,
+                    shouldSort: false,
+                    placeholder: true,
+                    placeholderValue: "Начните печатать для поиска…",
+                    itemSelectText: "",
+                });
             });
         });
     </script>
