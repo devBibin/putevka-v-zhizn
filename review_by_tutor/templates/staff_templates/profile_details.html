@@ -127,7 +127,7 @@
 
                                 <div class="col-12">
                                     <label class="form-label">{{ form.planned_exams.label }}</label>
-                                    {{ form.planned_exams }}
+                                    {{ form.planned_exams|add_class:"form-select" }}
                                     {% if form.planned_exams.errors %}
                                         <div class="text-danger small mt-1">{{ form.planned_exams.errors }}</div>{% endif %}
                                 </div>
@@ -341,6 +341,121 @@
                             {% else %}
                                 <em class="text-muted">Нет аватара</em>
                             {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header">Внутренние метки (не видны участнику)</div>
+                        <div class="card-body">
+
+                            <div class="row g-3 mb-3">
+                                <div class="col-12">
+                                    <label class="form-label">{{ form.internal_study_profile.label }}</label>
+                                    {{ form.internal_study_profile }}
+                                    {% if form.internal_study_profile.errors %}
+                                        <div class="text-danger small mt-1">{{ form.internal_study_profile.errors }}</div>
+                                    {% endif %}
+                                    <div class="form-text">Это поле пойдёт в сводку как “учебный профиль”.</div>
+                                </div>
+
+                                <div class="col-12">
+                                    <label class="form-label">{{ form.settlement_type.label }}</label>
+                                    {{ form.settlement_type }}
+                                    {% if form.settlement_type.errors %}
+                                        <div class="text-danger small mt-1">{{ form.settlement_type.errors }}</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <div class="row g-2">
+                                <div class="col-md-6">
+                                    <div class="form-check mb-2">
+                                        {{ form.is_large_family }}
+                                        <label class="form-check-label" for="{{ form.is_large_family.id_for_label }}">
+                                            {{ form.is_large_family.label }}
+                                        </label>
+                                    </div>
+
+                                    <div class="form-check mb-2">
+                                        {{ form.is_single_parent_family }}
+                                        <label class="form-check-label"
+                                               for="{{ form.is_single_parent_family.id_for_label }}">
+                                            {{ form.is_single_parent_family.label }}
+                                        </label>
+                                    </div>
+
+                                    <div class="form-check mb-2">
+                                        {{ form.has_candidate_disability }}
+                                        <label class="form-check-label"
+                                               for="{{ form.has_candidate_disability.id_for_label }}">
+                                            {{ form.has_candidate_disability.label }}
+                                        </label>
+                                    </div>
+
+                                    <div class="form-check mb-2">
+                                        {{ form.is_orphan_or_under_guardianship }}
+                                        <label class="form-check-label"
+                                               for="{{ form.is_orphan_or_under_guardianship.id_for_label }}">
+                                            {{ form.is_orphan_or_under_guardianship.label }}
+                                        </label>
+                                    </div>
+
+                                    <div class="form-check mb-2">
+                                        {{ form.has_breadwinner_loss }}
+                                        <label class="form-check-label"
+                                               for="{{ form.has_breadwinner_loss.id_for_label }}">
+                                            {{ form.has_breadwinner_loss.label }}
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <div class="form-check mb-2">
+                                        {{ form.has_relative_disability }}
+                                        <label class="form-check-label"
+                                               for="{{ form.has_relative_disability.id_for_label }}">
+                                            {{ form.has_relative_disability.label }}
+                                        </label>
+                                    </div>
+
+                                    <div class="form-check mb-2">
+                                        {{ form.is_parent_pensioner }}
+                                        <label class="form-check-label"
+                                               for="{{ form.is_parent_pensioner.id_for_label }}">
+                                            {{ form.is_parent_pensioner.label }}
+                                        </label>
+                                    </div>
+
+                                    <div class="form-check mb-2">
+                                        {{ form.is_parent_in_svo }}
+                                        <label class="form-check-label" for="{{ form.is_parent_in_svo.id_for_label }}">
+                                            {{ form.is_parent_in_svo.label }}
+                                        </label>
+                                    </div>
+
+                                    <div class="form-check mb-2">
+                                        {{ form.has_alumni_sibling }}
+                                        <label class="form-check-label"
+                                               for="{{ form.has_alumni_sibling.id_for_label }}">
+                                            {{ form.has_alumni_sibling.label }}
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mt-3">
+                                <label class="form-label">{{ form.life_situation_notes.label }}</label>
+                                {{ form.life_situation_notes }}
+                                {% if form.life_situation_notes.errors %}
+                                    <div class="text-danger small mt-1">{{ form.life_situation_notes.errors }}</div>
+                                {% endif %}
+                                {% if form.life_situation_notes.help_text %}
+                                    <div class="form-text">{{ form.life_situation_notes.help_text }}</div>
+                                {% else %}
+                                    <div class="form-text">Коротко опиши, что важно учесть.</div>
+                                {% endif %}
+                            </div>
+
                         </div>
                     </div>
 

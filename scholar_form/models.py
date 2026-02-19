@@ -11,6 +11,9 @@ from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
 from django.utils import timezone
 
+from my_study.models import Subject
+
+
 class StaffNote(models.Model):
     target_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="staff_notes")
 
@@ -102,9 +105,6 @@ class UserInfo(models.Model):
     school_address = models.CharField(max_length=1000, verbose_name="Адрес школы", blank=True)
     class_teacher = models.CharField(max_length=1000, verbose_name="Классный руководитель", blank=True)
 
-    # TODO: оставим, чтобы не удалять бд, потом удалить
-    next_year_class = models.CharField(max_length=10, verbose_name="Класс в следующем учебном году", blank=True)
-
     next_year_class_digit = models.IntegerField(verbose_name="Класс в следующем учебном году", blank=True, null=True,
                                                 validators=[
                                                     MinValueValidator(1),
@@ -112,7 +112,12 @@ class UserInfo(models.Model):
                                                 ])
 
     class_profile = models.CharField(max_length=255, blank=True, verbose_name="Профиль класса")
-    planned_exams = models.CharField(max_length=1000, verbose_name="Планируемые экзамены", blank=True)
+    planned_exams = models.ManyToManyField(
+        Subject,
+        verbose_name="Планируемые экзамены",
+        blank=True,
+        related_name="planned_by_users"
+    )
     subject_grades = models.CharField(max_length=1000, verbose_name="Средние оценки по предметам", blank=True)
 
     # Step 3: Admission Plans
@@ -149,6 +154,138 @@ class UserInfo(models.Model):
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата заполнения анкеты")
 
     tutor_summary = models.TextField(verbose_name="Заметки куратора", blank=True, null=True)
+
+    avg_grade_last_period = models.DecimalField(
+        verbose_name="Средний балл успеваемости (все предметы) за последний отчётный период",
+        max_digits=6,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1), MaxValueValidator(100)],
+        help_text="Например: 4.57 или 8.92 (зависит от шкалы в школе).",
+    )
+
+    avg_russian_last_2_periods = models.DecimalField(
+        verbose_name="Средний балл по русскому за последние 2 отчётных периода",
+        max_digits=6,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1), MaxValueValidator(100)],
+    )
+
+    avg_math_last_2_periods = models.DecimalField(
+        verbose_name="Средний балл по математике за последние 2 отчётных периода",
+        max_digits=6,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1), MaxValueValidator(100)],
+    )
+
+    avg_profile_subjects_last_2_periods = models.CharField(
+        verbose_name="Средний балл по профильным предметам за последние 2 отчётных периода",
+        null=True,
+        blank=True,
+        help_text="Профильные — те, которые важны для поступления по выбранному направлению.",
+    )
+
+    class FamilyMaterialStatus(models.TextChoices):
+        NOT_ENOUGH_FOOD = "1", "Иногда не хватает денег на необходимые продукты питания"
+        FOOD_OK_OTHER_LIMITS = "2", "На еду денег хватает, но на других ежедневных расходах приходится себя ограничивать"
+        CLOTHES_HARD = "3", "На ежедневные расходы хватает, но покупка одежды уже представляет трудность"
+        TECH_HARD = "4", "На еду и одежду хватает, но покупка техники (телевизор, холодильник и т.п.) представляет трудности"
+        CAR_VACATION_CREDIT = "5", "Достаточно обеспечены материально, но для покупки автомобиля и дорогостоящего отпуска пришлось бы залезть в долги"
+        CAN_AFFORD = "6", "Материально обеспечены, можем позволить себе дорогостоящий отпуск и покупку автомобиля"
+        HARD_TO_ANSWER = "99", "Затрудняюсь ответить"
+
+    family_material_status = models.CharField(
+        max_length=2,
+        choices=FamilyMaterialStatus.choices,
+        blank=True,
+        null=True,
+        verbose_name="Как бы вы оценили материальное положение вашей семьи?",
+        help_text="Если вопрос о родителе (Sodem4) не задаётся — этот вопрос тоже не показывать.",
+        db_index=True,
+    )
+
+    class InternalStudyProfile(models.TextChoices):
+        IT = "it", "IT"
+        PHYS_MATH = "phys_math", "Физмат"
+        MEDIC = "medic", "Врач"
+        CHEM_BIO = "chem_bio", "Химбио"
+        GEO_ECO = "geo_eco", "География / экология"
+        ARCH_DESIGN = "arch_design", "Архитектура / строительство / дизайн"
+        HUMANITIES = "humanities", "Гуманитарий"
+        OTHER = "other", "Прочее"
+
+    internal_study_profile = models.CharField(
+        max_length=32,
+        choices=InternalStudyProfile.choices,
+        blank=True,
+        null=True,
+        verbose_name="Учебный профиль (внутренний)",
+        help_text="Стафф-поле. Используется в сводке.",
+        db_index=True,
+    )
+
+    is_large_family = models.BooleanField(
+        default=False,
+        verbose_name="Многодетность (внутреннее)",
+    )
+    is_single_parent_family = models.BooleanField(
+        default=False,
+        verbose_name="Неполная семья (внутреннее)",
+    )
+    has_candidate_disability = models.BooleanField(
+        default=False,
+        verbose_name="Инвалидность кандидата (внутреннее)",
+    )
+    is_orphan_or_under_guardianship = models.BooleanField(
+        default=False,
+        verbose_name="Сирота / под опекой (внутреннее)",
+    )
+    has_breadwinner_loss = models.BooleanField(
+        default=False,
+        verbose_name="Потеря кормильца (внутреннее)",
+    )
+    has_relative_disability = models.BooleanField(
+        default=False,
+        verbose_name="Инвалидность близкого (внутреннее)",
+    )
+    is_parent_pensioner = models.BooleanField(
+        default=False,
+        verbose_name="Родитель пенсионер (внутреннее)",
+    )
+    is_parent_in_svo = models.BooleanField(
+        default=False,
+        verbose_name="Родитель на СВО (внутреннее)",
+    )
+    has_alumni_sibling = models.BooleanField(
+        default=False,
+        verbose_name="Сиблинг выпускника (внутреннее)",
+    )
+
+    class SettlementType(models.TextChoices):
+        BIG_CITY = "big_city", "Крупный город"
+        MID_CITY = "mid_city", "Средний город"
+        SMALL_SETTLEMENT = "small_settlement", "Малое поселение"
+
+    settlement_type = models.CharField(
+        max_length=32,
+        choices=SettlementType.choices,
+        blank=True,
+        null=True,
+        verbose_name="Тип населённого пункта (внутреннее)",
+        db_index=True,
+    )
+
+    life_situation_notes = models.TextField(
+        blank=True,
+        null=True,
+        verbose_name="Особенность жизненной ситуации (внутреннее)",
+        help_text="Коротко: что важно учесть при рассмотрении анкеты.",
+    )
 
     @property
     def is_locked(self) -> bool:

@@ -5,8 +5,10 @@ from django.dispatch import Signal
 from django.forms import HiddenInput
 from django.http import HttpResponseForbidden
 from django.shortcuts import redirect
+from django.db import models
 from formtools.wizard.views import SessionWizardView
 
+from my_study.models import Subject
 from .models import UserInfo, ScholarVideo, UserPersonalData
 
 
@@ -64,6 +66,9 @@ class PersonalForm(forms.ModelForm):
             'city': forms.TextInput(attrs={'placeholder': 'Город N'}),
             'address': forms.TextInput(attrs={'placeholder': 'ул. Ленина, д. 1, кв. 2'}),
         }
+        help_texts = {
+            'middle_name': 'при наличии'
+        }
 
 
 class EducationForm(forms.ModelForm):
@@ -83,19 +88,60 @@ class EducationForm(forms.ModelForm):
         label='Средние оценки по предметам'
     )
 
+    planned_exams = forms.ModelMultipleChoiceField(
+        label="Планируемые экзамены",
+        queryset=Subject.objects.all(),
+        required=False,
+        widget=forms.SelectMultiple()
+    )
+
     class Meta:
         model = UserInfo
         fields = [
-            'school_name', 'school_address', 'class_teacher', 'next_year_class_digit',
-            'class_profile', 'planned_exams', 'subject_grades'
+            'school_name',
+            'school_address',
+            'class_teacher',
+            'next_year_class_digit',
+            'class_profile',
+            'planned_exams',
+            'subject_grades',
+
+            'avg_grade_last_period',
+            'avg_russian_last_2_periods',
+            'avg_math_last_2_periods',
+            'avg_profile_subjects_last_2_periods',
         ]
+
         widgets = {
             'school_name': forms.TextInput(attrs={'placeholder': 'МБОУ СОШ №1'}),
             'school_address': forms.TextInput(attrs={'placeholder': 'г. Москва, ул. Школьная, 5'}),
-            'class_teacher': forms.TextInput(attrs={'placeholder': 'Петрова Мария Ивановна, +7 (999) 123-45-67'}),
             'class_profile': forms.TextInput(attrs={'placeholder': 'Физико-математический'}),
-            'planned_exams': forms.Textarea(attrs={'placeholder': 'Математика, Русский язык, Физика'}),
             'subject_grades': forms.Textarea(attrs={'placeholder': 'Математика — 5, Физика — 4'}),
+
+            'avg_grade_last_period': forms.NumberInput(attrs={
+                'step': '0.01',
+                'min': '1',
+                'max': '10',
+                'placeholder': 'Например: 4.75'
+            }),
+            'avg_russian_last_2_periods': forms.NumberInput(attrs={
+                'step': '0.01',
+                'min': '1',
+                'max': '10',
+                'placeholder': 'Например: 4.80'
+            }),
+            'avg_math_last_2_periods': forms.NumberInput(attrs={
+                'step': '0.01',
+                'min': '1',
+                'max': '10',
+                'placeholder': 'Например: 4.60'
+            }),
+            'avg_profile_subjects_last_2_periods': forms.TextInput(attrs={'placeholder': 'География - 4.9, ...'}),
+        }
+
+        help_texts = {
+            'avg_grade_last_period': 'Средний балл за последнюю четверть / семестр.',
+            'avg_profile_subjects_last_2_periods': 'Профильные предметы — важные для выбранного направления.',
         }
 
 
@@ -123,10 +169,22 @@ class FamilyForm(forms.ModelForm):
     class Meta:
         model = UserInfo
         fields = [
-            'mother', 'father', 'legal_guardian', 'siblings_count', 'siblings_info',
-            'family_size', 'income_per_member', 'is_low_income', 'receives_subsidy',
-            'other_factors', 'has_pc_with_internet'
+            'mother',
+            'father',
+            'legal_guardian',
+            'siblings_count',
+            'siblings_info',
+            'family_size',
+            'income_per_member',
+            'is_low_income',
+            'receives_subsidy',
+
+            'family_material_status',
+
+            'other_factors',
+            'has_pc_with_internet'
         ]
+
         widgets = {
             'mother': forms.Textarea(attrs={'placeholder': 'Иванова Наталья Петровна, врач, ГКБ №1'}),
             'father': forms.Textarea(attrs={'placeholder': 'Иванов Пётр Сергеевич, инженер, Газпром'}),
@@ -137,15 +195,19 @@ class FamilyForm(forms.ModelForm):
             'income_per_member': forms.TextInput(attrs={'placeholder': '15 000'}),
             'is_low_income': forms.TextInput(attrs={'placeholder': 'Да / Нет'}),
             'receives_subsidy': forms.TextInput(attrs={'placeholder': 'Пособие на ребёнка'}),
+
+            'family_material_status': forms.Select(attrs={
+                'class': 'form-control'
+            }),
+
             'other_factors': forms.Textarea(attrs={'placeholder': 'Семья арендует жильё, инвалидность'}),
             'has_pc_with_internet': forms.TextInput(attrs={'placeholder': 'Да / Нет'}),
         }
+
         help_texts = {
-            'mother': "ФИО, телефон, e-mail, место работы",
-            'father': "ФИО, телефон, e-mail, место работы",
-            'legal_guardian': "ФИО, телефон, e-mail, место работы. Если твоими законными представителями являются родители, оставь это поле пустым. В иных случаях укажи человека, который за тебя отвечает: бабушка, тетя, директор детского учреждения.",
             'receives_subsidy': 'Если да, то на каком основании?',
-            'income_per_member': 'Сложи годовой доход «на руки» каждого из родителей, живущих с тобой, раздели на 12, а потом раздели на число членов семьи, проживающих вместе /финансово зависимых от родителей.  Если среднемесячный доход на одного члена твоей семьи больше 15 000 р., ты можешь принять участие в отборе, но мы попросим объяснить, почему ты считаешь, что помощь для тебя критична.'
+            'family_material_status': 'Оцените общее материальное положение вашей семьи.',
+            'income_per_member': 'Сложи годовой доход «на руки» каждого родителя, раздели на 12 и затем на число членов семьи.',
         }
 
 
@@ -187,6 +249,18 @@ TEMPLATES = {
 
 
 class ApplicationWizard(SessionWizardView):
+    def _get_model_fields(self):
+        normal = set()
+        m2m = set()
+        for f in UserInfo._meta.get_fields():
+            if f.auto_created and not f.concrete:
+                continue
+            if isinstance(f, models.ManyToManyField):
+                m2m.add(f.name)
+            elif getattr(f, "attname", None):
+                normal.add(f.name)
+        return normal, m2m
+
     def get_template_names(self):
         return [TEMPLATES[self.steps.current]]
 
@@ -215,7 +289,7 @@ class ApplicationWizard(SessionWizardView):
                     field.widget.attrs.pop("required", None)
             return form
 
-        required_false_list = ['legal_guardian', 'vk']
+        required_false_list = ['legal_guardian', 'vk', 'middle_name']
         for name, field in form.fields.items():
             if name in required_false_list:
                 field.required = False
@@ -236,35 +310,56 @@ class ApplicationWizard(SessionWizardView):
         model_fields = {f.name for f in UserInfo._meta.get_fields() if getattr(f, 'attname', None)}
         for name in form_class.base_fields.keys():
             if name in model_fields:
-                initial[name] = getattr(instance, name, None)
+                val = getattr(instance, name, None)
+
+                if hasattr(val, "all") and hasattr(val, "values_list"):
+                    val = list(val.values_list("pk", flat=True))
+
+                initial[name] = val
         return initial
 
     @transaction.atomic
     def process_step(self, form):
         instance = self.get_form_instance(self.steps.current)
-        model_fields = {f.name for f in UserInfo._meta.get_fields() if getattr(f, 'attname', None)}
+        normal_fields, m2m_fields = self._get_model_fields()
+
+        m2m_to_set = {}
+
         for field, value in form.cleaned_data.items():
-            if field in model_fields:
+            if field in normal_fields:
                 setattr(instance, field, value)
+            elif field in m2m_fields:
+                m2m_to_set[field] = value
+
         instance.save()
 
-        _sync_user_from_userinfo(instance)
+        for field, value in m2m_to_set.items():
+            getattr(instance, field).set(value or [])
 
+        _sync_user_from_userinfo(instance)
         return super().process_step(form)
 
     def done(self, form_list, **kwargs):
         instance = self.get_form_instance(None)
-        model_fields = {f.name for f in UserInfo._meta.get_fields() if getattr(f, 'attname', None)}
+        normal_fields, m2m_fields = self._get_model_fields()
+
+        m2m_to_set = {}
+
         for form in form_list:
             for field, value in form.cleaned_data.items():
-                if field in model_fields:
+                if field in normal_fields:
                     setattr(instance, field, value)
+                elif field in m2m_fields:
+                    m2m_to_set[field] = value
+
         instance.form_status = "submitted"
         wizard_done.send(sender=self.__class__, instance=instance, forms=form_list)
         instance.save()
 
-        _sync_user_from_userinfo(instance)
+        for field, value in m2m_to_set.items():
+            getattr(instance, field).set(value or [])
 
+        _sync_user_from_userinfo(instance)
         return redirect('thank_you')
 
     def post(self, *args, **kwargs):
@@ -272,26 +367,31 @@ class ApplicationWizard(SessionWizardView):
         is_autosave = request.POST.get("_autosave") == "1"
 
         if is_autosave:
-            form = self.get_form(
-                data=request.POST, files=request.FILES, step=self.steps.current
-            )
+            form = self.get_form(data=request.POST, files=request.FILES, step=self.steps.current)
             for f in form.fields.values():
                 f.required = False
 
             if form.is_valid():
                 instance = self.get_form_instance(self.steps.current)
-                model_fields = {f.name for f in UserInfo._meta.get_fields() if getattr(f, 'attname', None)}
+                normal_fields, m2m_fields = self._get_model_fields()
+
+                m2m_to_set = {}
                 for field, value in form.cleaned_data.items():
-                    if field in model_fields:
+                    if field in normal_fields:
                         setattr(instance, field, value)
+                    elif field in m2m_fields:
+                        m2m_to_set[field] = value
+
                 instance.save()
+                for field, value in m2m_to_set.items():
+                    getattr(instance, field).set(value or [])
 
                 _sync_user_from_userinfo(instance)
 
                 from django.http import HttpResponse
                 return HttpResponse(status=204)
-            else:
-                return self.render(self.get_form_step_data(form))
+
+            return self.render(self.get_form_step_data(form))
 
         return super().post(*args, **kwargs)
 
