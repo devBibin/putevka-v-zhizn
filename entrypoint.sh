@@ -51,12 +51,12 @@ echo "
 from django.contrib.auth import get_user_model
 User = get_user_model()
 
-username = os.environ.get('DJANGO_SUPERUSER_USERNAME', 'admin')
+user_name = os.environ.get('DJANGO_SUPERUSER_USERNAME', 'admin')
 email = os.environ.get('DJANGO_SUPERUSER_EMAIL', '')
 password = os.environ.get('DJANGO_SUPERUSER_PASSWORD', '0000')
 
-if not User.objects.filter(username=username).exists():
-    User.objects.create_superuser(username, email, password)
+if not User.objects.filter(username=user_name).exists():
+    User.objects.create_superuser(user_name, email, password)
 " | python manage.py shell
 
 django-admin compilemessages
