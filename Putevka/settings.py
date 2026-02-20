@@ -10,15 +10,13 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
-import os
 from pathlib import Path
 
+import dj_database_url
+import os
 from dotenv import load_dotenv
 
 import config
-import dj_database_url, os
-
-
 
 load_dotenv()
 
@@ -100,8 +98,7 @@ WSGI_APPLICATION = 'Putevka.wsgi.application'
 DATABASES = {
     "default": dj_database_url.config(
         default=os.getenv("DATABASE_URL"),
-        conn_max_age=60,
-        ssl_require=True
+        conn_max_age=60
     )
 }
 
