@@ -29,10 +29,10 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-(ct6qihahs$niey_!sj__0l4$o4wd8jz%nf&p%jgtf94upx^v('
+SECRET_KEY = os.getenv("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
 
@@ -128,7 +128,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'ru'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Europe/Moscow'
 
 USE_I18N = True
 
@@ -146,9 +146,6 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-STATIC_URL = '/static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
@@ -160,6 +157,8 @@ EMAIL_USE_TLS = True
 
 EMAIL_HOST_USER = os.getenv("YC_EMAIL_USER")
 EMAIL_HOST_PASSWORD = os.getenv("YC_EMAIL_PASSWORD")
+
+EMAIL_TIMEOUT = 10
 
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL")
 
@@ -243,22 +242,22 @@ LOGGING = {
         },
         'django.request': {
             'handlers': ['telegram_errors', 'file_error'],
-            'level': 'ERROR',
+            'level': 'INFO',
             'propagate': False,
         },
         'core': {
             'handlers': ['console', 'file_info', 'file_error', 'telegram_errors'],
-            'level': 'DEBUG',  # В разработке может быть DEBUG, на продакшене INFO
+            'level': 'INFO',  # В разработке может быть DEBUG, на продакшене INFO
             'propagate': False,
         },
         'documents': {
             'handlers': ['console', 'file_info', 'file_error', 'telegram_errors'],
-            'level': 'DEBUG',  # В разработке может быть DEBUG, на продакшене INFO
+            'level': 'INFO',  # В разработке может быть DEBUG, на продакшене INFO
             'propagate': False,
         },
         'scholar_form': {
             'handlers': ['console', 'file_info', 'file_error', 'telegram_errors'],
-            'level': 'DEBUG',  # В разработке может быть DEBUG, на продакшене INFO
+            'level': 'INFO',  # В разработке может быть DEBUG, на продакшене INFO
             'propagate': False,
         },
         '': {
