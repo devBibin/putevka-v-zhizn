@@ -27,6 +27,9 @@ TG_TOKEN_ADMIN = get_variable('TG_TOKEN_ADMIN')
 TG_TOKEN_USERS = get_variable('TG_TOKEN_USERS')
 TG_BOT_USERS_USERNAME = get_variable('TG_BOT_USERS_USERNAME')
 
+TG_TOKEN_MAIL = get_variable('TG_TOKEN_MAIL')
+TG_CHAT_ID_MAIL = get_variable('TG_CHAT_ID_MAIL')
+
 GPT_TOKEN = get_variable('GPT_TOKEN')
 
 PUBLIC_KEY_CALL = get_variable('PUBLIC_KEY_CALL')

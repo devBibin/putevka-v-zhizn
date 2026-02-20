@@ -143,3 +143,19 @@ class MotivationLetterForm(forms.ModelForm):
 
 class SendNotificationForm(forms.Form):
     message = forms.CharField(widget=forms.Textarea, label="Текст оповещения")
+
+
+class FeedbackForm(forms.Form):
+    message = forms.CharField(
+        label="Сообщение",
+        widget=forms.Textarea(attrs={"rows": 5}),
+        required=True
+    )
+
+    website = forms.CharField(required=False)
+
+    def clean(self):
+        cleaned = super().clean()
+        if cleaned.get("website"):
+            raise forms.ValidationError("Спам.")
+        return cleaned
