@@ -79,7 +79,10 @@ class UserInfoStaffForm(forms.ModelForm):
             "foundation_help": forms.Textarea(attrs={"rows": 2}),
             "heard_about_program": forms.Textarea(attrs={"rows": 2}),
             "tutor_summary": forms.Textarea(attrs={"rows": 4}),
-
+            "planned_exams": forms.SelectMultiple(attrs={
+                "class": "form-select js-tomselect",
+                "placeholder": "Начни вводить предмет…",
+            }),
             "life_situation_notes": forms.Textarea(attrs={"rows": 3}),
         }
 

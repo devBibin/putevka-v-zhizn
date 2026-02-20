@@ -138,9 +138,11 @@
 
                                 <div class="col-12">
                                     <label class="form-label">{{ form.planned_exams.label }}</label>
-                                    {{ form.planned_exams|add_class:"form-select" }}
+                                    {{ form.planned_exams }}
                                     {% if form.planned_exams.errors %}
-                                        <div class="text-danger small mt-1">{{ form.planned_exams.errors }}</div>{% endif %}
+                                        <div class="text-danger small mt-1">{{ form.planned_exams.errors }}</div>
+                                    {% endif %}
+                                    <div class="form-text">Можно выбрать несколько. Есть поиск.</div>
                                 </div>
 
                                 <div class="col-12">
@@ -538,4 +540,33 @@
             </div>
         </form>
     </div>
+{% endblock %}
+
+{% block extra_js %}
+    <script>
+        function initChoices(root = document) {
+            root.querySelectorAll("select[multiple]").forEach((el) => {
+                if (el.dataset.choicesInited === "1") return;
+
+                new Choices(el, {
+                    removeItemButton: true,
+                    searchEnabled: true,
+                    shouldSort: false,
+                    placeholder: true,
+                    placeholderValue: el.getAttribute("data-placeholder") || "Начните печатать для поиска…",
+                    itemSelectText: "",
+                });
+
+                el.dataset.choicesInited = "1";
+            });
+        }
+
+        document.addEventListener("DOMContentLoaded", function () {
+            initChoices(document);
+
+            document.body.addEventListener("htmx:afterSwap", function (e) {
+                initChoices(e.target);
+            });
+        });
+    </script>
 {% endblock %}
