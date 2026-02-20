@@ -5,6 +5,7 @@ from django.urls import reverse
 
 from core.decorators import ensure_registration_gate
 from review_by_tutor.models import TestAssignment
+from review_by_tutor.utils.selection_stages import require_selection_step
 from scholar_form.forms import UserProfileForm, ScholarVideoForm, UserPersonalDataForm
 from scholar_form.models import UserInfo, UserPersonalData, ScholarVideo
 
@@ -38,6 +39,7 @@ def personal_info(request):
         },
     )
 
+@require_selection_step(UserInfo.SelectionStep.VIDEO)
 @ensure_registration_gate('protected')
 @login_required
 def my_video_page(request):
@@ -69,3 +71,18 @@ def test_assignment_complete(request, pk):
         return redirect(reverse("candidate_testing_list"))
 
     return redirect(reverse("candidate_testing_list"))
+
+
+@login_required
+def form_step_entry(request):
+    user_obj = request.user
+    uinfo, _ = UserInfo.objects.get_or_create(user=user_obj)
+
+    return render(
+        request,
+        "stage_locked.html",
+        {
+            "user_obj": user_obj,
+            "uinfo": uinfo,
+        },
+    )

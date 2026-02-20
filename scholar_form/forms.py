@@ -74,7 +74,7 @@ class PersonalForm(forms.ModelForm):
 class EducationForm(forms.ModelForm):
     class_teacher = forms.CharField(
         widget=forms.TextInput(
-            attrs={'placeholder': 'Петрова Мария Ивановна, +7 (999) 123-45-67'}
+            attrs={'placeholder': 'Петрова Мария Ивановна, +7 (999) 123-45-67, mama@example.com'}
         ),
         label='Классный руководитель',
         required=True,
@@ -186,8 +186,8 @@ class FamilyForm(forms.ModelForm):
         ]
 
         widgets = {
-            'mother': forms.Textarea(attrs={'placeholder': 'Иванова Наталья Петровна, врач, ГКБ №1'}),
-            'father': forms.Textarea(attrs={'placeholder': 'Иванов Пётр Сергеевич, инженер, Газпром'}),
+            'mother': forms.Textarea(attrs={'placeholder': 'Иванова Наталья Петровна, врач, ГКБ №1, mama@example.com, +73000000000'}),
+            'father': forms.Textarea(attrs={'placeholder': 'Иванов Пётр Сергеевич, инженер, Газпром, papa@example.com, +73000000000'}),
             'legal_guardian': forms.Textarea(attrs={'placeholder': 'Не заполняется, если не актуально'}),
             'siblings_count': forms.NumberInput(attrs={'placeholder': '1'}),
             'siblings_info': forms.Textarea(attrs={'placeholder': 'Брат — Иван, 20 лет, студент'}),
@@ -205,8 +205,6 @@ class FamilyForm(forms.ModelForm):
         }
 
         help_texts = {
-            'mother': "ФИО, email, телефон",
-            'father': "ФИО, email, телефон",
             'legal_guardian': "ФИО, email, телефон",
             'receives_subsidy': 'Если да, то на каком основании?',
             'family_material_status': 'Оцените общее материальное положение вашей семьи.',
@@ -217,6 +215,13 @@ class FamilyForm(forms.ModelForm):
 class AdditionalForm(forms.ModelForm):
     agree_processing = forms.BooleanField(label="Согласен(на) на обработку персональных данных")
     agree_documents = forms.BooleanField(label="Обязуюсь предоставить подтверждающие документы")
+
+    vk = forms.CharField(
+        label="Вконтакте",
+        widget=forms.TextInput(attrs={
+            "caption": "ВАЖНО: ссылка должна быть в формате https://vk.com/id000000000. Чтобы получить такую ссылку, можно конвертировать её через https://regvk.com/"
+        })
+    )
 
     class Meta:
         model = UserInfo

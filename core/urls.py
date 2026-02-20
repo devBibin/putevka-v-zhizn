@@ -60,4 +60,6 @@ urlpatterns = [
 
     path("staff/scholars/<int:user_id>/", StaffScholarDossierView.as_view(), name="staff_scholar_dossier"),
     path("staff/scholars/<int:user_id>/action/", staff_scholar_action, name="staff_scholar_action"),
+
+    path("feedback/", views.feedback_view, name="feedback"),
 ]

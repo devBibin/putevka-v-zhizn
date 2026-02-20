@@ -1,11 +1,18 @@
+import logging
+
 from django.shortcuts import render, redirect
+from django.contrib import messages
 from django.utils import timezone
 from django.core.mail import send_mail
 from django.conf import settings
 from django.urls import reverse
+from django.views.decorators.http import require_http_methods
 
+from core.forms import FeedbackForm
 from .forms import EmailSubscriberForm
 from .models import EmailSubscriber
+
+logger = logging.getLogger(__name__)
 
 def _abs_url(request, path: str) -> str:
     return request.build_absolute_uri(path)
@@ -28,3 +35,5 @@ def thanks(request):
     if email is None:
         return redirect("announce")
     return render(request, "thanks.html", {"username": email})
+
+

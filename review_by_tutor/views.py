@@ -29,6 +29,7 @@ from review_by_tutor.forms import MotivationLetterStaffForm, UserInfoStaffForm, 
     LetterRevisionForm, MotivationLetterRubricReviewStaffForm, LetterDeadlineForm, ScholarVideoDeadlineForm, \
     InterviewResultForm
 from review_by_tutor.models import Interview, TestAssignment, InterviewPreparation, InterviewTemplate, InterviewResult
+from review_by_tutor.utils.selection_stages import require_selection_step
 from scholar_form.models import UserInfo, ScholarVideo, StaffNote
 
 logger = logging.getLogger(__name__)
@@ -232,7 +233,7 @@ def staff_profile_detail(request, user_id: int):
                         send_tg_notification_to_user(
                             obj.user,
                             message_text,
-                            url=f"{BASE_URL}/apply/",
+                            url=f"{BASE_URL}/form/apply/",
                             button_text="📄 Открыть анкету"
                         )
                     except Exception as e:
@@ -806,6 +807,7 @@ def download_interview_template(request, user_id: int):
     return response
 
 
+@require_selection_step(UserInfo.SelectionStep.TEST)
 @login_required
 def testing_list_for_candidate(request):
     items = (TestAssignment.objects
@@ -888,6 +890,7 @@ def testing_fill_result(request, pk):
                   {"form": form, "obj": obj, "user_obj": get_object_or_404(User, pk=obj.user.id), "active": "testing"})
 
 
+@require_selection_step(UserInfo.SelectionStep.INTERVIEW_PREP)
 @ensure_registration_gate('protected')
 @login_required
 def interview_preparation_view(request):

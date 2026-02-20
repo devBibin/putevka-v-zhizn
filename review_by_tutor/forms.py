@@ -7,6 +7,15 @@ from review_by_tutor.models import Interview, TestAssignment, InterviewResult
 from scholar_form.models import UserInfo, ScholarVideo
 
 
+class SelectionStepUpdateForm(forms.ModelForm):
+    class Meta:
+        model = UserInfo
+        fields = ["selection_step"]
+        widgets = {
+            "selection_step": forms.Select(attrs={"class": "form-select"}),
+        }
+
+
 class StatusChangeForm(forms.ModelForm):
     class Meta:
         model = UserInfo
@@ -70,7 +79,10 @@ class UserInfoStaffForm(forms.ModelForm):
             "foundation_help": forms.Textarea(attrs={"rows": 2}),
             "heard_about_program": forms.Textarea(attrs={"rows": 2}),
             "tutor_summary": forms.Textarea(attrs={"rows": 4}),
-
+            "planned_exams": forms.SelectMultiple(attrs={
+                "class": "form-select js-tomselect",
+                "placeholder": "Начни вводить предмет…",
+            }),
             "life_situation_notes": forms.Textarea(attrs={"rows": 3}),
         }
 

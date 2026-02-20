@@ -63,6 +63,12 @@
                                 {{ field|add_class:"form-control" }}
                             {% endif %}
 
+                            {% with caption=field.field.widget.attrs.caption %}
+                                {% if caption %}
+                                    <div class="form-text">{{ caption }}</div>
+                                {% endif %}
+                            {% endwith %}
+
                             {% for error in field.errors %}
                                 <div class="text-danger small">{{ error }}</div>
                             {% endfor %}

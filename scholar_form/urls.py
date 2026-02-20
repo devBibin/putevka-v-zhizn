@@ -19,4 +19,6 @@ urlpatterns = [
 
     path("tests/complete/<int:pk>/", views.test_assignment_complete, name="test_assignment_complete"),
 
+    path('waiting_stage/', views.form_step_entry, name='form_step_entry'),
+
 ]

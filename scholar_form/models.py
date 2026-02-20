@@ -60,6 +60,20 @@ class UserInfo(models.Model):
     STATUSES = [('CANDIDATE', 'Кандидат'), ('ALTERNATIVE', 'Альтернативный трек'), ('FINAL STAGE', 'Финалист'), ('SCHOLAR', 'Участник'),
                 ('ALUMNUS', 'Выпускник')]
 
+    class SelectionStep(models.TextChoices):
+        FORM = "form", "Анкета"
+        TEST = "test", "Тестирование"
+        ML = "ml", "Мотивационное письмо"
+        VIDEO = "video", "Видеовизитка"
+        INTERVIEW_PREP = "interview_prep", "Подготовка к собеседованию"
+
+    selection_step = models.CharField(
+        max_length=32,
+        choices=SelectionStep.choices,
+        default=SelectionStep.FORM,
+        db_index=True,
+    )
+
     class FormStatus(models.TextChoices):
         DRAFT = "draft", "Не отправлена"
         SUBMITTED = "submitted", "Отправлена"
@@ -125,7 +139,7 @@ class UserInfo(models.Model):
     # Step 3: Admission Plans
     olympiad_plans = models.CharField(max_length=10000, verbose_name="Планы участия в олимпиадах", blank=True)
     admission_path = models.CharField(max_length=10000, verbose_name="Планируемый путь поступления", blank=True)
-    target_universities = models.CharField(max_length=10000, verbose_name="Целевые вузы", blank=True)
+    target_universities = models.CharField(max_length=10000, verbose_name="Приоритетные вузы", blank=True)
     specializations = models.CharField(max_length=10000, verbose_name="Интересующие направления", blank=True)
 
     # Step 4: Family
@@ -143,7 +157,7 @@ class UserInfo(models.Model):
                                             blank=True)
 
     # Step 5: Additional
-    vk = models.URLField(max_length=500, verbose_name="Ссылка на вк", blank=True, null=True, validators=[validate_vk_id_url], help_text="ВАЖНО: ссылка должна быть в формате https://vk.com/id000000000. Чтобы получить такую ссылку, можно конвертировать её через https://regvk.com/")
+    vk = models.URLField(max_length=500, verbose_name="Ссылка на вк", blank=True, null=True, validators=[validate_vk_id_url])
     achievements = models.CharField(max_length=10000, verbose_name="Кратко опиши свои достижения за последние два года", blank=True)
     preparation_plan = models.CharField(max_length=10000, verbose_name="План подготовки к поступлению", blank=True)
     foundation_help = models.CharField(max_length=10000, verbose_name="Какая помощь от фонда нужна", blank=True)

@@ -1,0 +1,35 @@
+{% extends "core/base.html" %}
+{% load widget_tweaks %}
+
+{% block content %}
+<div class="container py-5" style="max-width: 720px;">
+  <h1 class="mb-3">Обратная связь</h1>
+  <p class="text-muted">
+    Напишите нам — сообщение будет отправлено от вашего аккаунта.
+  </p>
+
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+    {% endfor %}
+  {% endif %}
+
+  <form method="post" class="card p-4 shadow-sm">
+    {% csrf_token %}
+
+    <div style="display:none;">
+      {{ form.website }}
+    </div>
+
+    <div class="mb-3">
+      <label class="form-label">{{ form.message.label }}</label>
+      {{ form.message|add_class:"form-control" }}
+      {{ form.message.errors }}
+    </div>
+
+    <button class="btn btn-primary" type="submit">
+      Отправить
+    </button>
+  </form>
+</div>
+{% endblock %}

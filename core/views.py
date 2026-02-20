@@ -17,12 +17,14 @@ from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST, require_http_methods
 
 import config
 from Putevka import settings
+from review_by_tutor.utils.selection_stages import require_selection_step
 from .decorators import ensure_registration_gate
-from .forms import CustomUserCreationForm, RegistrationForm, VerifyEmailForm, PhoneNumberForm, MotivationLetterForm
+from .forms import CustomUserCreationForm, RegistrationForm, VerifyEmailForm, PhoneNumberForm, MotivationLetterForm, \
+    FeedbackForm
 from .models import TelegramAccount, RegistrationPersonalData, MotivationLetterInstruction
 from scholar_form.models import UserInfo
 from datetime import datetime, timedelta
@@ -40,12 +42,55 @@ from .forms import SendNotificationForm
 from .models import UserNotification, Notification
 
 from .bot import webhook
-from .services.email_service import send_email_verification_code, get_email_verification_link
+from .services.email_service import send_email_verification_code
+from .services.tg_service import send_telegram_feedback_message
 from .services.zvonok_service import initiate_zvonok_verification, poll_zvonok_status
 from django.db import transaction
 from django.utils import timezone
 
 logger = logging.getLogger(__name__)
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def feedback_view(request):
+    if request.method == "POST":
+        form = FeedbackForm(request.POST)
+        if form.is_valid():
+            cd = form.cleaned_data
+            user = request.user
+
+            user_info = getattr(user, "user_info", None)
+
+            full_name = user.get_full_name() or user.username
+            email = user.email or "—"
+            phone = getattr(user_info, "phone", "—") if user_info else "—"
+
+            tg = user.telegram_account.username
+
+            text = (
+                "📝 <b>Обратная связь с сайта</b>\n\n"
+                f"👤 <b>Пользователь:</b> {full_name} (id={user.id})\n"
+                f"📧 <b>Email:</b> {email}\n"
+                f"📱 <b>Телефон:</b> {phone}\n"
+                f"📱 <b>Телеграм:</b> @{tg}\n\n"
+                f"💬 <b>Сообщение:</b>\n{cd['message']}"
+            )
+
+            logger.info(f"Получена обратная связь от user_id={user.id}")
+
+            try:
+                send_telegram_feedback_message(text)
+            except Exception:
+                messages.error(request, "Не удалось отправить сообщение. Попробуйте позже.")
+                return render(request, "feedback.html", {"form": form})
+
+            messages.success(request, "Спасибо! Сообщение отправлено.")
+            return redirect("feedback")
+    else:
+        form = FeedbackForm()
+
+    return render(request, "feedback.html", {"form": form})
 
 @login_required()
 @ensure_registration_gate('protected')
@@ -120,7 +165,6 @@ def verify_email(request):
 
     return render(request, 'registration/verify_email.html', {
         'email': attempt.email,
-        'verification_link': get_email_verification_link(attempt),
         'can_resend_now': can_resend_now,
         'can_resend_at': can_resend_at,
         'cooldown_seconds': COOLDOWN_SECONDS,
@@ -334,6 +378,7 @@ def finish_registration(request):
 
     return render(request, 'registration/registration_complete.html', {'user': user})
 
+@require_selection_step(UserInfo.SelectionStep.ML)
 @ensure_registration_gate('protected')
 @login_required
 def motivation_letter(request):
