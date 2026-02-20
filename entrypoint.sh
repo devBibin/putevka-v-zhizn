@@ -59,7 +59,7 @@ if not User.objects.filter(username=user_name).exists():
     User.objects.create_superuser(user_name, email, password)
 " | python manage.py shell
 
-django-admin compilemessages
+python manage.py compilemessages
 
 python telegram_bot_polling.py &
 
