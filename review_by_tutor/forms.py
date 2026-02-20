@@ -250,7 +250,7 @@ class TestAssignmentEditForm(forms.ModelForm):
 class TestResultForm(forms.ModelForm):
     class Meta:
         model = TestAssignment
-        fields = ("result_score", "result_text", "passed", "percentile")
+        fields = ("result_score", "percentile", "result_text", "passed")
         widgets = {
             "result_text": forms.Textarea(attrs={"rows": 4}),
             "percentile": forms.NumberInput(attrs={"step": "0.01", "min": "0", "max": "100"}),
