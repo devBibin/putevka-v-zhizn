@@ -59,7 +59,8 @@ if not User.objects.filter(username=user_name).exists():
     User.objects.create_superuser(user_name, email, password)
 " | python manage.py shell
 
-python manage.py compilemessages
+#TODO не хочет запускаться по непонятным причинам
+#python manage.py compilemessages
 
 python telegram_bot_polling.py &
 
