@@ -142,7 +142,14 @@ class MotivationLetterForm(forms.ModelForm):
         }
 
 class SendNotificationForm(forms.Form):
-    message = forms.CharField(widget=forms.Textarea, label="Текст оповещения")
+    message = forms.CharField(
+        label="",
+        widget=forms.Textarea(attrs={
+            "class": "form-control",
+            "rows": 4,
+            "placeholder": "Напиши сообщение участнику…",
+        })
+    )
 
 
 class FeedbackForm(forms.Form):

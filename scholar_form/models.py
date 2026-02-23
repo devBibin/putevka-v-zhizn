@@ -138,7 +138,7 @@ class UserInfo(models.Model):
 
     # Step 3: Admission Plans
     olympiad_plans = models.CharField(max_length=10000, verbose_name="Планы участия в олимпиадах", blank=True)
-    admission_path = models.CharField(max_length=10000, verbose_name="Планируемый путь поступления", blank=True)
+    admission_path = models.CharField(max_length=10000, verbose_name="Ты планируешь поступать по ЕГЭ или олимпиадам?", blank=True)
     target_universities = models.CharField(max_length=10000, verbose_name="Приоритетные вузы", blank=True)
     specializations = models.CharField(max_length=10000, verbose_name="Интересующие направления", blank=True)
 

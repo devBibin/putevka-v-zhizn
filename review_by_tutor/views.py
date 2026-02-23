@@ -29,6 +29,7 @@ from review_by_tutor.forms import MotivationLetterStaffForm, UserInfoStaffForm, 
     LetterRevisionForm, MotivationLetterRubricReviewStaffForm, LetterDeadlineForm, ScholarVideoDeadlineForm, \
     InterviewResultForm
 from review_by_tutor.models import Interview, TestAssignment, InterviewPreparation, InterviewTemplate, InterviewResult
+from review_by_tutor.utils.contact_form import handle_send_notification
 from review_by_tutor.utils.selection_stages import require_selection_step
 from scholar_form.models import UserInfo, ScholarVideo, StaffNote
 
@@ -45,6 +46,7 @@ def _staff_check(user):
 @transaction.atomic
 def staff_letter_detail(request, user_id: int):
     user = get_object_or_404(User, pk=user_id)
+    send_notification_form = handle_send_notification(request, user)
 
     letter = (
         MotivationLetter.objects.select_related("user", "rubric_review")
@@ -146,6 +148,8 @@ def staff_letter_detail(request, user_id: int):
 
         "active": "motivation_letter",
         "readonly": readonly_ctx,
+
+        "send_notification_form": send_notification_form,
     }
     return render(request, "staff_templates/letter_detail.html", ctx)
 
@@ -156,6 +160,7 @@ def staff_letter_detail(request, user_id: int):
 def staff_profile_detail(request, user_id: int):
     user_obj = get_object_or_404(User, pk=user_id)
     profile = get_object_or_404(UserInfo.objects.select_related("user"), user_id=user_id)
+    send_notification_form = handle_send_notification(request, user_obj)
 
     if request.method == "POST":
         form = UserInfoStaffForm(request.POST, request.FILES, instance=profile)
@@ -209,7 +214,6 @@ def staff_profile_detail(request, user_id: int):
                             )
                         except Exception as e:
                             logger.exception("Ошибка отправки Email уведомления: %s", e)
-
 
                 transaction.on_commit(_notify)
 
@@ -277,6 +281,7 @@ def staff_profile_detail(request, user_id: int):
         "user_obj": user_obj,
         "form": form,
         "active": "apply",
+        "send_notification_form": send_notification_form,
     })
 
 
@@ -285,6 +290,7 @@ def staff_profile_detail(request, user_id: int):
 @transaction.atomic
 def staff_video_detail(request, user_id: int):
     user_obj = get_object_or_404(User, pk=user_id)
+    send_notification_form = handle_send_notification(request, user_obj)
 
     video = (ScholarVideo.objects
              .select_related("user")
@@ -339,6 +345,8 @@ def staff_video_detail(request, user_id: int):
         "form": staff_form,
         "deadline_form": deadline_form,
         "active": "my_video_page",
+        "send_notification_form": send_notification_form,
+
     })
 
 
@@ -347,6 +355,8 @@ def staff_video_detail(request, user_id: int):
 @transaction.atomic
 def staff_documents_detail(request, user_id: int):
     user_obj = get_object_or_404(User, pk=user_id)
+    send_notification_form = handle_send_notification(request, user_obj)
+
     docs = (Document.objects
             .filter(user_id=user_id)
             .prefetch_related("related_documents")
@@ -404,6 +414,8 @@ def staff_documents_detail(request, user_id: int):
         "rows": rows,
         "upload_form": upload_form,
         "active": "documents_dashboard",
+        "send_notification_form": send_notification_form,
+
     })
 
 
@@ -411,6 +423,7 @@ def staff_documents_detail(request, user_id: int):
 @user_passes_test(_staff_check)
 def staff_study_detail(request, user_id: int):
     user_obj = get_object_or_404(User, pk=user_id)
+    send_notification_form = handle_send_notification(request, user_obj)
 
     selections = (
         CourseSelection.objects
@@ -438,6 +451,7 @@ def staff_study_detail(request, user_id: int):
         "priorities": priorities,
         "assessments": assessments,
         "active": "study",
+        "send_notification_form": send_notification_form,
 
     })
 
@@ -458,6 +472,7 @@ def staff_note_delete(request, user_id: int, note_id: int):
 @user_passes_test(_staff_check)
 def staff_notes_by_user(request, user_id: int):
     user_obj = get_object_or_404(User, pk=user_id)
+    send_notification_form = handle_send_notification(request, user_obj)
 
     if request.method == "POST":
         text = (request.POST.get("text") or "").strip()
@@ -505,7 +520,9 @@ def staff_notes_by_user(request, user_id: int):
         "documents": documents,
         "video": video,
         "active": "notes",
-        "is_candidate": user_obj.user_info.status == "CANDIDATE"
+        "is_candidate": user_obj.user_info.status == "CANDIDATE",
+        "send_notification_form": send_notification_form,
+
     }
     return render(request, "staff_templates/staff_notes_by_user.html", ctx)
 
@@ -640,6 +657,7 @@ def staff_send_notification(request):
 
 def interview_detail(request, user_id: int):
     user_obj = get_object_or_404(User, pk=user_id)
+    send_notification_form = handle_send_notification(request, user_obj)
     interview, _ = Interview.objects.get_or_create(user=user_obj)
 
     sections = [
@@ -775,6 +793,8 @@ def interview_detail(request, user_id: int):
         "active": "interview",
         "result_form": result_form,
         "interview_sections": sections,
+        "send_notification_form": send_notification_form,
+
     }
     return render(request, "staff_templates/interview_detail.html", ctx)
 
@@ -818,13 +838,15 @@ def testing_list_for_candidate(request):
 
 @user_passes_test(_staff_check)
 def testing_list_for_user(request, user_id):
+    send_notification_form = handle_send_notification(request, User.objects.get(pk=user_id))
     items = (TestAssignment.objects
              .select_related("user", "assigned_by", "result_filled_by")
              .filter(user_id=user_id)
              .order_by("-assigned_at", "-id"))
     return render(request, "staff_templates/testing/list.html",
                   {"items": items, "target_user_id": user_id, "user_obj": get_object_or_404(User, pk=user_id),
-                   "active": 'testing'})
+                   "active": 'testing', "send_notification_form": send_notification_form,
+})
 
 
 @user_passes_test(_staff_check)
