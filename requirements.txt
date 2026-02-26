@@ -17,3 +17,4 @@ jinja2
 num2words
 docxtpl
 openpyxl
+httpx
