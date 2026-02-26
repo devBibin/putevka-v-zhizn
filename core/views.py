@@ -66,14 +66,15 @@ def feedback_view(request):
             email = user.email or "—"
             phone = getattr(user_info, "phone", "—") if user_info else "—"
 
-            tg = user.telegram_account.username
+            tg = getattr(user, "telegram_account", None)
+            tg_user = getattr(tg, "username", None)
 
             text = (
                 "📝 <b>Обратная связь с сайта</b>\n\n"
                 f"👤 <b>Пользователь:</b> {full_name} (id={user.id})\n"
                 f"📧 <b>Email:</b> {email}\n"
                 f"📱 <b>Телефон:</b> {phone}\n"
-                f"📱 <b>Телеграм:</b> @{tg}\n\n"
+                f"📱 <b>Телеграм:</b> @{tg_user}\n\n"
                 f"💬 <b>Сообщение:</b>\n{cd['message']}"
             )
 
@@ -90,7 +91,7 @@ def feedback_view(request):
     else:
         form = FeedbackForm()
 
-    return render(request, "feedback.html", {"form": form})
+    return render(request, "feedback.html", {"form": form, "active": "feedback"})
 
 @login_required()
 @ensure_registration_gate('protected')
