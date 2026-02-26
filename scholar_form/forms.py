@@ -462,7 +462,7 @@ class UserInfoForm(forms.ModelForm):
             # Step 2: Education
             'school_address': forms.Textarea(attrs={'rows': 2, 'cols': 80}),
             'class_teacher': forms.Textarea(attrs={'rows': 2, 'cols': 80}),
-            'planned_exams': forms.Textarea(attrs={'rows': 2, 'cols': 80}),
+            'planned_exams': forms.CheckboxSelectMultiple(),
             'subject_grades': forms.Textarea(attrs={'rows': 2, 'cols': 80}),
 
             # Step 3: Admission
