@@ -146,7 +146,13 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_BACKEND = 'core.mail_backends.postbox.PostboxEmailBackend'
+POSTBOX_ENDPOINT = "https://postbox.cloud.yandex.net/v2/email/outbound-emails"
+POSTBOX_REGION = "ru-central1"
+POSTBOX_SERVICE = "ses"
+
+POSTBOX_ACCESS_KEY_ID = os.getenv("YC_EMAIL_USER")
+POSTBOX_SECRET_ACCESS_KEY = os.getenv("YC_EMAIL_PASSWORD")
 
 EMAIL_HOST = 'postbox.cloud.yandex.net'
 EMAIL_PORT = 465
