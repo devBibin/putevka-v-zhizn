@@ -34,7 +34,7 @@ POLLING_INTERVAL = int(os.getenv("INTERVIEW_RESULT_FILL_POLLING_INTERVAL", "60")
 BATCH_LIMIT = int(os.getenv("INTERVIEW_RESULT_FILL_BATCH_LIMIT", "2"))
 
 http_client = httpx.Client(
-    proxies=PROXY if PROXY else None,
+    proxy=PROXY if PROXY else None,
     timeout=httpx.Timeout(60.0, connect=30.0),
     verify=True,
 )

@@ -26,7 +26,7 @@ from core.models import MotivationLetter, MotivationLetterRubricReview
 OPENAI_API_KEY = config.GPT_TOKEN
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 http_client = httpx.Client(
-    proxies=PROXY if PROXY else None,
+    proxy=PROXY if PROXY else None,
     timeout=httpx.Timeout(60.0, connect=30.0),
     verify=True,
 )
