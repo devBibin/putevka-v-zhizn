@@ -3,15 +3,6 @@
     <div class="container py-5">
         <h1 class="mb-3">Подтверждение email</h1>
         <p>Мы отправили письмо со ссылкой на <strong>{{ email }}</strong>.</p>
-        <p>Для подтверждения нажмите на кнопку ниже:</p>
-
-        <p>
-            <a href="{{ verification_link }}"
-               class="btn btn-success"
-               target="_blank" rel="noopener">
-                Подтвердить email
-            </a>
-        </p>
 
         {% if can_resend_now %}
             <form method="post" action="{% url 'resend_email_code' %}">
