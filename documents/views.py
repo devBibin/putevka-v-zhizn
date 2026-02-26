@@ -11,6 +11,7 @@ from django.shortcuts import get_object_or_404
 from django.shortcuts import render, redirect
 
 from core.decorators import ensure_registration_gate
+from review_by_tutor.utils.contact_form import handle_send_notification
 from review_by_tutor.views import _staff_check
 from .ctx_builders import merge_context, base_user_context
 from .decorators import rate_limit_uploads
@@ -179,6 +180,8 @@ def template_params(request, template_id, user_id):
 @user_passes_test(_staff_check)
 def template_list(request, user_id):
     templates = DocTemplate.objects.filter(is_active=True).order_by("name")
+    send_notification_form = handle_send_notification(request, User.objects.get(pk=user_id))
     return render(request, "staff_templates/docs/templates.html",
                   {"templates": templates, "active": "documents_templates",
-                   "user_obj": get_object_or_404(User, pk=user_id), })
+                   "user_obj": get_object_or_404(User, pk=user_id), "send_notification_form": send_notification_form,
+})
