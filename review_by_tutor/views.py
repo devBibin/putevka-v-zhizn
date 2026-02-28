@@ -9,12 +9,12 @@ from django.core.mail import send_mail
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.db import transaction
 from django.db.models import Q, Subquery, OuterRef, Count, Exists
-from django.http import Http404, FileResponse
+from django.http import Http404, FileResponse, JsonResponse
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.encoding import smart_str
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST, require_GET
 
 from Putevka import settings
 from config import BASE_URL
@@ -550,6 +550,8 @@ def staff_users_list(request):
     curator_paid = (request.GET.get("curator_need") or "").strip()
     grade = (request.GET.get("grade") or "").strip()
 
+    step = (request.GET.get("step") or "").strip()
+
     qs = (User.objects
           .all()
           .select_related("user_info")
@@ -579,6 +581,9 @@ def staff_users_list(request):
     elif curator_paid == "0":
         qs = qs.filter(course_selections__need_tutor=False)
 
+    if step:
+        qs = qs.filter(user_info__selection_step=step)
+
     qs = qs.distinct()
 
     letter_status_sq = Subquery(
@@ -607,6 +612,8 @@ def staff_users_list(request):
 
     grades = list(range(9, 12))
 
+    steps = getattr(UserInfo, "SELECTION_STEP_CHOICES", None) or UserInfo._meta.get_field("selection_step").choices
+
     return render(request, "staff_templates/users_list.html", {
         "page_obj": page_obj,
 
@@ -618,7 +625,59 @@ def staff_users_list(request):
         "grades": grades,
         "schools": schools,
         "courses": courses,
+
+        "step": step,
+        "steps": steps,
     })
+
+
+def _staff_users_queryset_from_request(request):
+    q = (request.GET.get("q") or "").strip()
+    school = (request.GET.get("school") or "").strip()
+    course = (request.GET.get("course") or "").strip()
+    curator_paid = (request.GET.get("curator_need") or "").strip()
+    grade = (request.GET.get("grade") or "").strip()
+    step = (request.GET.get("step") or "").strip()
+
+    qs = User.objects.all().select_related("user_info")
+
+    if q:
+        qs = qs.filter(
+            Q(username__icontains=q) |
+            Q(email__icontains=q) |
+            Q(first_name__icontains=q) |
+            Q(last_name__icontains=q) |
+            Q(user_info__phone__icontains=q) |
+            Q(user_info__region__icontains=q)
+        )
+
+    if school:
+        qs = qs.filter(course_selections__course__school_id=school)
+
+    if course:
+        qs = qs.filter(course_selections__course_id=course)
+
+    if grade:
+        qs = qs.filter(user_info__next_year_class_digit=grade)
+
+    if curator_paid == "1":
+        qs = qs.filter(course_selections__need_tutor=True)
+    elif curator_paid == "0":
+        qs = qs.filter(course_selections__need_tutor=False)
+
+    if step:
+        qs = qs.filter(user_info__selection_step=step)
+
+    return qs.distinct()
+
+
+@login_required
+@user_passes_test(_staff_check)
+@require_GET
+def staff_users_ids(request):
+    qs = _staff_users_queryset_from_request(request)
+    ids = list(qs.values_list("id", flat=True))
+    return JsonResponse({"ids": ids})
 
 
 @staff_member_required
@@ -827,8 +886,9 @@ def download_interview_template(request, user_id: int):
     return response
 
 
-@require_selection_step(UserInfo.SelectionStep.TEST)
+
 @login_required
+@require_selection_step(UserInfo.SelectionStep.TEST)
 def testing_list_for_candidate(request):
     items = (TestAssignment.objects
              .filter(user=request.user)
@@ -912,8 +972,9 @@ def testing_fill_result(request, pk):
                   {"form": form, "obj": obj, "user_obj": get_object_or_404(User, pk=obj.user.id), "active": "testing"})
 
 
-@require_selection_step(UserInfo.SelectionStep.INTERVIEW_PREP)
+
 @ensure_registration_gate('protected')
+@require_selection_step(UserInfo.SelectionStep.INTERVIEW_PREP)
 @login_required
 def interview_preparation_view(request):
     prep = (

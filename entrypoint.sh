@@ -62,6 +62,8 @@ if not User.objects.filter(username=user_name).exists():
 #TODO не хочет запускаться по непонятным причинам
 #python manage.py compilemessages
 
+python Shadows/notification_worker.py &
+
 python telegram_bot_polling.py &
 
 python Shadows/gpt_reviewer.py &

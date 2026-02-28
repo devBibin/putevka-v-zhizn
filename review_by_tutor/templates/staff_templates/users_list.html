@@ -41,6 +41,18 @@
                 </select>
             </div>
 
+            <div class="col-md-3">
+                <label class="form-label">Этап отбора</label>
+                <select name="step" class="form-select">
+                    <option value="">Все этапы</option>
+                    {% for value, label in steps %}
+                        <option value="{{ value }}" {% if step == value|stringformat:"s" %}selected{% endif %}>
+                            {{ label }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
             <!-- Класс -->
             <div class="col-md-2">
                 <label class="form-label">Класс в след. учебном году</label>
@@ -79,6 +91,15 @@
                             data-bs-target="#sendNotifModal" id="openModalBtn">
                         Отправить оповещение выбранным
                     </button>
+
+                    <button type="button" class="btn btn-outline-success" id="selectAllFilteredBtn">
+                        Выбрать всех (по фильтру)
+                    </button>
+
+                    <button type="button" class="btn btn-outline-secondary" id="clearSelectionBtn">
+                        Снять выбор
+                    </button>
+
                     <span class="text-muted small">Отметьте галочками пользователей в таблице ниже.</span>
                     <span class="ms-auto small">Выбрано: <strong id="selectedCount">0</strong></span>
                 </div>
@@ -229,7 +250,13 @@
                         {% if page_obj.has_previous %}
                             <li class="page-item">
                                 <a class="page-link"
-                                   href="?page={{ page_obj.previous_page_number }}&q={{ q }}&role={{ role }}&active={{ active }}">Назад</a>
+                                   href="?page={{ page_obj.previous_page_number }}
+        &q={{ q|urlencode }}
+        &school={{ school|urlencode }}
+        &course={{ course|urlencode }}
+        &grade={{ grade|urlencode }}
+        &curator_need={{ curator_need|urlencode }}
+        &step={{ step|urlencode }}">Назад</a>
                             </li>
                         {% endif %}
                         <li class="page-item disabled">
@@ -238,7 +265,13 @@
                         {% if page_obj.has_next %}
                             <li class="page-item">
                                 <a class="page-link"
-                                   href="?page={{ page_obj.next_page_number }}&q={{ q }}&role={{ role }}&active={{ active }}">Вперёд</a>
+                                   href="?page={{ page_obj.next_page_number }}
+        &q={{ q|urlencode }}
+        &school={{ school|urlencode }}
+        &course={{ course|urlencode }}
+        &grade={{ grade|urlencode }}
+        &curator_need={{ curator_need|urlencode }}
+        &step={{ step|urlencode }}">Вперёд</a>
                             </li>
                         {% endif %}
                     </ul>
@@ -343,6 +376,162 @@
                     // Инициализация счётчика при загрузке
                     updateCount();
                 })();
+
+                (function () {
+                    const STORAGE_KEY = "staff_users_selected_ids";
+
+                    const checkAll = document.getElementById('checkAllOnPage');
+                    const selectedCount = document.getElementById('selectedCount');
+                    const openModalBtn = document.getElementById('openModalBtn');
+                    const submitBtn = document.getElementById('submitNotifBtn');
+                    const messageText = document.getElementById('messageText');
+                    const form = document.getElementById('notifyForm');
+
+                    const selectAllFilteredBtn = document.getElementById('selectAllFilteredBtn');
+                    const clearSelectionBtn = document.getElementById('clearSelectionBtn');
+
+                    function loadSelected() {
+                        try {
+                            return new Set(JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]").map(String));
+                        } catch (e) {
+                            return new Set();
+                        }
+                    }
+
+                    function saveSelected(set) {
+                        localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(set)));
+                    }
+
+                    let selected = loadSelected();
+
+                    function updateCount() {
+                        selectedCount.textContent = String(selected.size);
+                        return selected.size;
+                    }
+
+                    function restoreChecksOnPage() {
+                        document.querySelectorAll('.row-check').forEach(cb => {
+                            cb.checked = selected.has(String(cb.value));
+                        });
+
+                        const pageChecks = Array.from(document.querySelectorAll('.row-check'));
+                        if (checkAll && pageChecks.length) {
+                            checkAll.checked = pageChecks.every(cb => cb.checked);
+                            checkAll.indeterminate = !checkAll.checked && pageChecks.some(cb => cb.checked);
+                        }
+                        updateCount();
+                    }
+
+                    // checkbox single
+                    document.addEventListener('change', function (e) {
+                        const t = e.target;
+                        if (t && t.classList && t.classList.contains('row-check')) {
+                            const id = String(t.value);
+                            if (t.checked) selected.add(id);
+                            else selected.delete(id);
+                            saveSelected(selected);
+                            restoreChecksOnPage();
+                        }
+                    });
+
+                    // check all on page
+                    if (checkAll) {
+                        checkAll.addEventListener('change', function () {
+                            document.querySelectorAll('.row-check').forEach(cb => {
+                                cb.checked = checkAll.checked;
+                                const id = String(cb.value);
+                                if (checkAll.checked) selected.add(id);
+                                else selected.delete(id);
+                            });
+                            saveSelected(selected);
+                            restoreChecksOnPage();
+                        });
+                    }
+
+                    // ✅ select all by filter (старый принцип: просто заполняем ids)
+                    if (selectAllFilteredBtn) {
+                        selectAllFilteredBtn.addEventListener('click', async function () {
+                            // текущие фильтры = текущий querystring
+                            const url = "{% url 'staff_users_ids' %}" + window.location.search;
+
+                            selectAllFilteredBtn.disabled = true;
+                            const oldText = selectAllFilteredBtn.textContent;
+                            selectAllFilteredBtn.textContent = "Выбираю…";
+
+                            try {
+                                const resp = await fetch(url, {headers: {"X-Requested-With": "XMLHttpRequest"}});
+                                if (!resp.ok) throw new Error("HTTP " + resp.status);
+                                const data = await resp.json();
+
+                                selected = new Set((data.ids || []).map(String));
+                                saveSelected(selected);
+                                restoreChecksOnPage();
+
+                                alert("Выбрано пользователей: " + selected.size);
+                            } catch (err) {
+                                console.error(err);
+                                alert("Не удалось выбрать всех по фильтру.");
+                            } finally {
+                                selectAllFilteredBtn.disabled = false;
+                                selectAllFilteredBtn.textContent = oldText;
+                            }
+                        });
+                    }
+
+                    // ✅ clear
+                    if (clearSelectionBtn) {
+                        clearSelectionBtn.addEventListener('click', function () {
+                            selected = new Set();
+                            saveSelected(selected);
+                            restoreChecksOnPage();
+                        });
+                    }
+
+                    function requireSelection(e) {
+                        if (updateCount() === 0) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            alert('Отметьте хотя бы одного пользователя.');
+                            return false;
+                        }
+                        return true;
+                    }
+
+                    if (openModalBtn) {
+                        openModalBtn.addEventListener('click', function (e) {
+                            requireSelection(e);
+                        });
+                    }
+
+                    // при отправке — добавляем hidden ids для ВСЕХ выбранных (со всех страниц)
+                    function injectAllSelectedHiddenInputs() {
+                        form.querySelectorAll('input[name="ids"][data-from-storage="1"]').forEach(el => el.remove());
+                        selected.forEach(id => {
+                            const input = document.createElement('input');
+                            input.type = "hidden";
+                            input.name = "ids";
+                            input.value = id;
+                            input.setAttribute("data-from-storage", "1");
+                            form.appendChild(input);
+                        });
+                    }
+
+                    if (submitBtn) {
+                        submitBtn.addEventListener('click', function (e) {
+                            if (!requireSelection(e)) return;
+
+                            if (!messageText.value.trim()) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                alert('Введите текст сообщения.');
+                                return;
+                            }
+                            injectAllSelectedHiddenInputs();
+                        });
+                    }
+
+                    restoreChecksOnPage();
+                })()
             </script>
 
         {% else %}
