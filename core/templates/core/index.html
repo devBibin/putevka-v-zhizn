@@ -7,27 +7,13 @@
 
     {% if user.is_authenticated %}
         <div class="alert alert-success text-center">
-            Здравствуйте, <strong>{{ user.username }}</strong>! Вы уже авторизованы.
+            Здравствуйте, <strong>{{ user.username }}</strong>!
         </div>
 
         {% if not user.user_info.is_done and user.user_info.status == "CANDIDATE" %}
             <div class="alert alert-warning">
                 Ваша <strong>анкета</strong> ещё не отправлена.
                 <a href="{% url 'apply' %}" class="alert-link">Заполнить сейчас</a>.
-            </div>
-        {% endif %}
-
-        {% if user.motivation_letter %}
-            {% if not user.motivation_letter.is_done and user.motivation_letter.status != user.motivation_letter.Status.SUBMITTED and user.user_info.status == "CANDIDATE" %}
-                <div class="alert alert-warning">
-                    Ваше <strong>мотивационное письмо</strong> ещё не отправлено.
-                    <a href="{% url 'motivation_letter' %}" class="alert-link">Перейти к письму</a>.
-                </div>
-            {% endif %}
-        {% elif user.user_info.status == "CANDIDATE" %}
-            <div class="alert alert-warning">
-                У вас ещё нет <strong>мотивационного письма</strong>.
-                <a href="{% url 'motivation_letter' %}" class="alert-link">Создать письмо</a>.
             </div>
         {% endif %}
 
@@ -46,8 +32,8 @@
                             Базовая информация о вас. Обязательный первый шаг.
                         </li>
                         <li class="mb-2">
-                            <strong>Тестирование</strong><br>
-                            Становится доступным, когда сотрудники фонда добавляют его в личный кабинет.
+                            <strong>Тестирование способностей</strong><br>
+                            После принятия анкеты сотрудники фонда назначат тестирования.
                         </li>
                         <li class="mb-2">
                             <strong>Мотивационное письмо</strong><br>
@@ -55,15 +41,15 @@
                         </li>
                         <li class="mb-2">
                             <strong>Видеовизитка</strong><br>
-                            Короткое видео-знакомство в свободном формате.
+                            Короткий ответ в формате видео о планируемой подготовке
                         </li>
                         <li class="mb-2">
-                            <strong>Подготовка к собеседованию</strong><br>
-                            Материалы и рекомендации для подготовки к онлайн-собеседованию.
+                            <strong>Собеседование</strong><br>
+                            Беседа с сотрудником фонда в онлайн-формате
                         </li>
                         <li>
-                            <strong>Онлайн-собеседование</strong><br>
-                            Финальный этап, по итогам которого принимается решение.
+                            <strong>Подтверждение данных</strong><br>
+                            Предоставление подтверждающих документов о доходе и данных из анкеты.
                         </li>
                     </ul>
                 </div>

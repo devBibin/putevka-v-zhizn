@@ -353,7 +353,8 @@ class InterviewResult(models.Model):
 
     admission_way = models.CharField(
         max_length=255, blank=True, default="", db_index=True,
-        verbose_name="Планируемый способ поступления"
+        verbose_name="Планируемая траектория поступления",
+        help_text="Существует несколько траекторий поступления, опиши ту, которую планируешь использовать сейчас"
     )
 
     ege_subjects = models.CharField(
