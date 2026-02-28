@@ -4,6 +4,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 
 from core.decorators import ensure_registration_gate
+from my_study.models import Subject
 from review_by_tutor.models import TestAssignment
 from review_by_tutor.utils.selection_stages import require_selection_step
 from scholar_form.forms import UserProfileForm, ScholarVideoForm, UserPersonalDataForm
@@ -15,6 +16,9 @@ from scholar_form.models import UserInfo, UserPersonalData, ScholarVideo
 def personal_info(request):
     profile, _ = UserInfo.objects.get_or_create(user=request.user)
     personal_data, _ = UserPersonalData.objects.get_or_create(user=request.user)
+
+    planned_exams_qs = profile.planned_exams.all()
+    planned_exams_labels = [str(x) for x in planned_exams_qs]
 
     if request.method == "POST":
         profile_form = UserProfileForm(request.POST, request.FILES, instance=profile)
@@ -36,11 +40,12 @@ def personal_info(request):
             "personal_form": personal_form,
             "active": "personal_info",
             "profile": profile,
+            "planned_exams_labels": planned_exams_labels,
         },
     )
 
-@require_selection_step(UserInfo.SelectionStep.VIDEO)
 @ensure_registration_gate('protected')
+@require_selection_step(UserInfo.SelectionStep.VIDEO)
 @login_required
 def my_video_page(request):
     instance, _ = ScholarVideo.objects.get_or_create(user=request.user)
