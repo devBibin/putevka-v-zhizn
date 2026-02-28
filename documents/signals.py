@@ -131,53 +131,50 @@ def notify_telegram_on_status_change(sender, instance: Document, **kwargs):
     )
 
 
-@receiver(post_save, sender=UserNotification)
-def notify_telegram_on_notification(sender, instance, created, **kwargs):
-    if not created:
-        return
-
-    notif = instance.notification
-    user = instance.recipient
-
-    msg = (
-        "📬 <b>Новое уведомление!</b>\n\n"
-        f"{notif.message}\n\n"
-        f"👤 <b>Отправитель:</b> {notif.sender}\n"
-        f"🕒 <b>Время:</b> {notif.created_at:%d.%m.%Y %H:%M}"
-    )
-
-    site_url = f"{BASE_URL}"
-
-    def _send():
-        send_tg_notification_to_user(
-            user,
-            msg,
-            url=site_url,
-            button_text="🌐 Открыть сайт",
-        )
-        logger.debug(
-            f"TG уведомление (through) отправлено {user.username} "
-            f"по Notification(id={notif.pk})"
-        )
-
-        send_email_to_user(
-            subject="Новое уведомление",
-            user=user,
-            text=(
-                "У вас новое уведомление.\n\n"
-                f"{notif.message}\n\n"
-                f"Отправитель: {notif.sender}\n"
-                f"Время: {notif.created_at:%d.%m.%Y %H:%M}\n\n"
-                f"Открыть сайт: {site_url}"
-            ),
-            html=(
-                "<b>📬 Новое уведомление!</b><br><br>"
-                f"{notif.message}<br><br>"
-                f"<b>Отправитель:</b> {notif.sender}<br>"
-                f"<b>Время:</b> {notif.created_at:%d.%m.%Y %H:%M}<br><br>"
-                f"<a href='{site_url}'>🌐 Открыть сайт</a>"
-            ),
-        )
-
-    from django.db import transaction
-    transaction.on_commit(_send)
+# @receiver(post_save, sender=UserNotification)
+# def notify_telegram_on_notification(sender, instance, created, **kwargs):
+#     if not created:
+#         return
+#
+#     notif = instance.notification
+#     user = instance.recipient
+#
+#     msg = (
+#         "📬 <b>Новое уведомление!</b>\n\n"
+#         f"{notif.message}\n\n"
+#         f"👤 <b>Отправитель:</b> {notif.sender}\n"
+#     )
+#
+#     site_url = f"{BASE_URL}"
+#
+#     def _send():
+#         send_tg_notification_to_user(
+#             user,
+#             msg,
+#             url=site_url,
+#             button_text="🌐 Открыть сайт",
+#         )
+#         logger.debug(
+#             f"TG уведомление (through) отправлено {user.username} "
+#             f"по Notification(id={notif.pk})"
+#         )
+#
+#         send_email_to_user(
+#             subject="Новое уведомление",
+#             user=user,
+#             text=(
+#                 "У вас новое уведомление.\n\n"
+#                 f"{notif.message}\n\n"
+#                 f"Отправитель: {notif.sender}\n"
+#                 f"Открыть сайт: {site_url}"
+#             ),
+#             html=(
+#                 "<b>📬 Новое уведомление!</b><br><br>"
+#                 f"{notif.message}<br><br>"
+#                 f"<b>Отправитель:</b> {notif.sender}<br>"
+#                 f"<a href='{site_url}'>🌐 Открыть сайт</a>"
+#             ),
+#         )
+#
+#     from django.db import transaction
+#     transaction.on_commit(_send)

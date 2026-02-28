@@ -33,6 +33,8 @@ if not User.objects.filter(username='admin').exists():
 #django-admin compilemessages
 #TODO: включить в проде, когда понадобится перевод на русский (очень долго грузит пакеты)
 
+python Shadows/notification_worker.py &
+
 python telegram_bot_polling.py &
 
 python Shadows/gpt_reviewer.py &

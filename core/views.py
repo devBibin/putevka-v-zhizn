@@ -379,8 +379,8 @@ def finish_registration(request):
 
     return render(request, 'registration/registration_complete.html', {'user': user})
 
-@require_selection_step(UserInfo.SelectionStep.ML)
 @ensure_registration_gate('protected')
+@require_selection_step(UserInfo.SelectionStep.ML)
 @login_required
 def motivation_letter(request):
     user = request.user

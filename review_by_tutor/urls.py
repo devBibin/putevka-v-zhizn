@@ -32,4 +32,6 @@ urlpatterns = [
     path("staff/notes/<int:user_id>/favorite/<int:note_id>/", views.staff_note_toggle_favorite,
          name="staff_note_toggle_favorite"),
     path("staff/notes/<int:user_id>/delete/<int:note_id>/", views.staff_note_delete, name="staff_note_delete"),
+
+    path("staff/users/ids/", views.staff_users_ids, name="staff_users_ids"),
 ]

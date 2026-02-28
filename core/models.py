@@ -523,6 +523,14 @@ class UserNotification(models.Model):
         verbose_name="Пользователь"
     )
 
+    tg_sent_at = models.DateTimeField(null=True, blank=True)
+    email_sent_at = models.DateTimeField(null=True, blank=True)
+
+    send_attempts = models.PositiveIntegerField(default=0)
+    last_error = models.TextField(blank=True, default="")
+
+    created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
+
     is_seen = models.BooleanField(default=False, verbose_name="Просмотрено")
 
     seen_at = models.DateTimeField(null=True, blank=True, verbose_name="Время просмотра")
