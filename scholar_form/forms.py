@@ -1,11 +1,11 @@
 from django import forms
 from django.contrib import messages
+from django.db import models
 from django.db import transaction
 from django.dispatch import Signal
 from django.forms import HiddenInput
 from django.http import HttpResponseForbidden
 from django.shortcuts import redirect
-from django.db import models
 from formtools.wizard.views import SessionWizardView
 
 from my_study.models import Subject
@@ -45,14 +45,20 @@ class PersonalForm(forms.ModelForm):
         ),
         input_formats=['%Y-%m-%d'],
         label='Дата рождения',
-        required=True,
-        help_text="От рождества Христова"
+        required=True
+    )
+
+    vk = forms.CharField(
+        label="Ссылка на профиль ВКонтакте",
+        widget=forms.TextInput(attrs={
+            "caption": "ВАЖНО: ссылка должна быть в формате https://vk.com/id000000000. Чтобы получить такую ссылку, можно конвертировать её через https://regvk.com/"
+        })
     )
 
     class Meta:
         model = UserInfo
         fields = [
-            'last_name', 'first_name', 'middle_name', 'gender', 'birth_date', 'region', 'city', 'address'
+            'last_name', 'first_name', 'middle_name', 'gender', 'birth_date', 'vk', 'region', 'city', 'address'
         ]
         widgets = {
             'last_name': forms.TextInput(attrs={'placeholder': 'Иванов'}),
@@ -74,7 +80,7 @@ class PersonalForm(forms.ModelForm):
 class EducationForm(forms.ModelForm):
     class_teacher = forms.CharField(
         widget=forms.TextInput(
-            attrs={'placeholder': 'Петрова Мария Ивановна, +7 (999) 123-45-67, mama@example.com'}
+            attrs={'placeholder': 'Петрова Мария Ивановна, +7 (999) 123-45-67, teacher@example.com'}
         ),
         label='Классный руководитель',
         required=True,
@@ -152,16 +158,17 @@ class AdmissionForm(forms.ModelForm):
             'olympiad_plans', 'admission_path', 'target_universities', 'specializations'
         ]
         widgets = {
-            'olympiad_plans': forms.Textarea(attrs={'placeholder': 'Планирую участвовать в ВОШ, ЯП, Ломоносов'}),
-            'admission_path': forms.Textarea(attrs={'placeholder': 'Через ЕГЭ, возможно через олимпиаду'}),
-            'target_universities': forms.Textarea(attrs={'placeholder': 'МГУ, ВШЭ, МФТИ'}),
-            'specializations': forms.Textarea(attrs={'placeholder': 'Прикладная математика, инженерия'}),
-        }
-        help_texts = {
-            'specializations': 'Мы не требуем от тебя железного решения уже сейчас. Но наверняка у тебя есть примерный '
-                               'перечень специальностей, о которых ты задумывался. Укажи в заявке те направления, '
-                               'которые тебе были бы интересны.',
-            'target_universities': 'Список наиболее приоритетных ВУЗов, в которые планируешь поступать (не более 5).\nНаименование, город, факультет.\nМы не требуем от тебя железного решения уже сейчас. Укажи те вузы, о которых ты слышал, что они выпускают специалистов твоего направления; те вузы, в которых ты хотел бы учиться.'
+            'olympiad_plans': forms.Textarea(attrs={
+                'placeholder': 'Планирую участвовать во ВсОШ по математике, Всесибе по биологии и химии, Высшей пробе по химии'}),
+            'admission_path': forms.Textarea(attrs={
+                'placeholder': 'Буду писать перечневые олимпиады, но рассчитываю в основном на поступление по ЕГЭ. У меня есть льгота, планирую взять целевое.'}),
+            'target_universities': forms.Textarea(
+                attrs={'placeholder': '1. МГУ, Москва\n2. СПбПУ, Санкт-Петербург\n3. КубГУ, Краснодар…',
+                       "caption": 'Список наиболее приоритетных ВУЗов, в которые планируешь поступать (не более 5).\nНаименование, город, факультет.\nМы не требуем от тебя железного решения уже сейчас. Укажи те вузы, о которых ты слышал, что они выпускают специалистов твоего направления; те вузы, в которых ты хотел бы учиться.'}),
+            'specializations': forms.Textarea(attrs={'placeholder': 'Прикладная математика, инженерия',
+                                                     'caption': 'Мы не требуем от тебя железного решения уже сейчас. Но наверняка у тебя есть примерный '
+                                                                'перечень специальностей, о которых ты задумывался. Укажи в заявке те направления, '
+                                                                'которые тебе были бы интересны.', }),
         }
 
 
@@ -186,56 +193,64 @@ class FamilyForm(forms.ModelForm):
         ]
 
         widgets = {
-            'mother': forms.Textarea(attrs={'placeholder': 'Иванова Наталья Петровна, врач, ГКБ №1, mama@example.com, +73000000000'}),
-            'father': forms.Textarea(attrs={'placeholder': 'Иванов Пётр Сергеевич, инженер, Газпром, papa@example.com, +73000000000'}),
+            'mother': forms.Textarea(
+                attrs={'placeholder': 'Иванова Наталья Петровна, врач, ГКБ №1, mama@example.com, +73000000000'}),
+            'father': forms.Textarea(
+                attrs={'placeholder': 'Иванов Пётр Сергеевич, инженер, Газпром, papa@example.com, +73000000000'}),
             'legal_guardian': forms.Textarea(attrs={'placeholder': 'Не заполняется, если не актуально'}),
             'siblings_count': forms.NumberInput(attrs={'placeholder': '1'}),
-            'siblings_info': forms.Textarea(attrs={'placeholder': 'Брат — Иван, 20 лет, студент'}),
+            'siblings_info': forms.Textarea(attrs={
+                'placeholder': 'Брат — Иван, 20 лет, студент 3 курса\nСестра — Алина, 12 лет, учится в 5 классе'}),
             'family_size': forms.NumberInput(attrs={'placeholder': '4'}),
-            'income_per_member': forms.TextInput(attrs={'placeholder': '15 000'}),
+            'income_per_member': forms.TextInput(attrs={'placeholder': '15 000',
+                                                        'caption': 'Сложи годовой доход «на руки» каждого родителя, раздели на 12 и затем на число членов семьи.', }),
             'is_low_income': forms.TextInput(attrs={'placeholder': 'Да / Нет'}),
-            'receives_subsidy': forms.TextInput(attrs={'placeholder': 'Пособие на ребёнка'}),
+            'receives_subsidy': forms.TextInput(attrs={'placeholder': 'Да, пособие на ребенка'}),
 
             'family_material_status': forms.Select(attrs={
                 'class': 'form-control'
             }),
 
-            'other_factors': forms.Textarea(attrs={'placeholder': 'Семья арендует жильё, инвалидность'}),
+            'other_factors': forms.Textarea(attrs={'placeholder': 'Семья снимает жилье, значительная часть бюджета уходит на лекарства бабушки и др.'}),
             'has_pc_with_internet': forms.TextInput(attrs={'placeholder': 'Да / Нет'}),
         }
 
         help_texts = {
-            'legal_guardian': "ФИО, email, телефон",
-            'receives_subsidy': 'Если да, то на каком основании?',
-            'family_material_status': 'Оцените общее материальное положение вашей семьи.',
-            'income_per_member': 'Сложи годовой доход «на руки» каждого родителя, раздели на 12 и затем на число членов семьи.',
+            'mother': "ФИО, место работы, должность, контакт",
+            'father': "ФИО, место работы, должность, контакт",
+            'legal_guardian': "ФИО, место работы, должность, контакт",
+            'receives_subsidy': 'Если да, указать основание',
+            'other_factors': 'Если нет, поставь прочерк'
         }
 
 
 class AdditionalForm(forms.ModelForm):
     agree_processing = forms.BooleanField(label="Согласен(на) на обработку персональных данных")
     agree_documents = forms.BooleanField(label="Обязуюсь предоставить подтверждающие документы")
+    agree_program_conditions = forms.BooleanField(
+        label="Ознакомился(-ась) с условиями Благотворительной программы «Поддержи таланты»"
+    )
 
-    vk = forms.CharField(
-        label="Вконтакте",
-        widget=forms.TextInput(attrs={
-            "caption": "ВАЖНО: ссылка должна быть в формате https://vk.com/id000000000. Чтобы получить такую ссылку, можно конвертировать её через https://regvk.com/"
-        })
+    agree_privacy_policy = forms.BooleanField(
+        label="Согласен(-на) с Политикой конфиденциальности"
     )
 
     class Meta:
         model = UserInfo
         fields = [
-            'vk', 'achievements', 'preparation_plan', 'foundation_help',
+            'achievements', 'preparation_plan', 'foundation_help',
             'heard_about_program', 'willing_to_participate',
-            'agree_processing', 'agree_documents'
+            'agree_processing', 'agree_documents', 'agree_program_conditions', 'agree_program_conditions'
         ]
         widgets = {
-            'achievements': forms.Textarea(attrs={'placeholder': 'Призёр олимпиады по физике, волонтёрство'}),
-            'preparation_plan': forms.Textarea(attrs={'placeholder': 'Хожу на курсы, решаю задачи'}),
-            'foundation_help': forms.Textarea(attrs={'placeholder': 'Поддержка в подготовке, менторство'}),
-            'heard_about_program': forms.TextInput(attrs={'placeholder': 'Через учителя'}),
+            'achievements': forms.Textarea(attrs={'placeholder': 'Призер муниципального этапа ВсОШ по физике, 80 верифицированных часов волонтерства на добро.рф, диплом 2 степени на областном фестивале исполнителей на русских народных инструментах, золотая медаль на городских соревнованиях по баскетболу'}),
+            'preparation_plan': forms.Textarea(attrs={'placeholder': 'Хожу на дополнительные занятия в школе, занимаюсь с репетитором, смотрю вебинары и пр'}),
+            'foundation_help': forms.Textarea(attrs={'placeholder': 'Курсы подготовки к ЕГЭ, поддержка во время приемной кампании, материальная поддержка для поездок на перечневые олимпиады и др.'}),
+            'heard_about_program': forms.Textarea(attrs={'placeholder': 'Увидел(-а) пост в канале онлайн-школы “Название школы”/ в школу приезжал волонтер с презентацией/ увидел(-а) рекламу/ свой вариант'}),
             'willing_to_participate': forms.TextInput(attrs={'placeholder': 'Да / Нет'}),
+        }
+        help_texts = {
+            'heard_about_program': 'Пожалуйста, напиши развернуто'
         }
 
 
@@ -297,7 +312,7 @@ class ApplicationWizard(SessionWizardView):
                     field.widget.attrs.pop("required", None)
             return form
 
-        required_false_list = ['legal_guardian', 'vk', 'middle_name']
+        required_false_list = ['legal_guardian', 'vk', 'middle_name', 'class_profile']
         for name, field in form.fields.items():
             if name in required_false_list:
                 field.required = False

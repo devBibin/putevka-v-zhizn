@@ -113,7 +113,7 @@ class UserInfo(models.Model):
     phone = models.CharField(max_length=20, verbose_name="Телефон", blank=True)
     email = models.EmailField(verbose_name="Email", blank=True)
     region = models.CharField(max_length=1000, verbose_name="Регион проживания", blank=True)
-    city = models.CharField(max_length=1000, verbose_name="Город проживания", blank=True)
+    city = models.CharField(max_length=1000, verbose_name="Населенный пункт", blank=True)
     address = models.CharField(max_length=1000, verbose_name="Адрес проживания", blank=True)
 
     # Step 2: Education
@@ -121,13 +121,13 @@ class UserInfo(models.Model):
     school_address = models.CharField(max_length=1000, verbose_name="Адрес школы", blank=True)
     class_teacher = models.CharField(max_length=1000, verbose_name="Классный руководитель", blank=True)
 
-    next_year_class_digit = models.IntegerField(verbose_name="Класс в следующем учебном году", blank=True, null=True,
+    next_year_class_digit = models.IntegerField(verbose_name="Класс в 2026-2027 учебном году", blank=True, null=True,
                                                 validators=[
                                                     MinValueValidator(1),
                                                     MaxValueValidator(11)
                                                 ])
 
-    class_profile = models.CharField(max_length=255, blank=True, verbose_name="Профиль класса")
+    class_profile = models.CharField(max_length=255, blank=True, verbose_name="Профиль класса", help_text="при наличии")
     planned_exams = models.ManyToManyField(
         Subject,
         verbose_name="Планируемые экзамены",
@@ -137,7 +137,7 @@ class UserInfo(models.Model):
     subject_grades = models.CharField(max_length=1000, verbose_name="Средние оценки по предметам", blank=True)
 
     # Step 3: Admission Plans
-    olympiad_plans = models.CharField(max_length=10000, verbose_name="Планы участия в олимпиадах", blank=True)
+    olympiad_plans = models.CharField(max_length=10000, verbose_name="Планы участия в олимпиадах", blank=True, help_text='если не планируешь участвовать, поставь прочерк')
     admission_path = models.CharField(max_length=10000, verbose_name="Ты планируешь поступать по ЕГЭ или олимпиадам?", blank=True)
     target_universities = models.CharField(max_length=10000, verbose_name="Приоритетные вузы", blank=True)
     specializations = models.CharField(max_length=10000, verbose_name="Интересующие направления", blank=True)
@@ -152,20 +152,38 @@ class UserInfo(models.Model):
     income_per_member = models.CharField(max_length=255, verbose_name="Среднемесячный доход на 1 члена семьи за последние 12 месяцев (руб.)", blank=True)
     is_low_income = models.CharField(max_length=10, verbose_name="Имеет ли семья статус малоимущей?", blank=True)
     receives_subsidy = models.CharField(max_length=255, verbose_name="Получает ли семья субсидии от государства? ", blank=True)
-    other_factors = models.CharField(max_length=10000, blank=True, verbose_name="Есть какие-либо иные обстоятельства, о которых ты хотел(-a) бы сообщить?")
-    has_pc_with_internet = models.CharField(max_length=1000, verbose_name="Есть ли дома компьютер с интернетом",
+    other_factors = models.CharField(max_length=10000, blank=True, verbose_name="Какие-либо иные обстоятельства, о которых ты хотел(-а) бы сообщить")
+    has_pc_with_internet = models.CharField(max_length=1000, verbose_name="Есть ли у тебя компьютер/ноутбук с доступом в интернет?”",
                                             blank=True)
 
     # Step 5: Additional
     vk = models.URLField(max_length=500, verbose_name="Ссылка на вк", blank=True, null=True, validators=[validate_vk_id_url])
     achievements = models.CharField(max_length=10000, verbose_name="Кратко опиши свои достижения за последние два года", blank=True)
-    preparation_plan = models.CharField(max_length=10000, verbose_name="План подготовки к поступлению", blank=True)
-    foundation_help = models.CharField(max_length=10000, verbose_name="Какая помощь от фонда нужна", blank=True)
-    heard_about_program = models.CharField(max_length=255, verbose_name="Как узнали о программе", blank=True)
+    preparation_plan = models.CharField(max_length=10000, verbose_name="Как ты планируешь свою подготовку к поступлению на следующий год?", blank=True)
+    foundation_help = models.CharField(max_length=10000, verbose_name="Какую помощь ты хочешь получить от Фонда?", blank=True)
+    heard_about_program = models.CharField(max_length=255, verbose_name="Как ты узнал(-а) о программе Фонда?", blank=True)
     willing_to_participate = models.CharField(max_length=10, verbose_name="Готов(-а) ли ты активно принимать участие в программе Фонда?",
                                               blank=True)
-    agree_processing = models.BooleanField(verbose_name="Согласие на обработку данных", null=True)
-    agree_documents = models.BooleanField(verbose_name="Согласие на предоставление документов", null=True)
+
+    agree_program_conditions = models.BooleanField(
+        verbose_name="Ознакомился(-ась) с условиями Благотворительной программы “Поддержи таланты”",
+        null=True
+    )
+
+    agree_privacy_policy = models.BooleanField(
+        verbose_name="Согласен(-на) с Политикой конфиденциальности",
+        null=True
+    )
+
+    agree_processing = models.BooleanField(
+        verbose_name="Даю согласие на обработку персональных данных",
+        null=True
+    )
+
+    agree_documents = models.BooleanField(
+        verbose_name="В случае утверждения участия в программе обязуюсь предоставить в Фонд документы, подтверждающие сведения обо мне",
+        null=True
+    )
 
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата заполнения анкеты")
 
@@ -220,7 +238,7 @@ class UserInfo(models.Model):
         choices=FamilyMaterialStatus.choices,
         blank=True,
         null=True,
-        verbose_name="Как бы вы оценили материальное положение вашей семьи?",
+        verbose_name="Как бы ты оценил(-а) материальное положение вашей семьи?",
         db_index=True,
     )
 
