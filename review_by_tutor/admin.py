@@ -1,6 +1,8 @@
+from symtable import Class
+
 from django.contrib import admin
 
-from review_by_tutor.models import Interview, TestAssignment, InterviewPreparation, InterviewTemplate
+from review_by_tutor.models import Interview, TestAssignment, InterviewPreparation, InterviewTemplate, TestTemplate
 
 
 @admin.register(Interview)
@@ -30,3 +32,8 @@ class InterviewTemplateAdmin(admin.ModelAdmin):
     list_display = ("title", "is_active", "uploaded_at")
     list_filter = ("is_active",)
     search_fields = ("title",)
+
+
+@admin.register(TestTemplate)
+class TestTemplateAdmin(admin.ModelAdmin):
+    list_display = ("title", "is_active", "created_at")
