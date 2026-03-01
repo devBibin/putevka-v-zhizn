@@ -10,9 +10,10 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
-import os
 from pathlib import Path
 
+import dj_database_url
+import os
 from dotenv import load_dotenv
 
 import config
@@ -26,12 +27,14 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-(ct6qihahs$niey_!sj__0l4$o4wd8jz%nf&p%jgtf94upx^v('
+SECRET_KEY = os.getenv("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
+
+CSRF_TRUSTED_ORIGINS = os.getenv("CSRF_TRUSTED_ORIGINS", "localhost,127.0.0.1").split(",")
 
 # Application definition
 
@@ -93,14 +96,10 @@ WSGI_APPLICATION = 'Putevka.wsgi.application'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv("POSTGRES_DB"),
-        'USER': os.getenv("POSTGRES_USER"),
-        'PASSWORD': os.getenv("POSTGRES_PASSWORD"),
-        'HOST': 'db',
-        'PORT': 5432,
-    }
+    "default": dj_database_url.config(
+        default=os.getenv("DATABASE_URL"),
+        conn_max_age=60
+    )
 }
 
 # Password validation
@@ -126,7 +125,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 LANGUAGE_CODE = 'ru'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Europe/Moscow'
 
 USE_I18N = True
 
@@ -144,20 +143,25 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-STATIC_URL = '/static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_BACKEND = 'core.mail_backends.postbox.PostboxEmailBackend'
+POSTBOX_ENDPOINT = "https://postbox.cloud.yandex.net/v2/email/outbound-emails"
+POSTBOX_REGION = "ru-central1"
+POSTBOX_SERVICE = "ses"
+
+POSTBOX_ACCESS_KEY_ID = os.getenv("YC_EMAIL_USER")
+POSTBOX_SECRET_ACCESS_KEY = os.getenv("YC_EMAIL_PASSWORD")
 
 EMAIL_HOST = 'postbox.cloud.yandex.net'
-EMAIL_PORT = 587
+EMAIL_PORT = 465
 EMAIL_USE_TLS = True
 
 EMAIL_HOST_USER = os.getenv("YC_EMAIL_USER")
 EMAIL_HOST_PASSWORD = os.getenv("YC_EMAIL_PASSWORD")
+
+EMAIL_TIMEOUT = 10
 
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL")
 
@@ -241,22 +245,22 @@ LOGGING = {
         },
         'django.request': {
             'handlers': ['telegram_errors', 'file_error'],
-            'level': 'ERROR',
+            'level': 'INFO',
             'propagate': False,
         },
         'core': {
             'handlers': ['console', 'file_info', 'file_error', 'telegram_errors'],
-            'level': 'DEBUG',  # В разработке может быть DEBUG, на продакшене INFO
+            'level': 'INFO',  # В разработке может быть DEBUG, на продакшене INFO
             'propagate': False,
         },
         'documents': {
             'handlers': ['console', 'file_info', 'file_error', 'telegram_errors'],
-            'level': 'DEBUG',  # В разработке может быть DEBUG, на продакшене INFO
+            'level': 'INFO',  # В разработке может быть DEBUG, на продакшене INFO
             'propagate': False,
         },
         'scholar_form': {
             'handlers': ['console', 'file_info', 'file_error', 'telegram_errors'],
-            'level': 'DEBUG',  # В разработке может быть DEBUG, на продакшене INFO
+            'level': 'INFO',  # В разработке может быть DEBUG, на продакшене INFO
             'propagate': False,
         },
         '': {

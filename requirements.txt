@@ -8,6 +8,8 @@ django-formtools
 django-widget-tweaks
 openai>=1.52.0
 python-magic
+dj_database_url
+psycopg
 Pillow
 pydantic
 requests
@@ -15,3 +17,5 @@ jinja2
 num2words
 docxtpl
 openpyxl
+httpx
+botocore

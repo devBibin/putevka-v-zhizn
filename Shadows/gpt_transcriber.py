@@ -13,6 +13,8 @@ from openai import OpenAI
 
 import config
 
+import httpx
+
 load_dotenv()
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "Putevka.settings")
@@ -32,7 +34,18 @@ MAX_MODEL_AUDIO_SECONDS = int(os.getenv("OPENAI_TRANSCRIBE_MAX_SECONDS", 1400))
 CHUNK_SECONDS = int(os.getenv("OPENAI_TRANSCRIBE_CHUNK_SECONDS", 1100))
 CHUNK_OVERLAP_SECONDS = int(os.getenv("OPENAI_TRANSCRIBE_CHUNK_OVERLAP_SECONDS", 2))
 
-client = OpenAI(api_key=OPENAI_API_KEY)
+PROXY = os.getenv("OPENAI_PROXY")
+
+http_client = httpx.Client(
+    proxy=PROXY if PROXY else None,
+    timeout=httpx.Timeout(60.0, connect=30.0),
+    verify=True,
+)
+
+client = OpenAI(
+    api_key=OPENAI_API_KEY,
+    http_client=http_client,
+)
 
 
 def _probe_duration_seconds(media_path: str) -> float:

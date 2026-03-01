@@ -13,6 +13,8 @@ from django.utils.dateparse import parse_date, parse_datetime
 
 from openai import OpenAI
 
+import httpx
+
 load_dotenv()
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", os.getenv("DJANGO_SETTINGS_MODULE", "Putevka.settings"))
@@ -21,7 +23,9 @@ django.setup()
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
 
-from review_by_tutor.models import Interview, InterviewResult  # <-- проверь путь
+from review_by_tutor.models import Interview, InterviewResult
+
+PROXY = os.getenv("OPENAI_PROXY")
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY") or os.getenv("GPT_TOKEN")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
@@ -29,7 +33,16 @@ OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 POLLING_INTERVAL = int(os.getenv("INTERVIEW_RESULT_FILL_POLLING_INTERVAL", "60"))
 BATCH_LIMIT = int(os.getenv("INTERVIEW_RESULT_FILL_BATCH_LIMIT", "2"))
 
-client = OpenAI(api_key=OPENAI_API_KEY)
+http_client = httpx.Client(
+    proxy=PROXY if PROXY else None,
+    timeout=httpx.Timeout(60.0, connect=30.0),
+    verify=True,
+)
+
+client = OpenAI(
+    api_key=OPENAI_API_KEY,
+    http_client=http_client,
+)
 
 SKIP_FIELDS = {
     "id",

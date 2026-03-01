@@ -17,7 +17,7 @@ RUN pip install --no-cache-dir \
     -r requirements.txt \
     -vv
 
-COPY .env .
+#COPY .env .
 COPY telegram_bot_polling.py .
 COPY Shadows/gpt_reviewer.py .
 COPY Shadows/gpt_transcriber.py .

@@ -10,6 +10,10 @@ from openai import OpenAI
 import config
 from core.llm_safe import parse_llm_json
 
+import httpx
+
+PROXY = os.getenv("OPENAI_PROXY")
+
 load_dotenv()
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "Putevka.settings")
@@ -17,11 +21,20 @@ django.setup()
 
 logger = logging.getLogger(__name__)
 
-from core.models import MotivationLetter, MotivationLetterRubricReview  # <-- новая модель здесь
+from core.models import MotivationLetter, MotivationLetterRubricReview
 
 OPENAI_API_KEY = config.GPT_TOKEN
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
-client = OpenAI(api_key=OPENAI_API_KEY)
+http_client = httpx.Client(
+    proxy=PROXY if PROXY else None,
+    timeout=httpx.Timeout(60.0, connect=30.0),
+    verify=True,
+)
+
+client = OpenAI(
+    api_key=OPENAI_API_KEY,
+    http_client=http_client,
+)
 
 POLLING_INTERVAL = int(os.getenv("SHADOW_POLLING_INTERVAL", 60))
 BATCH_LIMIT = int(os.getenv("SHADOW_BATCH_LIMIT", 10))
