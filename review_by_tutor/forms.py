@@ -234,7 +234,7 @@ class InterviewForm(forms.ModelForm):
 class TestAssignmentCreateForm(forms.ModelForm):
     class Meta:
         model = TestAssignment
-        fields = ("user", "title", "external_url", "instructions", "due_at", "status")
+        fields = ("template", "user", "title", "external_url", "instructions", "due_at", "status")
         widgets = {
             "due_at": forms.DateTimeInput(attrs={"type": "datetime-local"}),
             "instructions": forms.Textarea(attrs={"rows": 3}),
@@ -364,3 +364,19 @@ class InterviewResultForm(forms.ModelForm):
 
             if isinstance(widget, forms.Textarea) and "rows" not in widget.attrs:
                 widget.attrs["rows"] = 1
+
+
+
+class TestRevisionForm(forms.ModelForm):
+    class Meta:
+        model = TestAssignment
+        fields = ["revision_comment"]
+        widgets = {
+            "revision_comment": forms.Textarea(attrs={"rows": 4}),
+        }
+
+    def clean_revision_comment(self):
+        txt = (self.cleaned_data.get("revision_comment") or "").strip()
+        if not txt:
+            raise forms.ValidationError("Нужно написать комментарий, что именно дописать.")
+        return txt

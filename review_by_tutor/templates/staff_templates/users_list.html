@@ -53,6 +53,24 @@
                 </select>
             </div>
 
+
+            <div class="col-md-3">
+                <label class="form-label">Дедлайны тестов</label>
+                <select name="test_deadline" class="form-select">
+                    <option value="" {% if not test_deadline %}selected{% endif %}>Все</option>
+                    <option value="overdue" {% if test_deadline == "overdue" %}selected{% endif %}>Просрочены</option>
+                    <option value="due_soon" {% if test_deadline == "due_soon" %}selected{% endif %}>Скоро дедлайн (3
+                        дня)
+                    </option>
+                    <option value="no_due" {% if test_deadline == "no_due" %}selected{% endif %}>Без дедлайна</option>
+                    <option value="has_due" {% if test_deadline == "has_due" %}selected{% endif %}>Есть дедлайн</option>
+                    <option value="completed" {% if test_deadline == "completed" %}selected{% endif %}>Тесты завершены
+                    </option>
+                    <option value="active" {% if test_deadline == "active" %}selected{% endif %}>Есть активные тесты
+                    </option>
+                </select>
+            </div>
+
             <!-- Класс -->
             <div class="col-md-2">
                 <label class="form-label">Класс в след. учебном году</label>
@@ -237,6 +255,10 @@
                                     {% else %}
                                         <span class="text-muted">—</span>
                                     {% endif %}
+
+                                    {% if u.has_overdue_test %}
+                                        <span class="badge text-bg-danger ms-1">тест просрочен</span>
+                                    {% endif %}
                                 </td>
                             </tr>
                         {% endfor %}
@@ -256,7 +278,8 @@
         &course={{ course|urlencode }}
         &grade={{ grade|urlencode }}
         &curator_need={{ curator_need|urlencode }}
-        &step={{ step|urlencode }}">Назад</a>
+        &step={{ step|urlencode }}
+        &test_deadline={{ test_deadline|urlencode }}">Назад</a>
                             </li>
                         {% endif %}
                         <li class="page-item disabled">
@@ -271,7 +294,8 @@
         &course={{ course|urlencode }}
         &grade={{ grade|urlencode }}
         &curator_need={{ curator_need|urlencode }}
-        &step={{ step|urlencode }}">Вперёд</a>
+        &step={{ step|urlencode }}
+        &test_deadline={{ test_deadline|urlencode }}">Вперёд</a>
                             </li>
                         {% endif %}
                     </ul>

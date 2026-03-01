@@ -1,5 +1,6 @@
 import logging
 import mimetypes
+from datetime import timedelta
 
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
@@ -21,14 +22,16 @@ from config import BASE_URL
 from core.bot import send_tg_notification_to_user
 from core.decorators import ensure_registration_gate
 from core.models import MotivationLetter, Notification, UserNotification
+from core.services.email_service import send_email_to_user
 from documents.models import Document
 from my_study.models import CourseSelection, UniversityPriority, AssessmentResult, School, Course
 from review_by_tutor.forms import MotivationLetterStaffForm, UserInfoStaffForm, ScholarVideoStaffForm, \
     DocumentStaffUploadForm, DocumentCommentForm, \
     DocumentStatusForm, InterviewForm, TestAssignmentCreateForm, TestAssignmentEditForm, TestResultForm, \
     LetterRevisionForm, MotivationLetterRubricReviewStaffForm, LetterDeadlineForm, ScholarVideoDeadlineForm, \
-    InterviewResultForm
-from review_by_tutor.models import Interview, TestAssignment, InterviewPreparation, InterviewTemplate, InterviewResult
+    InterviewResultForm, TestRevisionForm
+from review_by_tutor.models import Interview, TestAssignment, InterviewPreparation, InterviewTemplate, InterviewResult, \
+    TestTemplate
 from review_by_tutor.utils.contact_form import handle_send_notification
 from review_by_tutor.utils.selection_stages import require_selection_step
 from scholar_form.models import UserInfo, ScholarVideo, StaffNote
@@ -552,6 +555,8 @@ def staff_users_list(request):
 
     step = (request.GET.get("step") or "").strip()
 
+    test_deadline = (request.GET.get("test_deadline") or "").strip()
+
     qs = (User.objects
           .all()
           .select_related("user_info")
@@ -583,6 +588,60 @@ def staff_users_list(request):
 
     if step:
         qs = qs.filter(user_info__selection_step=step)
+
+    user_tests = TestAssignment.objects.filter(user_id=OuterRef("pk")).exclude(
+        status=TestAssignment.Status.CANCELLED
+    )
+
+    qs = qs.annotate(
+        has_overdue_test=Exists(
+            TestAssignment.objects.filter(user_id=OuterRef("pk"))
+            .exclude(status=TestAssignment.Status.CANCELLED)
+            .filter(due_at__lt=timezone.now(), completed_at__isnull=True)
+        ),
+    )
+
+    if test_deadline == "overdue":
+        qs = qs.annotate(
+            has_overdue_test=Exists(
+                user_tests.filter(due_at__lt=timezone.now(), completed_at__isnull=True)
+            )
+        ).filter(has_overdue_test=True)
+
+    elif test_deadline == "due_soon":
+        qs = qs.annotate(
+            has_due_soon_test=Exists(
+                user_tests.filter(due_at__gte=timezone.now(), due_at__lte=timezone.now() + timedelta(days=3), completed_at__isnull=True)
+            )
+        ).filter(has_due_soon_test=True)
+
+    elif test_deadline == "no_due":
+        qs = qs.annotate(
+            has_no_due_test=Exists(
+                user_tests.filter(due_at__isnull=True)
+            )
+        ).filter(has_no_due_test=True)
+
+    elif test_deadline == "has_due":
+        qs = qs.annotate(
+            has_due_test=Exists(
+                user_tests.filter(due_at__isnull=False)
+            )
+        ).filter(has_due_test=True)
+
+    elif test_deadline == "completed":
+        qs = qs.annotate(
+            has_completed_test=Exists(
+                user_tests.filter(completed_at__isnull=False)
+            )
+        ).filter(has_completed_test=True)
+
+    elif test_deadline == "active":
+        qs = qs.annotate(
+            has_active_test=Exists(
+                user_tests.filter(completed_at__isnull=True)
+            )
+        ).filter(has_active_test=True)
 
     qs = qs.distinct()
 
@@ -628,6 +687,8 @@ def staff_users_list(request):
 
         "step": step,
         "steps": steps,
+
+        "test_deadline": test_deadline,
     })
 
 
@@ -915,16 +976,30 @@ def testing_create(request):
 
     fixed_user = None
     if fixed_user_id:
-        fixed_user = User.objects.filter(pk=fixed_user_id).only("id").first()
+        fixed_user = User.objects.filter(pk=fixed_user_id).only("id", "username").first()
 
     if request.method == "POST":
         form = TestAssignmentCreateForm(request.POST)
         if form.is_valid():
             obj = form.save(commit=False)
+
             if fixed_user:
                 obj.user = fixed_user
+
             obj.assigned_by = request.user
             obj.save()
+
+            notify_participant(
+                user=obj.user,
+                subject="Назначен новый тест",
+                message=(
+                    f"Тебе назначен тест: «{obj.title}».\n"
+                    f"{'Дедлайн: ' + obj.due_at.strftime('%d.%m.%Y %H:%M') if obj.due_at else ''}\n"
+                    f"Ссылка: {BASE_URL + '/form/testing'}\n"
+                    f"{'Комментарий: ' + obj.instructions if obj.instructions else ''}"
+                ).strip(),
+                sender=request.user,
+            )
             return redirect("staff_testing_list_for_user", user_id=obj.user_id)
     else:
         if fixed_user:
@@ -936,8 +1011,8 @@ def testing_create(request):
         "form": form,
         "title": "Назначить тест",
         "fixed_user": fixed_user,
-
     })
+
 
 
 @user_passes_test(_staff_check)
@@ -954,22 +1029,82 @@ def testing_edit(request, pk):
                   {"form": form, "title": "Редактировать тест", "user_obj": get_object_or_404(User, pk=obj.user.id)})
 
 
+def notify_participant(user, subject: str, message: str, sender=None):
+    notif = Notification.objects.create(
+        message=message,
+        sender=sender
+    )
+    UserNotification.objects.create(notification=notif, recipient=user)
+
 @user_passes_test(_staff_check)
 def testing_fill_result(request, pk):
     obj = get_object_or_404(TestAssignment, pk=pk)
+
     if request.method == "POST":
-        form = TestResultForm(request.POST, instance=obj)
-        if form.is_valid():
-            filled = form.save(commit=False)
-            filled.result_filled_by = request.user
-            filled.result_filled_at = timezone.now()
-            filled.mark_completed()
-            filled.save()
-            return redirect("staff_testing_list_for_user", user_id=obj.user_id)
+        action = (request.POST.get("action") or "").strip()
+
+        if action == "revision":
+            rev_form = TestRevisionForm(request.POST, instance=obj)
+
+            if rev_form.is_valid():
+                old_status = obj.status
+
+                comment = rev_form.cleaned_data["revision_comment"]
+                obj.mark_needs_revision(by_user=request.user, comment=comment)
+                obj.save()
+
+                if old_status != obj.Status.NEEDS_REVISION:
+                    notify_participant(
+                        user=obj.user,
+                        subject="Тест отправлен на дописывание",
+                        message=(
+                            f"✍️ Тест «{obj.title}» отправлен на дописывание.\n\n"
+                            f"Комментарий:\n{obj.revision_comment}"
+                        ),
+                        sender=request.user,
+                    )
+
+                return redirect("staff_testing_list_for_user", user_id=obj.user_id)
+
+
+        else:
+            res_form = TestResultForm(request.POST, instance=obj)
+            rev_form = TestRevisionForm(instance=obj)
+            if res_form.is_valid():
+                filled = res_form.save(commit=False)
+                filled.result_filled_by = request.user
+                filled.result_filled_at = timezone.now()
+                filled.mark_completed()
+                filled.save()
+                notify_participant(
+                    user=filled.user,
+                    subject="Результат теста внесён",
+                    message=(
+                        f"✅ По тесту «{filled.title}» внесён результат.\n\n"
+                        f"{'Баллы: ' + str(filled.result_score) if filled.result_score is not None else ''}\n"
+                        f"{'Перцентиль: ' + str(filled.percentile) if filled.percentile is not None else ''}\n"
+                        f"{'Комментарий: ' + filled.result_text if filled.result_text else ''}"
+                    ).strip(),
+                    sender=request.user,
+                )
+
+                return redirect("staff_testing_list_for_user", user_id=obj.user_id)
+
     else:
-        form = TestResultForm(instance=obj)
-    return render(request, "staff_templates/testing/result_form.html",
-                  {"form": form, "obj": obj, "user_obj": get_object_or_404(User, pk=obj.user.id), "active": "testing"})
+        res_form = TestResultForm(instance=obj)
+        rev_form = TestRevisionForm(instance=obj)
+
+    return render(
+        request,
+        "staff_templates/testing/result_form.html",
+        {
+            "form": res_form,
+            "rev_form": rev_form,
+            "obj": obj,
+            "user_obj": get_object_or_404(User, pk=obj.user_id),
+            "active": "testing",
+        }
+    )
 
 
 
@@ -985,3 +1120,28 @@ def interview_preparation_view(request):
     )
 
     return render(request, "interview_preparation.html", {"prep": prep, "active": "interview"})
+
+
+@user_passes_test(_staff_check)
+@require_GET
+def testing_template_payload(request):
+    template_id = (request.GET.get("template_id") or "").strip()
+    if not template_id:
+        return JsonResponse({"ok": False, "error": "template_id required"}, status=400)
+
+    tpl = TestTemplate.objects.filter(pk=template_id, is_active=True).first()
+    if not tpl:
+        return JsonResponse({"ok": False, "error": "not found"}, status=404)
+
+    due_at_str = ""
+    if tpl.default_due_days:
+        dt = timezone.localtime(timezone.now() + timedelta(days=tpl.default_due_days))
+        due_at_str = dt.strftime("%Y-%m-%dT%H:%M")
+
+    return JsonResponse({
+        "ok": True,
+        "title": tpl.title or "",
+        "external_url": tpl.external_url or "",
+        "instructions": tpl.instructions or "",
+        "due_at": due_at_str,
+    })

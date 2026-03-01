@@ -5,12 +5,51 @@ from django.utils import timezone
 User = get_user_model()
 
 
+class TestTemplate(models.Model):
+    title = models.CharField("Название теста", max_length=200)
+    external_url = models.URLField("Ссылка на прохождение", blank=True)
+    instructions = models.TextField("Инструкции/Комментарий", blank=True)
+
+    default_due_days = models.PositiveIntegerField(
+        "Дедлайн (дней от назначения)",
+        null=True, blank=True,
+        help_text="Если задано, дедлайн посчитается как assigned_at + N дней",
+    )
+
+    is_active = models.BooleanField("Активен", default=True)
+
+    created_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="created_test_templates",
+        verbose_name="Создал",
+    )
+    created_at = models.DateTimeField("Создано", default=timezone.now)
+
+    class Meta:
+        ordering = ["-id"]
+        verbose_name = "Шаблон теста"
+        verbose_name_plural = "Шаблоны тестов"
+
+    def __str__(self):
+        return self.title
+
+
 class TestAssignment(models.Model):
     class Status(models.TextChoices):
         ASSIGNED = "assigned", "Назначено"
         IN_PROGRESS = "in_progress", "В процессе"
+        NEEDS_REVISION = "needs_revision", "На дописывание"
         COMPLETED = "completed", "Завершено"
         CANCELLED = "cancelled", "Отменено"
+
+    template = models.ForeignKey(
+        "TestTemplate",
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="assignments",
+        verbose_name="Шаблон",
+    )
 
     user = models.ForeignKey(
         User,
@@ -64,6 +103,16 @@ class TestAssignment(models.Model):
     )
     result_filled_at = models.DateTimeField("Результат внесён", null=True, blank=True)
 
+    revision_comment = models.TextField("Комментарий для дописывания", blank=True)
+    revision_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="revision_requested_tests",
+        verbose_name="Отправил на дописывание",
+    )
+    revision_at = models.DateTimeField("Отправлено на дописывание", null=True, blank=True)
+
     class Meta:
         ordering = ["-assigned_at", "-id"]
         verbose_name = "Тестирование кандидата"
@@ -80,6 +129,35 @@ class TestAssignment(models.Model):
             self.completed_at = timezone.now()
         if self.status != self.Status.COMPLETED:
             self.status = self.Status.COMPLETED
+
+    def mark_needs_revision(self, by_user: User, comment: str):
+        self.status = self.Status.NEEDS_REVISION
+        self.revision_by = by_user
+        self.revision_at = timezone.now()
+        self.revision_comment = (comment or "").strip()
+
+        self.completed_at = None
+        self.passed = None
+
+    @property
+    def is_overdue(self) -> bool:
+        return bool(self.due_at and not self.completed_at and timezone.now() > self.due_at)
+
+    @property
+    def on_time(self):
+        if not self.due_at or not self.completed_at:
+            return None
+        return self.completed_at <= self.due_at
+
+    @property
+    def timing_label(self) -> str:
+        if self.on_time is True:
+            return "Успел"
+        if self.on_time is False:
+            return "Не успел"
+        if self.is_overdue:
+            return "Просрочено (ещё не сдано)"
+        return "Не определено"
 
 
 class InterviewPreparation(models.Model):
