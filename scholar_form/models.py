@@ -62,7 +62,7 @@ class UserInfo(models.Model):
 
     class SelectionStep(models.TextChoices):
         FORM = "form", "Анкета"
-        TEST = "test", "Тестирование"
+        TEST = "test", "Тестирование способностей"
         ML = "ml", "Мотивационное письмо"
         VIDEO = "video", "Видеовизитка"
         INTERVIEW_PREP = "interview_prep", "Подготовка к собеседованию"
@@ -137,7 +137,7 @@ class UserInfo(models.Model):
     subject_grades = models.CharField(max_length=1000, verbose_name="Средние оценки по предметам", blank=True)
 
     # Step 3: Admission Plans
-    olympiad_plans = models.CharField(max_length=10000, verbose_name="Планы участия в олимпиадах", blank=True, help_text='если не планируешь участвовать, поставь прочерк')
+    olympiad_plans = models.CharField(max_length=10000, verbose_name="Планы участия в олимпиадах", blank=True, help_text='Если не планируешь участвовать, поставь прочерк')
     admission_path = models.CharField(max_length=10000, verbose_name="Ты планируешь поступать по ЕГЭ или олимпиадам?", blank=True)
     target_universities = models.CharField(max_length=10000, verbose_name="Приоритетные вузы", blank=True)
     specializations = models.CharField(max_length=10000, verbose_name="Интересующие направления", blank=True)
@@ -153,7 +153,7 @@ class UserInfo(models.Model):
     is_low_income = models.CharField(max_length=10, verbose_name="Имеет ли семья статус малоимущей?", blank=True)
     receives_subsidy = models.CharField(max_length=255, verbose_name="Получает ли семья субсидии от государства? ", blank=True)
     other_factors = models.CharField(max_length=10000, blank=True, verbose_name="Какие-либо иные обстоятельства, о которых ты хотел(-а) бы сообщить")
-    has_pc_with_internet = models.CharField(max_length=1000, verbose_name="Есть ли у тебя компьютер/ноутбук с доступом в интернет?”",
+    has_pc_with_internet = models.CharField(max_length=1000, verbose_name="Есть ли у тебя компьютер/ноутбук с доступом в интернет?",
                                             blank=True)
 
     # Step 5: Additional

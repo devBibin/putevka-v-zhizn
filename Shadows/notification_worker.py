@@ -4,6 +4,13 @@ import logging
 
 import django
 
+import config
+
+logging.basicConfig(
+    level=logging.INFO,
+    force=True
+)
+
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "Putevka.settings")
 django.setup()
 
@@ -19,12 +26,12 @@ from core.models import UserNotification
 
 from django.db import models
 
-logging.basicConfig(level=logging.INFO)
+
 logger = logging.getLogger("notifications_worker")
 
 POLL_SECONDS = int(os.getenv("NOTIF_POLL_SECONDS", "5"))
 BATCH_SIZE = int(os.getenv("NOTIF_BATCH_SIZE", "100"))
-BASE_URL = getattr(settings, "BASE_URL", "")
+BASE_URL = config.BASE_URL
 
 
 def process_batch():

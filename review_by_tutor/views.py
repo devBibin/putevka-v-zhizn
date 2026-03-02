@@ -232,7 +232,7 @@ def staff_profile_detail(request, user_id: int):
                 def _notify():
                     message_text = (
                         "🎉 Анкета успешно принята!\n\n"
-                        "Поздравляем! Ваша анкета прошла проверку.\n\n"
+                        "Поздравляем! Твоя анкета прошла проверку.\n\n"
                         "Ожидайте дальнейшей информации."
                     )
 
@@ -1040,6 +1040,9 @@ def notify_participant(user, subject: str, message: str, sender=None):
 def testing_fill_result(request, pk):
     obj = get_object_or_404(TestAssignment, pk=pk)
 
+    res_form = TestResultForm(instance=obj)
+    rev_form = TestRevisionForm(instance=obj)
+
     if request.method == "POST":
         action = (request.POST.get("action") or "").strip()
 
@@ -1081,8 +1084,6 @@ def testing_fill_result(request, pk):
                     subject="Результат теста внесён",
                     message=(
                         f"✅ По тесту «{filled.title}» внесён результат.\n\n"
-                        f"{'Баллы: ' + str(filled.result_score) if filled.result_score is not None else ''}\n"
-                        f"{'Перцентиль: ' + str(filled.percentile) if filled.percentile is not None else ''}\n"
                         f"{'Комментарий: ' + filled.result_text if filled.result_text else ''}"
                     ).strip(),
                     sender=request.user,
