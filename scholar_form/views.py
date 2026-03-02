@@ -21,8 +21,11 @@ def personal_info(request):
     planned_exams_labels = [str(x) for x in planned_exams_qs]
 
     if request.method == "POST":
+        print("FILES:", request.FILES)
+        print("avatar:", request.FILES.get("avatar"))
+
         profile_form = UserProfileForm(request.POST, request.FILES, instance=profile)
-        personal_form = UserPersonalDataForm(request.POST, instance=personal_data)
+        personal_form = UserPersonalDataForm(request.POST, request.FILES, instance=personal_data)
 
         if profile_form.is_valid() and personal_form.is_valid():
             profile_form.save()
