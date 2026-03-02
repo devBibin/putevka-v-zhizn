@@ -153,7 +153,7 @@ class UserInfo(models.Model):
     is_low_income = models.CharField(max_length=10, verbose_name="Имеет ли семья статус малоимущей?", blank=True)
     receives_subsidy = models.CharField(max_length=255, verbose_name="Получает ли семья субсидии от государства? ", blank=True)
     other_factors = models.CharField(max_length=10000, blank=True, verbose_name="Какие-либо иные обстоятельства, о которых ты хотел(-а) бы сообщить")
-    has_pc_with_internet = models.CharField(max_length=1000, verbose_name="Есть ли у тебя компьютер/ноутбук с доступом в интернет?”",
+    has_pc_with_internet = models.CharField(max_length=1000, verbose_name="Есть ли у тебя компьютер/ноутбук с доступом в интернет?",
                                             blank=True)
 
     # Step 5: Additional
