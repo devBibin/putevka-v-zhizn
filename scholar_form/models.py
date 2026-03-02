@@ -137,7 +137,7 @@ class UserInfo(models.Model):
     subject_grades = models.CharField(max_length=1000, verbose_name="Средние оценки по предметам", blank=True)
 
     # Step 3: Admission Plans
-    olympiad_plans = models.CharField(max_length=10000, verbose_name="Планы участия в олимпиадах", blank=True, help_text='если не планируешь участвовать, поставь прочерк')
+    olympiad_plans = models.CharField(max_length=10000, verbose_name="Планы участия в олимпиадах", blank=True, help_text='Если не планируешь участвовать, поставь прочерк')
     admission_path = models.CharField(max_length=10000, verbose_name="Ты планируешь поступать по ЕГЭ или олимпиадам?", blank=True)
     target_universities = models.CharField(max_length=10000, verbose_name="Приоритетные вузы", blank=True)
     specializations = models.CharField(max_length=10000, verbose_name="Интересующие направления", blank=True)
