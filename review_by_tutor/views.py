@@ -1040,6 +1040,9 @@ def notify_participant(user, subject: str, message: str, sender=None):
 def testing_fill_result(request, pk):
     obj = get_object_or_404(TestAssignment, pk=pk)
 
+    res_form = TestResultForm(instance=obj)
+    rev_form = TestRevisionForm(instance=obj)
+
     if request.method == "POST":
         action = (request.POST.get("action") or "").strip()
 

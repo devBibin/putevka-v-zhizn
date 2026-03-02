@@ -67,9 +67,11 @@ class StaffScholarDossierView(TemplateView):
 
         ml_exists = ml is not None
         ml_needs_review = bool(
-            ml_exists and getattr(ml, "status", None) in ("submitted", "under_review") and not getattr(ml,
-                                                                                                       "admin_rating",
-                                                                                                       None))
+            ml_exists
+            and ml.status == ml.Status.SUBMITTED
+            and ml.admin_score is None
+            and not (ml.admin_rating or "").strip()
+        )
 
         documents_qs = Document.objects.filter(user=user, is_deleted=False).order_by("-uploaded_at") if Document else []
 

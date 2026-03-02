@@ -269,21 +269,16 @@
                                     <div class="small text-muted">Мотивационное письмо</div>
                                     {% if summary.ml_exists %}
                                         {% if summary.ml_needs_review %}
-                                            <div class="fw-semibold text-warning">Ждёт оценки</div>
+                                            Ждёт оценки
+                                        {% elif user_obj.motivation_letter.status == "revision" %}
+                                            На дописывании
+                                        {% elif user_obj.motivation_letter.status == "draft" %}
+                                            Черновик
                                         {% else %}
-                                            <div class="fw-semibold text-success">Есть (обработано)</div>
+                                            Есть (оценено/принято)
                                         {% endif %}
-
-                                        <div class="small text-muted mt-1">
-                                            Баллы:
-                                            {% if summary.ml_score is not None %}
-                                                <span class="fw-semibold">{{ summary.ml_score }}</span>
-                                            {% else %}
-                                                —
-                                            {% endif %}
-                                        </div>
                                     {% else %}
-                                        <div class="fw-semibold text-muted">Нет</div>
+                                        Нет
                                     {% endif %}
                                 </div>
                             </div>
