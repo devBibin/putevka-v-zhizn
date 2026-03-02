@@ -62,7 +62,7 @@ class UserInfo(models.Model):
 
     class SelectionStep(models.TextChoices):
         FORM = "form", "Анкета"
-        TEST = "test", "Тестирование"
+        TEST = "test", "Тестирование способностей"
         ML = "ml", "Мотивационное письмо"
         VIDEO = "video", "Видеовизитка"
         INTERVIEW_PREP = "interview_prep", "Подготовка к собеседованию"

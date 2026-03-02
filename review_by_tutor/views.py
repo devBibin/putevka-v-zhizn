@@ -1084,8 +1084,6 @@ def testing_fill_result(request, pk):
                     subject="Результат теста внесён",
                     message=(
                         f"✅ По тесту «{filled.title}» внесён результат.\n\n"
-                        f"{'Баллы: ' + str(filled.result_score) if filled.result_score is not None else ''}\n"
-                        f"{'Перцентиль: ' + str(filled.percentile) if filled.percentile is not None else ''}\n"
                         f"{'Комментарий: ' + filled.result_text if filled.result_text else ''}"
                     ).strip(),
                     sender=request.user,

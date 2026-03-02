@@ -9,6 +9,7 @@ from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.views.generic import TemplateView
 
+from config import BASE_URL
 from core.models import UserNotification, Notification
 from documents.models import Document
 from review_by_tutor.forms import StatusChangeForm, ProfileChangeForm, SelectionStepUpdateForm
@@ -212,18 +213,28 @@ def staff_scholar_action(request, user_id: int):
         else:
             messages.error(request, "Не удалось обновить профиль. Проверьте данные.")
 
+
     elif action == "change_selection_step":
         uinfo = user.user_info
+        old_step = uinfo.selection_step
         form = SelectionStepUpdateForm(request.POST, instance=uinfo)
-
         if form.is_valid():
-            form.save()
+            updated_obj = form.save(commit=False)
+            new_step = updated_obj.selection_step
+            updated_obj.save()
+            if old_step != new_step:
+                notif = Notification.objects.create(
+                    message=f"Теперь ты на этапе отбора: {uinfo.get_selection_step_display()}, проверь свой кабинет {BASE_URL}",
+                    sender=request.user
+                )
+                UserNotification.objects.create(
+                    notification=notif,
+                    recipient=user
+                )
             messages.success(request, "Этап отбора обновлён.")
         else:
             messages.error(request, "Ошибка обновления этапа.")
-
         return redirect(request.META.get("HTTP_REFERER", "/"))
-
     else:
         messages.error(request, "Неизвестное действие.")
 
