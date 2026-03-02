@@ -20,21 +20,16 @@
                                     id="avatarPreview"
                                     src="
 
-
-
-
-
-
                                             {% if form.instance.avatar %}{{ form.instance.avatar.url }}{% else %}https://ui-avatars.com/api/?name={{ user.get_full_name|default:user.username|urlencode }}&size=256&background=0D6EFD&color=fff{% endif %}"
                                     alt="Аватар"
                                     class="rounded-circle border"
                                     style="width: 140px; height: 140px; object-fit: cover;"
                             >
-                            <!-- Кнопка-иконка поверх аватарки -->
-                            <label for="id_avatar"
+
+                            <label for="{{ form.avatar.id_for_label }}"
                                    class="btn btn-light btn-sm border position-absolute bottom-0 end-0 rounded-circle shadow-sm"
                                    title="Загрузить новый аватар"
-                                   style="width: 40px; height: 40px;">
+                                   style="width:40px;height:40px; z-index:10; cursor:pointer;">
                                 <i class="bi bi-camera"></i>
                             </label>
                         </div>
@@ -70,6 +65,7 @@
             <div class="col-lg-8">
                 <form method="post" enctype="multipart/form-data" class="needs-validation" novalidate>
                     {% csrf_token %}
+                    {% render_field form.avatar class+="visually-hidden" %}
 
                     <!-- Ошибки формы -->
                     {% if form.non_field_errors %}
@@ -114,13 +110,6 @@
                             </div>
                             <div class="card-body">
                                 <div class="row g-3">
-                                    {# скрытое поле аватара #}
-                                    {% if form.avatar %}
-                                        <div class="col-12 d-none">
-                                            {% render_field form.avatar class+="form-control" %}
-                                        </div>
-                                    {% endif %}
-
                                     {# сначала обычные поля профиля #}
                                     {% for field in form.visible_fields %}
                                         {% if field.name != "avatar" %}
@@ -184,18 +173,29 @@
         (function () {
             const input = document.getElementById('id_avatar');
             const preview = document.getElementById('avatarPreview');
-            if (input && preview) {
-                input.addEventListener('change', (e) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
-                    if (!file.type.startsWith('image/')) return;
+
+            if (!input) return;
+
+            input.addEventListener('change', (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                if (!file.type.startsWith('image/')) return;
+
+                // Превью
+                if (preview) {
                     const reader = new FileReader();
                     reader.onload = (ev) => {
                         preview.src = ev.target.result;
                     };
                     reader.readAsDataURL(file);
-                });
-            }
+                }
+
+                // Автосабмит
+                const form = input.closest('form');
+                if (form) {
+                    form.submit();
+                }
+            });
         })();
     </script>
 {% endblock %}
