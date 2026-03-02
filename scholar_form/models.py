@@ -171,7 +171,7 @@ class UserInfo(models.Model):
     )
 
     agree_privacy_policy = models.BooleanField(
-        verbose_name="Согласен(-на) с Политикой конфиденциальности (дефис потерялся) (ссылка: https://disk.yandex.ru/d/I2-TWTBEYwWdXw)",
+        verbose_name="Согласен(-на) с Политикой конфиденциальности (ссылка: https://disk.yandex.ru/d/I2-TWTBEYwWdXw)",
         null=True
     )
 
