@@ -194,7 +194,7 @@ def staff_profile_detail(request, user_id: int):
                             f"Причина:\n{comment}\n\n"
                             "Открой анкету и внеси правки."
                         ),
-                        url=f"{BASE_URL}/apply/",
+                        url=f"{BASE_URL}apply/",
                         button_text="📝 Открыть анкету"
                     )
 
@@ -208,7 +208,7 @@ def staff_profile_detail(request, user_id: int):
                                     "Здравствуйте!\n\n"
                                     "Ваша анкета отправлена на доработку.\n\n"
                                     f"Причина:\n{comment}\n\n"
-                                    f"Перейдите по ссылке для редактирования:\n{BASE_URL}/apply/\n\n"
+                                    f"Перейдите по ссылке для редактирования:\n{BASE_URL}apply/\n\n"
                                     "С уважением,\nКоманда программы"
                                 ),
                                 from_email=settings.DEFAULT_FROM_EMAIL,
@@ -256,7 +256,7 @@ def staff_profile_detail(request, user_id: int):
                                     "Здравствуйте!\n\n"
                                     "Ваша анкета успешно прошла проверку и принята.\n\n"
                                     "Мы свяжемся с вами для дальнейших шагов.\n\n"
-                                    f"Просмотреть анкету можно здесь:\n{BASE_URL}/apply/\n\n"
+                                    f"Просмотреть анкету можно здесь:\n{BASE_URL}apply/\n\n"
                                     "С уважением,\nКоманда программы"
                                 ),
                                 from_email=settings.DEFAULT_FROM_EMAIL,

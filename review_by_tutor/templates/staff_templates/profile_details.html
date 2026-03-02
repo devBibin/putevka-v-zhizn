@@ -48,6 +48,14 @@
                                 </div>
 
                                 <div class="col-md-6">
+                                    <label class="form-label">{{ form.gender.label }}</label>
+                                    {{ form.gender }}
+                                    {% if form.gender.errors %}
+                                        <div class="text-danger small mt-1">{{ form.gender.errors }}</div>
+                                    {% endif %}
+                                </div>
+
+                                <div class="col-md-6">
                                     <label class="form-label">{{ form.birth_date.label }}</label>
                                     {{ form.birth_date }}
                                     {% if form.birth_date.errors %}
@@ -150,6 +158,17 @@
                                     {{ form.subject_grades }}
                                     {% if form.subject_grades.errors %}
                                         <div class="text-danger small mt-1">{{ form.subject_grades.errors }}</div>{% endif %}
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label class="form-label">{{ form.avg_grade_last_period.label }}</label>
+                                    {{ form.avg_grade_last_period }}
+                                    {% if form.avg_grade_last_period.errors %}
+                                        <div class="text-danger small mt-1">{{ form.avg_grade_last_period.errors }}</div>
+                                    {% endif %}
+                                    {% if form.avg_grade_last_period.help_text %}
+                                        <div class="form-text">{{ form.avg_grade_last_period.help_text }}</div>
+                                    {% endif %}
                                 </div>
                             </div>
                         </div>
@@ -267,6 +286,14 @@
                                 </div>
 
                                 <div class="col-12">
+                                    <label class="form-label">{{ form.family_material_status.label }}</label>
+                                    {{ form.family_material_status }}
+                                    {% if form.family_material_status.errors %}
+                                        <div class="text-danger small mt-1">{{ form.family_material_status.errors }}</div>
+                                    {% endif %}
+                                </div>
+
+                                <div class="col-12">
                                     <label class="form-label">{{ form.has_pc_with_internet.label }}</label>
                                     {{ form.has_pc_with_internet }}
                                     {% if form.has_pc_with_internet.errors %}
@@ -333,6 +360,32 @@
                                         </label>
                                         {% if form.agree_documents.errors %}
                                             <div class="text-danger small mt-1">{{ form.agree_documents.errors }}</div>{% endif %}
+                                    </div>
+
+                                    <div class="form-check mt-2">
+                                        {{ form.agree_program_conditions }}
+                                        <label class="form-check-label"
+                                               for="{{ form.agree_program_conditions.id_for_label }}">
+                                            {{ form.agree_program_conditions.label }}
+                                        </label>
+                                        {% if form.agree_program_conditions.errors %}
+                                            <div class="text-danger small mt-1">
+                                                {{ form.agree_program_conditions.errors }}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+
+                                    <div class="form-check mt-2">
+                                        {{ form.agree_privacy_policy }}
+                                        <label class="form-check-label"
+                                               for="{{ form.agree_privacy_policy.id_for_label }}">
+                                            {{ form.agree_privacy_policy.label }}
+                                        </label>
+                                        {% if form.agree_privacy_policy.errors %}
+                                            <div class="text-danger small mt-1">
+                                                {{ form.agree_privacy_policy.errors }}
+                                            </div>
+                                        {% endif %}
                                     </div>
                                 </div>
                             </div>
