@@ -88,10 +88,10 @@ class EducationForm(forms.ModelForm):
     )
 
     subject_grades = forms.CharField(
-        widget=forms.Textarea(attrs={'placeholder': 'Математика — 5, Физика — 4'}),
-        help_text="в т.ч.: Русский язык, Алгебра, Геометрия, Биология, Химия, Физика, Иностранный язык, Информатика",
+        widget=forms.Textarea(attrs={'placeholder': 'Русский язык — 5, математика — 4 …', 'caption': 'Найди среднее арифметическое 2 итоговых оценок, выставленных за последние 2 отчетных периода (четверть/полугодие/триместр) по каждому профильному предмету. Например: по физике за прошлую четверть 5, за позапрошлую 4. Среднее: 4,5.'}),
+        help_text="Все предметы, которые сдаешь на ЕГЭ",
         required=True,
-        label='Средние оценки по предметам'
+        label='Средний балл по профильным предметам за последние 2 отчетных периода'
     )
 
     planned_exams = forms.ModelMultipleChoiceField(
@@ -113,9 +113,6 @@ class EducationForm(forms.ModelForm):
             'subject_grades',
 
             'avg_grade_last_period',
-            'avg_russian_last_2_periods',
-            'avg_math_last_2_periods',
-            'avg_profile_subjects_last_2_periods',
         ]
 
         widgets = {
@@ -128,26 +125,13 @@ class EducationForm(forms.ModelForm):
                 'step': '0.01',
                 'min': '1',
                 'max': '10',
-                'placeholder': 'Например: 4.75'
+                'placeholder': '4.3',
+                'caption': 'Найди среднее арифметическое итоговых оценок по всем предметам за последний отчетный период (четверть/полугодие/триместр).'
             }),
-            'avg_russian_last_2_periods': forms.NumberInput(attrs={
-                'step': '0.01',
-                'min': '1',
-                'max': '10',
-                'placeholder': 'Например: 4.80'
-            }),
-            'avg_math_last_2_periods': forms.NumberInput(attrs={
-                'step': '0.01',
-                'min': '1',
-                'max': '10',
-                'placeholder': 'Например: 4.60'
-            }),
-            'avg_profile_subjects_last_2_periods': forms.TextInput(attrs={'placeholder': 'География - 4.9, ...'}),
         }
 
         help_texts = {
-            'avg_grade_last_period': 'Средний балл за последнюю четверть / семестр.',
-            'avg_profile_subjects_last_2_periods': 'Профильные предметы — важные для выбранного направления.',
+            'avg_grade_last_period': 'Оценки по всем предметам',
         }
 
 
@@ -229,14 +213,14 @@ class FamilyForm(forms.ModelForm):
 
 
 class AdditionalForm(forms.ModelForm):
-    agree_processing = forms.BooleanField(label="Согласен(на) на обработку персональных данных")
-    agree_documents = forms.BooleanField(label="Обязуюсь предоставить подтверждающие документы")
+    agree_processing = forms.BooleanField(label="Даю согласие на обработку персональных данных (ссылка: https://disk.yandex.ru/d/kme9vXodYjntrA)")
+    agree_documents = forms.BooleanField(label="В случае утверждения участия в программе обязуюсь предоставить в Фонд документы, подтверждающие предоставленные данные")
     agree_program_conditions = forms.BooleanField(
-        label="Ознакомился(-ась) с условиями Благотворительной программы «Поддержи таланты»"
+        label="Ознакомился(-ась) с условиями Благотворительной программы “Поддержи таланты” (ссылка: https://disk.yandex.ru/d/ESiT-bmIM6r6dQ)"
     )
 
     agree_privacy_policy = forms.BooleanField(
-        label="Согласен(-на) с Политикой конфиденциальности"
+        label="Согласен(-на) с Политикой конфиденциальности (дефис потерялся) (ссылка: https://disk.yandex.ru/d/I2-TWTBEYwWdXw)"
     )
 
     class Meta:
@@ -244,7 +228,8 @@ class AdditionalForm(forms.ModelForm):
         fields = [
             'achievements', 'preparation_plan', 'foundation_help',
             'heard_about_program', 'willing_to_participate',
-            'agree_processing', 'agree_documents', 'agree_program_conditions', 'agree_program_conditions'
+            'agree_program_conditions', 'agree_privacy_policy',
+            'agree_processing', 'agree_documents',
         ]
         widgets = {
             'achievements': forms.Textarea(attrs={'placeholder': 'Призер муниципального этапа ВсОШ по физике, 80 верифицированных часов волонтерства на добро.рф, диплом 2 степени на областном фестивале исполнителей на русских народных инструментах, золотая медаль на городских соревнованиях по баскетболу'}),

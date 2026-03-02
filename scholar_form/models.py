@@ -134,7 +134,7 @@ class UserInfo(models.Model):
         blank=True,
         related_name="planned_by_users"
     )
-    subject_grades = models.CharField(max_length=1000, verbose_name="Средние оценки по предметам", blank=True)
+    subject_grades = models.CharField(max_length=1000, verbose_name="Средний балл по профильным предметам за последние 2 отчетных периода", blank=True)
 
     # Step 3: Admission Plans
     olympiad_plans = models.CharField(max_length=10000, verbose_name="Планы участия в олимпиадах", blank=True, help_text='Если не планируешь участвовать, поставь прочерк')
@@ -166,22 +166,22 @@ class UserInfo(models.Model):
                                               blank=True)
 
     agree_program_conditions = models.BooleanField(
-        verbose_name="Ознакомился(-ась) с условиями Благотворительной программы “Поддержи таланты”",
+        verbose_name="Ознакомился(-ась) с условиями Благотворительной программы “Поддержи таланты” (ссылка: https://disk.yandex.ru/d/ESiT-bmIM6r6dQ)",
         null=True
     )
 
     agree_privacy_policy = models.BooleanField(
-        verbose_name="Согласен(-на) с Политикой конфиденциальности",
+        verbose_name="Согласен(-на) с Политикой конфиденциальности (дефис потерялся) (ссылка: https://disk.yandex.ru/d/I2-TWTBEYwWdXw)",
         null=True
     )
 
     agree_processing = models.BooleanField(
-        verbose_name="Даю согласие на обработку персональных данных",
+        verbose_name="Даю согласие на обработку персональных данных (ссылка: https://disk.yandex.ru/d/kme9vXodYjntrA)",
         null=True
     )
 
     agree_documents = models.BooleanField(
-        verbose_name="В случае утверждения участия в программе обязуюсь предоставить в Фонд документы, подтверждающие сведения обо мне",
+        verbose_name="В случае утверждения участия в программе обязуюсь предоставить в Фонд документы, подтверждающие предоставленные данные",
         null=True
     )
 
@@ -190,38 +190,13 @@ class UserInfo(models.Model):
     tutor_summary = models.TextField(verbose_name="Заметки куратора", blank=True, null=True)
 
     avg_grade_last_period = models.DecimalField(
-        verbose_name="Средний балл успеваемости (все предметы) за последний отчётный период",
+        verbose_name="Средний балл успеваемости за последний отчетный период",
         max_digits=6,
         decimal_places=2,
         null=True,
         blank=True,
         validators=[MinValueValidator(1), MaxValueValidator(100)],
         help_text="Например: 4.57 или 8.92 (зависит от шкалы в школе).",
-    )
-
-    avg_russian_last_2_periods = models.DecimalField(
-        verbose_name="Средний балл по русскому за последние 2 отчётных периода",
-        max_digits=6,
-        decimal_places=2,
-        null=True,
-        blank=True,
-        validators=[MinValueValidator(1), MaxValueValidator(100)],
-    )
-
-    avg_math_last_2_periods = models.DecimalField(
-        verbose_name="Средний балл по математике за последние 2 отчётных периода",
-        max_digits=6,
-        decimal_places=2,
-        null=True,
-        blank=True,
-        validators=[MinValueValidator(1), MaxValueValidator(100)],
-    )
-
-    avg_profile_subjects_last_2_periods = models.CharField(
-        verbose_name="Средний балл по профильным предметам за последние 2 отчётных периода",
-        null=True,
-        blank=True,
-        help_text="Профильные — те, которые важны для поступления по выбранному направлению.",
     )
 
     class FamilyMaterialStatus(models.TextChoices):
