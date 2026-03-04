@@ -4,103 +4,137 @@
 
 {% block content %}
     <div class="container py-4">
-        <h1 class="mb-4">Пользователи</h1>
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+            <h1 class="mb-0 me-auto">Пользователи</h1>
+            <span class="text-muted small">Всего на странице: {{ page_obj.object_list|length }} · Стр. {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+        </div>
 
-        <!-- Форма фильтрации -->
-        <form class="row g-3 mb-4" method="get">
+        <!-- Фильтры -->
+        <form class="row g-3 mb-3" method="get">
             <!-- Поиск -->
-            <div class="col-md-4">
+            <div class="col-lg-4">
                 <label class="form-label">Поиск</label>
                 <input type="search" name="q" value="{{ q }}" class="form-control"
                        placeholder="Имя, логин, email, телефон, регион">
             </div>
 
-            <!-- Онлайн-школа -->
-            <div class="col-md-3">
-                <label class="form-label">Онлайн-школа</label>
-                <select name="school" class="form-select">
-                    <option value="">Все школы</option>
-                    {% for s in schools %}
-                        <option value="{{ s.id }}" {% if s.id|stringformat:"s" == school %}selected{% endif %}>
-                            {{ s.name }}
-                        </option>
-                    {% endfor %}
+            <!-- ✅ Класс-группа -->
+            <div class="col-lg-2">
+                <label class="form-label">Класс</label>
+                <select name="grade_group" class="form-select">
+                    <option value="" {% if not grade_group %}selected{% endif %}>Все</option>
+                    <option value="9_10" {% if grade_group == "9_10" %}selected{% endif %}>9–10</option>
+                    <option value="other" {% if grade_group == "other" %}selected{% endif %}>Иное</option>
                 </select>
             </div>
 
-            <!-- Курс -->
-            <div class="col-md-3">
-                <label class="form-label">Курс</label>
-                <select name="course" class="form-select">
-                    <option value="">Все курсы</option>
-                    {% for c in courses %}
-                        <option value="{{ c.id }}" {% if c.id|stringformat:"s" == course %}selected{% endif %}>
-                            {{ c.title }}
-                        </option>
-                    {% endfor %}
-                </select>
-            </div>
-
-            <div class="col-md-3">
-                <label class="form-label">Этап отбора</label>
-                <select name="step" class="form-select">
-                    <option value="">Все этапы</option>
-                    {% for value, label in steps %}
-                        <option value="{{ value }}" {% if step == value|stringformat:"s" %}selected{% endif %}>
+            <!-- ✅ Профиль-группа -->
+            <div class="col-lg-2">
+                <label class="form-label">Профиль</label>
+                <select name="profile" class="form-select">
+                    <option value="" {% if not profile %}selected{% endif %}>Все</option>
+                    {% for value, label in profiles %}
+                        <option value="{{ value }}" {% if profile == value|stringformat:"s" %}selected{% endif %}>
                             {{ label }}
                         </option>
                     {% endfor %}
                 </select>
             </div>
 
-
-            <div class="col-md-3">
-                <label class="form-label">Дедлайны тестов</label>
-                <select name="test_deadline" class="form-select">
-                    <option value="" {% if not test_deadline %}selected{% endif %}>Все</option>
-                    <option value="overdue" {% if test_deadline == "overdue" %}selected{% endif %}>Просрочены</option>
-                    <option value="due_soon" {% if test_deadline == "due_soon" %}selected{% endif %}>Скоро дедлайн (3
-                        дня)
-                    </option>
-                    <option value="no_due" {% if test_deadline == "no_due" %}selected{% endif %}>Без дедлайна</option>
-                    <option value="has_due" {% if test_deadline == "has_due" %}selected{% endif %}>Есть дедлайн</option>
-                    <option value="completed" {% if test_deadline == "completed" %}selected{% endif %}>Тесты завершены
-                    </option>
-                    <option value="active" {% if test_deadline == "active" %}selected{% endif %}>Есть активные тесты
-                    </option>
-                </select>
-            </div>
-
-            <!-- Класс -->
-            <div class="col-md-2">
-                <label class="form-label">Класс в след. учебном году</label>
-                <select name="grade" class="form-select">
-                    <option value="">Все</option>
-                    {% for n in grades %}
-                        <option value="{{ n }}" {% if grade == n|stringformat:"s" %}selected{% endif %}>{{ n }} класс
-                        </option>
+            <!-- Этап -->
+            <div class="col-lg-2">
+                <label class="form-label">Этап</label>
+                <select name="step" class="form-select">
+                    <option value="" {% if not step %}selected{% endif %}>Все</option>
+                    {% for value, label in steps %}
+                        <option value="{{ value }}"
+                                {% if step == value|stringformat:"s" %}selected{% endif %}>{{ label }}</option>
                     {% endfor %}
                 </select>
             </div>
 
-            <!-- Куратор нужен -->
-            <div class="col-md-2">
-                <label class="form-label">Куратор нужен</label>
-                <select name="curator_need" class="form-select">
-                    <option value="">Все</option>
-                    <option value="1" {% if curator_need == '1' %}selected{% endif %}>Да</option>
-                    <option value="0" {% if curator_need == '0' %}selected{% endif %}>Нет</option>
+            <div class="col-lg-2">
+                <label class="form-label">Анкета</label>
+                <select name="form_status" class="form-select">
+                    <option value="" {% if not form_status %}selected{% endif %}>Все</option>
+
+                    <option value="draft" {% if form_status == "draft" %}selected{% endif %}>Черновик</option>
+                    <option value="submitted" {% if form_status == "submitted" %}selected{% endif %}>Отправлена</option>
+                    <option value="revision" {% if form_status == "revision" %}selected{% endif %}>На дописывание
+                    </option>
+                    <option value="approved" {% if form_status == "approved" %}selected{% endif %}>Принята</option>
+
+                    <option value="no_profile" {% if form_status == "no_profile" %}selected{% endif %}>Нет анкеты
+                    </option>
                 </select>
             </div>
 
-            <div class="col-md-2 align-self-end d-grid">
-                <button class="btn btn-primary">Фильтр</button>
+            <!-- Дедлайны тестов -->
+            <div class="col-lg-2">
+                <label class="form-label">Тесты</label>
+                <select name="test_deadline" class="form-select">
+                    <option value="" {% if not test_deadline %}selected{% endif %}>Все</option>
+                    <option value="overdue" {% if test_deadline == "overdue" %}selected{% endif %}>Просрочены</option>
+                    <option value="due_soon" {% if test_deadline == "due_soon" %}selected{% endif %}>Скоро (3 дня)
+                    </option>
+                    <option value="active" {% if test_deadline == "active" %}selected{% endif %}>Активные</option>
+                    <option value="completed" {% if test_deadline == "completed" %}selected{% endif %}>Завершены
+                    </option>
+                    <option value="no_due" {% if test_deadline == "no_due" %}selected{% endif %}>Активные без дедлайна
+                    </option>
+                    <option value="has_due" {% if test_deadline == "has_due" %}selected{% endif %}>Активные с
+                        дедлайном
+                    </option>
+                </select>
+            </div>
+
+            <!-- Доп. фильтры (схлопнули) -->
+            <div class="col-12">
+                <details class="mt-1">
+                    <summary class="text-muted small">Доп. фильтры (школа, курс, куратор)</summary>
+                    <div class="row g-3 mt-1">
+                        <div class="col-md-4">
+                            <label class="form-label">Онлайн-школа</label>
+                            <select name="school" class="form-select">
+                                <option value="">Все школы</option>
+                                {% for s in schools %}
+                                    <option value="{{ s.id }}"
+                                            {% if s.id|stringformat:"s" == school %}selected{% endif %}>{{ s.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">Курс</label>
+                            <select name="course" class="form-select">
+                                <option value="">Все курсы</option>
+                                {% for c in courses %}
+                                    <option value="{{ c.id }}"
+                                            {% if c.id|stringformat:"s" == course %}selected{% endif %}>{{ c.title }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">Куратор нужен</label>
+                            <select name="curator_need" class="form-select">
+                                <option value="" {% if not curator_need %}selected{% endif %}>Все</option>
+                                <option value="1" {% if curator_need == "1" %}selected{% endif %}>Да</option>
+                                <option value="0" {% if curator_need == "0" %}selected{% endif %}>Нет</option>
+                            </select>
+                        </div>
+                    </div>
+                </details>
+            </div>
+
+            <div class="col-12 d-flex gap-2">
+                <button class="btn btn-primary">Применить</button>
+                <a class="btn btn-outline-secondary" href="{% url 'staff_users_list' %}">Сбросить</a>
             </div>
         </form>
 
-
         {% if page_obj.object_list %}
-            <!-- Форма массовой отправки оповещений -->
+            <!-- Массовые действия (оставил твои кнопки) -->
             <form method="post" action="{% url 'staff_send_notification' %}" id="notifyForm">
                 {% csrf_token %}
 
@@ -118,27 +152,28 @@
                         Снять выбор
                     </button>
 
-                    <span class="text-muted small">Отметьте галочками пользователей в таблице ниже.</span>
-                    <span class="ms-auto small">Выбрано: <strong id="selectedCount">0</strong></span>
+                    <span class="text-muted small">Выбрано: <strong id="selectedCount">0</strong></span>
                 </div>
 
                 <div class="table-responsive">
-                    <table class="table align-middle">
-                        <thead>
+                    <table class="table table-sm align-middle">
+                        <thead class="table-light" style="position: sticky; top: 0; z-index: 1;">
                         <tr>
                             <th style="width:36px;">
                                 <input class="form-check-input" type="checkbox" id="checkAllOnPage"
                                        title="Выбрать все на странице">
                             </th>
                             <th style="min-width:260px;">Пользователь</th>
-                            <th>Email / Телефон</th>
-                            <th>Документы</th>
-                            <th>Письмо</th>
+                            <th style="min-width:120px;">Регистрация</th>
                             <th>Анкета</th>
+                            <th>Тесты</th>
+                            <th>МП</th>
                             <th>Видео</th>
-                            <th>Этап</th>
+                            <th>Собес</th>
+                            <th>Итог</th>
                         </tr>
                         </thead>
+
                         <tbody>
                         {% for u in page_obj.object_list %}
                             <tr>
@@ -146,156 +181,166 @@
                                     <input class="form-check-input row-check" type="checkbox" name="ids"
                                            value="{{ u.id }}">
                                 </td>
+
                                 <td class="text-break">
                                     <div class="fw-semibold">
                                         <a href="{% url 'staff_scholar_dossier' u.id %}"
-                                           class="link-dark text-decoration-none" style="transition:color .15s ease;">
+                                           class="link-dark text-decoration-none">
                                             {{ u.get_full_name|default:u.username }}
-                                            {% if u.username %}
-                                                <span class="text-muted"> · {{ u.username }}</span>{% endif %}
                                         </a>
+                                    </div>
+                                    <div class="small text-muted">
+                                        {{ u.email|default:"—" }}{% if u.user_info.phone %}<br>
+                                            {{ u.user_info.phone }}{% endif %}
                                     </div>
                                     <div class="mt-1">
                                         {% if u.is_active %}
                                             {% if u.user_info.status == "CANDIDATE" %}
                                                 <span class="badge text-bg-warning">Кандидат</span>
                                             {% elif u.user_info.status == "ALTERNATIVE" %}
-                                                <span class="badge text-bg-info">Альтернативный трек</span>
+                                                <span class="badge text-bg-info">Альтернативный</span>
                                             {% elif u.user_info.status == "SCHOLAR" %}
                                                 <span class="badge text-bg-success">Участник</span>
                                             {% elif u.user_info.status == "ALUMNUS" %}
                                                 <span class="badge text-bg-secondary">Выпускник</span>
                                             {% else %}
-                                                <span class="badge text-bg-light">Неизвестно</span>
+                                                <span class="badge text-bg-light text-dark">Статус?</span>
                                             {% endif %}
                                         {% else %}
                                             <span class="badge text-bg-dark">Неактивен</span>
                                         {% endif %}
-                                        {% if u.is_staff %}
-                                            <span class="badge text-bg-primary ms-1">staff</span>{% endif %}
-                                        {% if u.is_superuser %}
-                                            <span class="badge text-bg-dark ms-1">superuser</span>{% endif %}
+
+                                        {% if u.docs_pending %}
+                                            <span class="badge text-bg-warning ms-1"
+                                                  title="Документы на проверке">docs: {{ u.docs_pending }}</span>
+                                        {% endif %}
                                     </div>
                                 </td>
-                                <td>
-                                    <div class="text-break">{{ u.email|default:"—" }}</div>
-                                    <div class="small text-muted">{{ u.user_info.phone|default:"" }}</div>
+
+                                <!-- Регистрация -->
+                                <td class="small">
+                                    <div class="fw-semibold">{{ u.date_joined|date:"d.m.Y" }}</div>
+                                    <div class="text-muted">{{ u.date_joined|date:"H:i" }}</div>
                                 </td>
-                                <td>
-                                    <div class="small">
-                                        всего: <span class="badge text-bg-secondary">{{ u.docs_total }}</span>
-                                        {% if u.docs_pending %} · на проверке:
-                                            <span class="badge text-bg-warning">{{ u.docs_pending }}</span>{% endif %}
-                                        {% if u.docs_question %} · уточнить:
-                                            <span class="badge text-bg-danger">{{ u.docs_question }}</span>{% endif %}
-                                        {% if u.docs_signed %} · подписаны:
-                                            <span class="badge text-bg-success">{{ u.docs_signed }}</span>{% endif %}
-                                    </div>
-                                </td>
-                                <td>
-                                    {% if u.letter_status %}
-                                        <span class="badge
-                    {% if u.letter_status == 'submitted' %}text-bg-success
-                    {% elif u.letter_status == 'draft' %}text-bg-secondary
-                    {% else %}text-bg-secondary{% endif %}">
-                    {% if u.letter_status == 'submitted' %}Отправлено
-                    {% elif u.letter_status == 'draft' %}Черновик
-                    {% else %}—{% endif %}
-                  </span>
-                                    {% else %}
-                                        <span class="text-muted">—</span>
-                                    {% endif %}
-                                </td>
+
+                                <!-- Анкета -->
                                 <td>
                                     {% if u.user_info %}
-
                                         {% if u.user_info.form_status == "draft" %}
-                                            <span class="badge text-bg-secondary">Не отправлена</span>
-
+                                            <span class="badge text-bg-secondary">черновик</span>
                                         {% elif u.user_info.form_status == "submitted" %}
-                                            <span class="badge text-bg-warning">Отправлена</span>
-
+                                            <span class="badge text-bg-warning">отправлена</span>
                                         {% elif u.user_info.form_status == "revision" %}
-                                            <span class="badge text-bg-danger">На дописывание</span>
-
+                                            <span class="badge text-bg-danger">дописать</span>
                                         {% elif u.user_info.form_status == "approved" %}
-                                            <span class="badge text-bg-success">Принята</span>
-
+                                            <span class="badge text-bg-success">принята</span>
                                         {% else %}
-                                            <span class="badge text-bg-light text-dark">
-        {{ u.user_info.get_form_status_display }}
-      </span>
+                                            <span class="badge text-bg-light text-dark">{{ u.user_info.get_form_status_display }}</span>
                                         {% endif %}
-
-                                    {% else %}
-                                        <span class="badge text-bg-secondary">Нет анкеты</span>
-                                    {% endif %}
-
-                                    {% if u.user_info and u.user_info.tutor_summary %}
-                                        <div class="small text-muted mt-1 text-break"
-                                             style="max-width:210px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                                            {{ u.user_info.tutor_summary }}
-                                        </div>
-                                    {% endif %}
-                                </td>
-
-                                <td>
-                                    {% if u.has_video %}
-                                        <span class="badge text-bg-success">есть</span>
                                     {% else %}
                                         <span class="badge text-bg-secondary">нет</span>
                                     {% endif %}
                                 </td>
 
+                                <!-- Тесты -->
                                 <td>
-                                    {% if u.user_info and u.user_info.selection_step %}
-                                        <span class="badge text-bg-light text-dark">
-      {{ u.user_info.get_selection_step_display }}
-    </span>
+                                    {% if u.test_status == "overdue" %}
+                                        <span class="badge text-bg-danger">просрочены</span>
+                                    {% elif u.test_status == "due_soon" %}
+                                        <span class="badge text-bg-warning text-dark">скоро</span>
+                                    {% elif u.test_status == "active" %}
+                                        <span class="badge text-bg-primary">активные</span>
+                                    {% elif u.test_status == "completed" %}
+                                        <span class="badge text-bg-success">завершены</span>
                                     {% else %}
-                                        <span class="text-muted">—</span>
+                                        <span class="badge text-bg-secondary">нет</span>
                                     {% endif %}
 
-                                    {% if u.has_overdue_test %}
-                                        <span class="badge text-bg-danger ms-1">тест просрочен</span>
+                                    {% if u.next_test_due_at %}
+                                        <div class="small text-muted mt-1">до {{ u.next_test_due_at|date:"d.m" }}</div>
                                     {% endif %}
                                 </td>
+
+                                <!-- Мотписьмо -->
+                                <td>
+                                    {% if u.letter_status == "submitted" %}
+                                        <span class="badge text-bg-success">отправлено</span>
+                                    {% elif u.letter_status == "draft" %}
+                                        <span class="badge text-bg-secondary">черновик</span>
+                                    {% elif u.letter_status %}
+                                        <span class="badge text-bg-light text-dark">{{ u.letter_status }}</span>
+                                    {% else %}
+                                        <span class="badge text-bg-secondary">нет</span>
+                                    {% endif %}
+                                </td>
+
+                                <!-- Видео -->
+                                <td>
+                                    {% if u.video_has_file %}
+                                        <span class="badge text-bg-success">загружено</span>
+                                    {% else %}
+                                        <span class="badge text-bg-secondary">нет</span>
+                                    {% endif %}
+                                    {% if u.video_deadline_at %}
+                                        <div class="small text-muted mt-1">до {{ u.video_deadline_at|date:"d.m" }}</div>
+                                    {% endif %}
+                                </td>
+
+                                <!-- Собеседование -->
+                                <td>
+                                    <span class="badge text-bg-light text-dark">—</span>
+                                    {# сюда подключим, когда покажешь модель Interview/InterviewResult #}
+                                </td>
+
+                                <!-- Итог -->
+                                <td>
+                                    {% if u.user_info and u.user_info.selection_step %}
+                                        <span class="badge text-bg-light text-dark">{{ u.user_info.get_selection_step_display }}</span>
+                                    {% else %}
+                                        <span class="badge text-bg-secondary">—</span>
+                                    {% endif %}
+                                </td>
+
                             </tr>
                         {% endfor %}
                         </tbody>
                     </table>
                 </div>
 
-                <!-- Пагинация -->
+                <!-- пагинация (добавил новые параметры в querystring) -->
                 <nav class="mt-3">
                     <ul class="pagination">
                         {% if page_obj.has_previous %}
                             <li class="page-item">
-                                <a class="page-link"
-                                   href="?page={{ page_obj.previous_page_number }}
-        &q={{ q|urlencode }}
-        &school={{ school|urlencode }}
-        &course={{ course|urlencode }}
-        &grade={{ grade|urlencode }}
-        &curator_need={{ curator_need|urlencode }}
-        &step={{ step|urlencode }}
-        &test_deadline={{ test_deadline|urlencode }}">Назад</a>
+                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}
+              &q={{ q|urlencode }}
+              &grade_group={{ grade_group|urlencode }}
+              &profile={{ profile|urlencode }}
+              &step={{ step|urlencode }}
+              &test_deadline={{ test_deadline|urlencode }}
+              &school={{ school|urlencode }}
+              &course={{ course|urlencode }}
+              &curator_need={{ curator_need|urlencode }}
+              &form_status={{ form_status|urlencode }}">Назад</a>
                             </li>
                         {% endif %}
+
                         <li class="page-item disabled">
                             <span class="page-link">Стр. {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span>
                         </li>
+
                         {% if page_obj.has_next %}
                             <li class="page-item">
-                                <a class="page-link"
-                                   href="?page={{ page_obj.next_page_number }}
-        &q={{ q|urlencode }}
-        &school={{ school|urlencode }}
-        &course={{ course|urlencode }}
-        &grade={{ grade|urlencode }}
-        &curator_need={{ curator_need|urlencode }}
-        &step={{ step|urlencode }}
-        &test_deadline={{ test_deadline|urlencode }}">Вперёд</a>
+                                <a class="page-link" href="?page={{ page_obj.next_page_number }}
+              &q={{ q|urlencode }}
+              &grade_group={{ grade_group|urlencode }}
+              &profile={{ profile|urlencode }}
+              &step={{ step|urlencode }}
+              &test_deadline={{ test_deadline|urlencode }}
+              &school={{ school|urlencode }}
+              &course={{ course|urlencode }}
+              &curator_need={{ curator_need|urlencode }}
+&form_status={{ form_status|urlencode }}">Вперёд</a>
                             </li>
                         {% endif %}
                     </ul>

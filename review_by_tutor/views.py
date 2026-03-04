@@ -9,7 +9,7 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.core.mail import send_mail
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.db import transaction
-from django.db.models import Q, Subquery, OuterRef, Count, Exists
+from django.db.models import Q, Subquery, OuterRef, Count, Exists, CharField, Value, When, Case
 from django.http import Http404, FileResponse, JsonResponse
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
@@ -548,20 +548,38 @@ def staff_note_toggle_favorite(request, user_id: int, note_id: int):
 @user_passes_test(_staff_check)
 def staff_users_list(request):
     q = (request.GET.get("q") or "").strip()
+
     school = (request.GET.get("school") or "").strip()
     course = (request.GET.get("course") or "").strip()
-    curator_paid = (request.GET.get("curator_need") or "").strip()
-    grade = (request.GET.get("grade") or "").strip()
 
+    form_status = (request.GET.get("form_status") or "").strip()
+
+    # ✅ новые “человеческие” фильтры
+    grade_group = (request.GET.get("grade_group") or "").strip()      # "9_10" | "other" | ""
+    profile = (request.GET.get("profile") or "").strip()
+
+    curator_need = (request.GET.get("curator_need") or "").strip()
     step = (request.GET.get("step") or "").strip()
-
     test_deadline = (request.GET.get("test_deadline") or "").strip()
 
-    qs = (User.objects
-          .all()
-          .select_related("user_info")
-          )
+    qs = (
+        User.objects
+        .all()
+        .select_related("user_info")
+    )
 
+    profiles = list(UserInfo.InternalStudyProfile.choices or [])
+
+    if profile:
+        qs = qs.filter(user_info__isnull=False, **{f"user_info__internal_study_profile": profile})
+
+    if form_status:
+        if form_status == "no_profile":
+            qs = qs.filter(user_info__isnull=True)
+        else:
+            qs = qs.filter(user_info__isnull=False, user_info__form_status=form_status)
+
+    # --- поиск
     if q:
         qs = qs.filter(
             Q(username__icontains=q) |
@@ -572,95 +590,116 @@ def staff_users_list(request):
             Q(user_info__region__icontains=q)
         )
 
+    # --- фильтры школы/курса (оставляем, но будут в “доп. фильтры”)
     if school:
         qs = qs.filter(course_selections__course__school_id=school)
-
     if course:
         qs = qs.filter(course_selections__course_id=course)
 
-    if grade:
-        qs = qs.filter(user_info__next_year_class_digit=grade)
-
-    if curator_paid == "1":
+    # --- куратор
+    if curator_need == "1":
         qs = qs.filter(course_selections__need_tutor=True)
-    elif curator_paid == "0":
+    elif curator_need == "0":
         qs = qs.filter(course_selections__need_tutor=False)
 
+    # --- этап
     if step:
         qs = qs.filter(user_info__selection_step=step)
 
-    user_tests = TestAssignment.objects.filter(user_id=OuterRef("pk")).exclude(
-        status=TestAssignment.Status.CANCELLED
-    )
+    # --- ✅ класс-группа
+    if grade_group == "9_10":
+        qs = qs.filter(user_info__next_year_class_digit__in=[10, 11])
+    elif grade_group == "other":
+        qs = qs.exclude(user_info__next_year_class_digit__in=[10, 11])
 
-    qs = qs.annotate(
-        has_overdue_test=Exists(
-            TestAssignment.objects.filter(user_id=OuterRef("pk"))
-            .exclude(status=TestAssignment.Status.CANCELLED)
-            .filter(due_at__lt=timezone.now(), completed_at__isnull=True)
-        ),
-    )
+    # --- ✅ профиль-группа
+    # ВАЖНО: тут нужен список “наших профилей”.
+    # Подставь свои значения (например: ["math", "it", "phys"] или что у тебя в поле хранится).
 
-    if test_deadline == "overdue":
-        qs = qs.annotate(
-            has_overdue_test=Exists(
-                user_tests.filter(due_at__lt=timezone.now(), completed_at__isnull=True)
-            )
-        ).filter(has_overdue_test=True)
+    # -------------------------
+    # Статусы по шагам (аннотации)
+    # -------------------------
 
-    elif test_deadline == "due_soon":
-        qs = qs.annotate(
-            has_due_soon_test=Exists(
-                user_tests.filter(due_at__gte=timezone.now(), due_at__lte=timezone.now() + timedelta(days=3), completed_at__isnull=True)
-            )
-        ).filter(has_due_soon_test=True)
+    # анкета (form_status) — уже в user_info
 
-    elif test_deadline == "no_due":
-        qs = qs.annotate(
-            has_no_due_test=Exists(
-                user_tests.filter(due_at__isnull=True)
-            )
-        ).filter(has_no_due_test=True)
-
-    elif test_deadline == "has_due":
-        qs = qs.annotate(
-            has_due_test=Exists(
-                user_tests.filter(due_at__isnull=False)
-            )
-        ).filter(has_due_test=True)
-
-    elif test_deadline == "completed":
-        qs = qs.annotate(
-            has_completed_test=Exists(
-                user_tests.filter(completed_at__isnull=False)
-            )
-        ).filter(has_completed_test=True)
-
-    elif test_deadline == "active":
-        qs = qs.annotate(
-            has_active_test=Exists(
-                user_tests.filter(completed_at__isnull=True)
-            )
-        ).filter(has_active_test=True)
-
-    qs = qs.distinct()
-
+    # мотписьмо (берём статус)
     letter_status_sq = Subquery(
-        MotivationLetter.objects.filter(user_id=OuterRef("pk"))
+        MotivationLetter.objects
+        .filter(user_id=OuterRef("pk"))
         .values("status")[:1]
     )
 
+    # видео: есть ли файл + дедлайн (у тебя deadline_at есть)
+    video_qs = ScholarVideo.objects.filter(user_id=OuterRef("pk"))
+    video_has_file = Exists(video_qs.exclude(file="").exclude(file__isnull=True))
+    video_deadline_sq = Subquery(video_qs.values("deadline_at")[:1])
+
+    # тесты
+    now = timezone.now()
+    user_tests = (
+        TestAssignment.objects
+        .filter(user_id=OuterRef("pk"))
+        .exclude(status=TestAssignment.Status.CANCELLED)
+    )
+
+    has_active_test = Exists(user_tests.filter(completed_at__isnull=True))
+    has_overdue_test = Exists(user_tests.filter(due_at__lt=now, completed_at__isnull=True))
+    has_due_soon_test = Exists(user_tests.filter(due_at__gte=now, due_at__lte=now + timedelta(days=3), completed_at__isnull=True))
+    has_completed_test = Exists(user_tests.filter(completed_at__isnull=False))
+
+    next_test_due_at_sq = Subquery(
+        user_tests
+        .filter(completed_at__isnull=True)
+        .exclude(due_at__isnull=True)
+        .order_by("due_at")
+        .values("due_at")[:1]
+    )
+
+    # “человеческий” статус тестов одной строкой (для таблицы)
+    test_status_sq = Case(
+        When(has_overdue_test=True, then=Value("overdue")),
+        When(has_due_soon_test=True, then=Value("due_soon")),
+        When(has_active_test=True, then=Value("active")),
+        When(has_completed_test=True, then=Value("completed")),
+        default=Value("none"),
+        output_field=CharField(),
+    )
+
     qs = qs.annotate(
+        # документы оставим как маленькую сводку (по желанию можно убрать)
         docs_total=Count("documents", filter=Q(documents__is_deleted=False)),
         docs_pending=Count("documents", filter=Q(documents__is_deleted=False, documents__status="PENDING")),
-        docs_question=Count("documents", filter=Q(documents__is_deleted=False, documents__status="QUESTION")),
-        docs_signed=Count("documents", filter=Q(documents__is_deleted=False, documents__status="SIGNED")),
-        has_profile=Exists(UserInfo.objects.filter(user_id=OuterRef("pk"))),
-        has_video=Exists(ScholarVideo.objects.filter(user_id=OuterRef("pk"))),
-        letter_status=letter_status_sq,
-    ).order_by("last_name", "first_name", "username")
 
-    paginator = Paginator(qs, 20)
+        letter_status=letter_status_sq,
+
+        video_has_file=video_has_file,
+        video_deadline_at=video_deadline_sq,
+
+        has_active_test=has_active_test,
+        has_overdue_test=has_overdue_test,
+        has_due_soon_test=has_due_soon_test,
+        has_completed_test=has_completed_test,
+        next_test_due_at=next_test_due_at_sq,
+        test_status=test_status_sq,
+    )
+
+    # --- фильтр по дедлайнам тестов (используем аннотации, без повторов)
+    if test_deadline == "overdue":
+        qs = qs.filter(has_overdue_test=True)
+    elif test_deadline == "due_soon":
+        qs = qs.filter(has_due_soon_test=True)
+    elif test_deadline == "no_due":
+        qs = qs.filter(has_active_test=True, next_test_due_at__isnull=True)
+    elif test_deadline == "has_due":
+        qs = qs.filter(next_test_due_at__isnull=False)
+    elif test_deadline == "completed":
+        qs = qs.filter(has_completed_test=True)
+    elif test_deadline == "active":
+        qs = qs.filter(has_active_test=True)
+
+    qs = qs.distinct().order_by("-date_joined", "last_name", "first_name", "username")
+
+    paginator = Paginator(qs, 30)  # 20 при 500 заявках больно
     page_obj = paginator.get_page(request.GET.get("page"))
 
     schools = School.objects.all().order_by("name")
@@ -668,8 +707,6 @@ def staff_users_list(request):
     if school:
         courses_qs = courses_qs.filter(school_id=school)
     courses = courses_qs.order_by("title")
-
-    grades = list(range(9, 12))
 
     steps = getattr(UserInfo, "SELECTION_STEP_CHOICES", None) or UserInfo._meta.get_field("selection_step").choices
 
@@ -679,16 +716,21 @@ def staff_users_list(request):
         "q": q,
         "school": school,
         "course": course,
-        "curator_need": curator_paid,
-        "grade": grade,
-        "grades": grades,
         "schools": schools,
         "courses": courses,
 
+        "grade_group": grade_group,
+
+        "curator_need": curator_need,
         "step": step,
         "steps": steps,
 
         "test_deadline": test_deadline,
+
+        "form_status": form_status,
+
+        "profile": profile,
+        "profiles": profiles,
     })
 
 
