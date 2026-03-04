@@ -234,7 +234,7 @@ class InterviewForm(forms.ModelForm):
 class TestAssignmentCreateForm(forms.ModelForm):
     class Meta:
         model = TestAssignment
-        fields = ("template", "user", "title", "external_url", "instructions", "due_at", "status")
+        fields = ("template", "user", "title", "instructions", "due_at", "status")
         widgets = {
             "due_at": forms.DateTimeInput(attrs={"type": "datetime-local"}),
             "instructions": forms.Textarea(attrs={"rows": 3}),
@@ -244,13 +244,13 @@ class TestAssignmentCreateForm(forms.ModelForm):
 class TestAssignmentEditForm(forms.ModelForm):
     class Meta:
         model = TestAssignment
-        fields = ("title", "external_url", "instructions", "due_at", "status")
+        fields = ("title", "instructions", "due_at", "status")
 
 
 class TestResultForm(forms.ModelForm):
     class Meta:
         model = TestAssignment
-        fields = ("result_score", "percentile", "result_text", "passed")
+        fields = ("score_a", "percentile_a", "score_b", "percentile_b", "score_c", "percentile_c", "result_text", "passed")
         widgets = {
             "result_text": forms.Textarea(attrs={"rows": 4}),
             "percentile": forms.NumberInput(attrs={"step": "0.01", "min": "0", "max": "100"}),

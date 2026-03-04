@@ -221,10 +221,14 @@ def staff_scholar_action(request, user_id: int):
         if form.is_valid():
             updated_obj = form.save(commit=False)
             new_step = updated_obj.selection_step
+            send_url = BASE_URL
+            if new_step == "test":
+                send_url += "/form/testing"
+
             updated_obj.save()
             if old_step != new_step:
                 notif = Notification.objects.create(
-                    message=f"Теперь ты на этапе отбора: {uinfo.get_selection_step_display()}, проверь свой кабинет {BASE_URL}",
+                    message=f"Теперь ты на этапе отбора: {uinfo.get_selection_step_display()}, проверь свой кабинет {send_url}",
                     sender=request.user
                 )
                 UserNotification.objects.create(
