@@ -31,7 +31,7 @@ from review_by_tutor.forms import MotivationLetterStaffForm, UserInfoStaffForm, 
     LetterRevisionForm, MotivationLetterRubricReviewStaffForm, LetterDeadlineForm, ScholarVideoDeadlineForm, \
     InterviewResultForm, TestRevisionForm
 from review_by_tutor.models import Interview, TestAssignment, InterviewPreparation, InterviewTemplate, InterviewResult, \
-    TestTemplate
+    TestTemplate, TestingInstruction
 from review_by_tutor.utils.contact_form import handle_send_notification
 from review_by_tutor.utils.selection_stages import require_selection_step
 from scholar_form.models import UserInfo, ScholarVideo, StaffNote
@@ -954,7 +954,7 @@ def testing_list_for_candidate(request):
     items = (TestAssignment.objects
              .filter(user=request.user)
              .order_by("-assigned_at", "-id"))
-    return render(request, "testing.html", {"items": items, "user_obj": request.user, "active": "testing"})
+    return render(request, "testing.html", {"items": items, "user_obj": request.user, "active": "testing", "testing_instruction": TestingInstruction.get_current()})
 
 
 @user_passes_test(_staff_check)
@@ -983,8 +983,13 @@ def testing_create(request):
         if form.is_valid():
             obj = form.save(commit=False)
 
+
             if fixed_user:
                 obj.user = fixed_user
+
+                if fixed_user.user_info.selection_step == UserInfo.SelectionStep.FORM:
+                    fixed_user.user_info.selection_step = UserInfo.SelectionStep.TEST
+                    fixed_user.user_info.save()
 
             obj.assigned_by = request.user
             obj.save()
