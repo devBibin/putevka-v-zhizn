@@ -1,4 +1,5 @@
 {% extends "staff_templates/base_without_sidebar.html" %}
+{% load form_extras %}
 
 {% block title %}Пользователи — модерация{% endblock %}
 
@@ -18,27 +19,85 @@
                        placeholder="Имя, логин, email, телефон, регион">
             </div>
 
-            <!-- ✅ Класс-группа -->
             <div class="col-lg-2">
                 <label class="form-label">Класс</label>
-                <select name="grade_group" class="form-select">
-                    <option value="" {% if not grade_group %}selected{% endif %}>Все</option>
-                    <option value="9_10" {% if grade_group == "9_10" %}selected{% endif %}>9–10</option>
-                    <option value="other" {% if grade_group == "other" %}selected{% endif %}>Иное</option>
-                </select>
+
+                <div class="dropdown w-100">
+                    <button class="btn btn-outline-secondary dropdown-toggle w-100 text-start"
+                            type="button"
+                            data-bs-toggle="dropdown"
+                            id="gradeDropdownBtn">
+                        Классы
+                    </button>
+
+                    <div class="dropdown-menu p-3" style="max-height:200px;overflow:auto;">
+
+                        <div class="form-check">
+                            <input class="form-check-input grade-check"
+                                   type="checkbox"
+                                   name="grade_group"
+                                   value="9"
+                                   {% if "9" in grades_selected %}checked{% endif %}>
+                            <label class="form-check-label">9 класс</label>
+                        </div>
+
+                        <div class="form-check">
+                            <input class="form-check-input grade-check"
+                                   type="checkbox"
+                                   name="grade_group"
+                                   value="10"
+                                   {% if "10" in grades_selected %}checked{% endif %}>
+                            <label class="form-check-label">10 класс</label>
+                        </div>
+
+                        <div class="form-check">
+                            <input class="form-check-input grade-check"
+                                   type="checkbox"
+                                   name="grade_group"
+                                   value="11"
+                                   {% if "11" in grades_selected %}checked{% endif %}>
+                            <label class="form-check-label">11 класс</label>
+                        </div>
+
+                        <div class="form-check">
+                            <input class="form-check-input grade-check"
+                                   type="checkbox"
+                                   name="grade_group"
+                                   value="other"
+                                   {% if "other" in grades_selected %}checked{% endif %}>
+                            <label class="form-check-label">Иное</label>
+                        </div>
+
+                    </div>
+                </div>
             </div>
 
-            <!-- ✅ Профиль-группа -->
             <div class="col-lg-2">
                 <label class="form-label">Профиль</label>
-                <select name="profile" class="form-select">
-                    <option value="" {% if not profile %}selected{% endif %}>Все</option>
-                    {% for value, label in profiles %}
-                        <option value="{{ value }}" {% if profile == value|stringformat:"s" %}selected{% endif %}>
-                            {{ label }}
-                        </option>
-                    {% endfor %}
-                </select>
+
+                <div class="dropdown w-100">
+                    <button class="btn btn-outline-secondary dropdown-toggle w-100 text-start"
+                            type="button"
+                            data-bs-toggle="dropdown"
+                            id="profileDropdownBtn">
+                        Профили
+                    </button>
+
+                    <div class="dropdown-menu p-3" style="max-height:250px;overflow:auto;">
+                        {% for value, label in profiles %}
+                            <div class="form-check">
+                                <input class="form-check-input profile-check"
+                                       type="checkbox"
+                                       name="profile"
+                                       value="{{ value }}"
+                                       {% if value|stringformat:"s" in profiles_selected %}checked{% endif %}>
+                                <label class="form-check-label">
+                                    {{ label }}
+                                </label>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
             </div>
 
             <!-- Этап -->
@@ -163,14 +222,50 @@
                                 <input class="form-check-input" type="checkbox" id="checkAllOnPage"
                                        title="Выбрать все на странице">
                             </th>
-                            <th style="min-width:260px;">Пользователь</th>
-                            <th style="min-width:120px;">Регистрация</th>
-                            <th>Анкета</th>
-                            <th>Тесты</th>
-                            <th>МП</th>
-                            <th>Видео</th>
+
+                            <th style="min-width:260px;">
+                                <a class="text-decoration-none text-dark d-block" href="{% sort_url 'user' %}">
+                                    Пользователь {% sort_icon 'user' %}
+                                </a>
+                            </th>
+
+                            <th style="min-width:120px;">
+                                <a class="text-decoration-none text-dark d-block" href="{% sort_url 'date_joined' %}">
+                                    Регистрация {% sort_icon 'date_joined' %}
+                                </a>
+                            </th>
+
+                            <th>
+                                <a class="text-decoration-none text-dark d-block" href="{% sort_url 'form' %}">
+                                    Анкета {% sort_icon 'form' %}
+                                </a>
+                            </th>
+
+                            <th>
+                                <a class="text-decoration-none text-dark d-block" href="{% sort_url 'tests' %}">
+                                    Тесты {% sort_icon 'tests' %}
+                                </a>
+                            </th>
+
+                            <th>
+                                <a class="text-decoration-none text-dark d-block" href="{% sort_url 'letter' %}">
+                                    МП {% sort_icon 'letter' %}
+                                </a>
+                            </th>
+
+                            <th>
+                                <a class="text-decoration-none text-dark d-block" href="{% sort_url 'video' %}">
+                                    Видео {% sort_icon 'video' %}
+                                </a>
+                            </th>
+
                             <th>Собес</th>
-                            <th>Итог</th>
+
+                            <th>
+                                <a class="text-decoration-none text-dark d-block" href="{% sort_url 'result' %}">
+                                    Итог {% sort_icon 'result' %}
+                                </a>
+                            </th>
                         </tr>
                         </thead>
 
@@ -186,7 +281,11 @@
                                     <div class="fw-semibold">
                                         <a href="{% url 'staff_scholar_dossier' u.id %}"
                                            class="link-dark text-decoration-none">
-                                            {{ u.get_full_name|default:u.username }}
+                                            {% if u.last_name or u.first_name %}
+                                                {{ u.last_name }} {{ u.first_name }}
+                                            {% else %}
+                                                {{ u.username }}
+                                            {% endif %}
                                         </a>
                                     </div>
                                     <div class="small text-muted">
@@ -225,36 +324,50 @@
 
                                 <!-- Анкета -->
                                 <td>
-                                    {% if u.user_info %}
-                                        {% if u.user_info.form_status == "draft" %}
-                                            <span class="badge text-bg-secondary">черновик</span>
-                                        {% elif u.user_info.form_status == "submitted" %}
-                                            <span class="badge text-bg-warning">отправлена</span>
-                                        {% elif u.user_info.form_status == "revision" %}
-                                            <span class="badge text-bg-danger">дописать</span>
-                                        {% elif u.user_info.form_status == "approved" %}
-                                            <span class="badge text-bg-success">принята</span>
+                                    <a href="{% url 'staff_profile_detail' u.id %}"
+                                       class="text-decoration-none">
+                                        {% if u.user_info %}
+                                            {% if u.user_info.form_status == "draft" %}
+                                                <span class="badge text-bg-secondary">черновик</span>
+                                            {% elif u.user_info.form_status == "submitted" %}
+                                                <span class="badge text-bg-warning">отправлена</span>
+                                            {% elif u.user_info.form_status == "revision" %}
+                                                <span class="badge text-bg-danger">дописать</span>
+                                            {% elif u.user_info.form_status == "approved" %}
+                                                <span class="badge text-bg-success">принята</span>
+                                            {% else %}
+                                                <span class="badge text-bg-light text-dark">
+                    {{ u.user_info.get_form_status_display }}
+                </span>
+                                            {% endif %}
                                         {% else %}
-                                            <span class="badge text-bg-light text-dark">{{ u.user_info.get_form_status_display }}</span>
+                                            <span class="badge text-bg-secondary">нет</span>
                                         {% endif %}
-                                    {% else %}
-                                        <span class="badge text-bg-secondary">нет</span>
+                                    </a>
+
+                                    {% if u.user_info and u.user_info.tutor_summary %}
+                                        <div class="small text-muted mt-1">
+                                            {{ u.user_info.tutor_summary|truncatechars:20 }}
+                                        </div>
                                     {% endif %}
                                 </td>
 
                                 <!-- Тесты -->
                                 <td>
-                                    {% if u.test_status == "overdue" %}
-                                        <span class="badge text-bg-danger">просрочены</span>
-                                    {% elif u.test_status == "due_soon" %}
-                                        <span class="badge text-bg-warning text-dark">скоро</span>
-                                    {% elif u.test_status == "active" %}
-                                        <span class="badge text-bg-primary">активные</span>
-                                    {% elif u.test_status == "completed" %}
-                                        <span class="badge text-bg-success">завершены</span>
-                                    {% else %}
-                                        <span class="badge text-bg-secondary">нет</span>
-                                    {% endif %}
+                                    <a href="{% url 'staff_testing_list_for_user' u.id %}"
+                                       class="text-decoration-none">
+                                        {% if u.test_status == "overdue" %}
+                                            <span class="badge text-bg-danger">просрочены</span>
+                                        {% elif u.test_status == "due_soon" %}
+                                            <span class="badge text-bg-warning text-dark">скоро</span>
+                                        {% elif u.test_status == "active" %}
+                                            <span class="badge text-bg-primary">активные</span>
+                                        {% elif u.test_status == "completed" %}
+                                            <span class="badge text-bg-success">завершены</span>
+                                        {% else %}
+                                            <span class="badge text-bg-secondary">нет</span>
+                                        {% endif %}
+                                    </a>
 
                                     {% if u.next_test_due_at %}
                                         <div class="small text-muted mt-1">до {{ u.next_test_due_at|date:"d.m" }}</div>
@@ -263,24 +376,31 @@
 
                                 <!-- Мотписьмо -->
                                 <td>
-                                    {% if u.letter_status == "submitted" %}
-                                        <span class="badge text-bg-success">отправлено</span>
-                                    {% elif u.letter_status == "draft" %}
-                                        <span class="badge text-bg-secondary">черновик</span>
-                                    {% elif u.letter_status %}
-                                        <span class="badge text-bg-light text-dark">{{ u.letter_status }}</span>
-                                    {% else %}
-                                        <span class="badge text-bg-secondary">нет</span>
-                                    {% endif %}
+                                    <a href="{% url 'staff_letter_detail' u.id %}#ml"
+                                       class="text-decoration-none">
+                                        {% if u.letter_status == "submitted" %}
+                                            <span class="badge text-bg-success">отправлено</span>
+                                        {% elif u.letter_status == "draft" %}
+                                            <span class="badge text-bg-secondary">черновик</span>
+                                        {% elif u.letter_status %}
+                                            <span class="badge text-bg-light text-dark">{{ u.letter_status }}</span>
+                                        {% else %}
+                                            <span class="badge text-bg-secondary">нет</span>
+                                        {% endif %}
+                                    </a>
                                 </td>
 
                                 <!-- Видео -->
                                 <td>
-                                    {% if u.video_has_file %}
-                                        <span class="badge text-bg-success">загружено</span>
-                                    {% else %}
-                                        <span class="badge text-bg-secondary">нет</span>
-                                    {% endif %}
+                                    <a href="{% url 'staff_video_detail' u.id %}"
+                                       class="text-decoration-none">
+                                        {% if u.video_has_file %}
+                                            <span class="badge text-bg-success">загружено</span>
+                                        {% else %}
+                                            <span class="badge text-bg-secondary">нет</span>
+                                        {% endif %}
+                                    </a>
+
                                     {% if u.video_deadline_at %}
                                         <div class="small text-muted mt-1">до {{ u.video_deadline_at|date:"d.m" }}</div>
                                     {% endif %}
@@ -288,8 +408,10 @@
 
                                 <!-- Собеседование -->
                                 <td>
-                                    <span class="badge text-bg-light text-dark">—</span>
-                                    {# сюда подключим, когда покажешь модель Interview/InterviewResult #}
+                                    <a href="{% url 'interview_detail' u.id %}"
+                                       class="text-decoration-none">
+                                        <span class="badge text-bg-light text-dark">—</span>
+                                    </a>
                                 </td>
 
                                 <!-- Итог -->
@@ -312,16 +434,9 @@
                     <ul class="pagination">
                         {% if page_obj.has_previous %}
                             <li class="page-item">
-                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}
-              &q={{ q|urlencode }}
-              &grade_group={{ grade_group|urlencode }}
-              &profile={{ profile|urlencode }}
-              &step={{ step|urlencode }}
-              &test_deadline={{ test_deadline|urlencode }}
-              &school={{ school|urlencode }}
-              &course={{ course|urlencode }}
-              &curator_need={{ curator_need|urlencode }}
-              &form_status={{ form_status|urlencode }}">Назад</a>
+                                <a class="page-link" href="{% page_url page_obj.previous_page_number %}">
+                                    Назад
+                                </a>
                             </li>
                         {% endif %}
 
@@ -331,16 +446,9 @@
 
                         {% if page_obj.has_next %}
                             <li class="page-item">
-                                <a class="page-link" href="?page={{ page_obj.next_page_number }}
-              &q={{ q|urlencode }}
-              &grade_group={{ grade_group|urlencode }}
-              &profile={{ profile|urlencode }}
-              &step={{ step|urlencode }}
-              &test_deadline={{ test_deadline|urlencode }}
-              &school={{ school|urlencode }}
-              &course={{ course|urlencode }}
-              &curator_need={{ curator_need|urlencode }}
-&form_status={{ form_status|urlencode }}">Вперёд</a>
+                                <a class="page-link" href="{% page_url page_obj.next_page_number %}">
+                                    Вперёд
+                                </a>
                             </li>
                         {% endif %}
                     </ul>
@@ -600,7 +708,59 @@
                     }
 
                     restoreChecksOnPage();
-                })()
+                })();
+
+                (function () {
+
+                    const btn = document.getElementById("gradeDropdownBtn");
+                    const checks = document.querySelectorAll(".grade-check");
+
+                    function updateLabel() {
+                        const selected = Array.from(checks)
+                            .filter(c => c.checked)
+                            .map(c => c.nextElementSibling.textContent.trim());
+
+                        if (selected.length === 0) {
+                            btn.textContent = "Классы";
+                        } else {
+                            btn.textContent = selected.join(", ");
+                        }
+                    }
+
+                    checks.forEach(c => {
+                        c.addEventListener("change", updateLabel);
+                    });
+
+                    updateLabel();
+
+                })();
+
+                (function () {
+
+                    const btn = document.getElementById("profileDropdownBtn");
+                    const checks = document.querySelectorAll(".profile-check");
+
+                    function updateLabel() {
+                        const selected = Array.from(checks)
+                            .filter(c => c.checked)
+                            .map(c => c.nextElementSibling.textContent.trim());
+
+                        if (selected.length === 0) {
+                            btn.textContent = "Профили";
+                        } else if (selected.length <= 2) {
+                            btn.textContent = selected.join(", ");
+                        } else {
+                            btn.textContent = "Выбрано: " + selected.length;
+                        }
+                    }
+
+                    checks.forEach(c => {
+                        c.addEventListener("change", updateLabel);
+                    });
+
+                    updateLabel();
+
+                })();
             </script>
 
         {% else %}
