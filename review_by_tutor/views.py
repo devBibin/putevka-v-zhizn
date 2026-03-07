@@ -9,7 +9,7 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.core.mail import send_mail
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.db import transaction
-from django.db.models import Q, Subquery, OuterRef, Count, Exists, CharField, Value, When, Case
+from django.db.models import Q, Subquery, OuterRef, Count, Exists, CharField, Value, When, Case, IntegerField
 from django.http import Http404, FileResponse, JsonResponse
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
@@ -561,6 +561,9 @@ def staff_users_list(request):
     step = (request.GET.get("step") or "").strip()
     test_deadline = (request.GET.get("test_deadline") or "").strip()
 
+    sort = (request.GET.get("sort") or "-date_joined").strip()
+    sort_fields = [s.strip() for s in sort.split(",") if s.strip()]
+
     qs = (
         User.objects
         .all()
@@ -615,8 +618,8 @@ def staff_users_list(request):
 
         if include_other:
             grade_q |= (
-                    Q(user_info__isnull=False) &
-                    ~Q(user_info__next_year_class_digit__in=[9, 10, 11])
+                Q(user_info__isnull=False) &
+                ~Q(user_info__next_year_class_digit__in=[9, 10, 11])
             )
 
         qs = qs.filter(grade_q)
@@ -640,7 +643,13 @@ def staff_users_list(request):
 
     has_active_test = Exists(user_tests.filter(completed_at__isnull=True))
     has_overdue_test = Exists(user_tests.filter(due_at__lt=now, completed_at__isnull=True))
-    has_due_soon_test = Exists(user_tests.filter(due_at__gte=now, due_at__lte=now + timedelta(days=3), completed_at__isnull=True))
+    has_due_soon_test = Exists(
+        user_tests.filter(
+            due_at__gte=now,
+            due_at__lte=now + timedelta(days=3),
+            completed_at__isnull=True
+        )
+    )
     has_completed_test = Exists(user_tests.filter(completed_at__isnull=False))
 
     next_test_due_at_sq = Subquery(
@@ -660,6 +669,49 @@ def staff_users_list(request):
         output_field=CharField(),
     )
 
+    # Числовые веса для сортировки статусов
+    form_status_order = Case(
+        When(user_info__isnull=True, then=Value(0)),
+        When(user_info__form_status="draft", then=Value(1)),
+        When(user_info__form_status="submitted", then=Value(2)),
+        When(user_info__form_status="revision", then=Value(3)),
+        When(user_info__form_status="approved", then=Value(4)),
+        default=Value(99),
+        output_field=IntegerField(),
+    )
+
+    test_status_order = Case(
+        When(has_overdue_test=True, then=Value(1)),
+        When(has_due_soon_test=True, then=Value(2)),
+        When(has_active_test=True, then=Value(3)),
+        When(has_completed_test=True, then=Value(4)),
+        default=Value(5),
+        output_field=IntegerField(),
+    )
+
+    letter_status_order = Case(
+        When(letter_status="draft", then=Value(1)),
+        When(letter_status="submitted", then=Value(2)),
+        default=Value(3),
+        output_field=IntegerField(),
+    )
+
+    video_status_order = Case(
+        When(video_has_file=True, then=Value(1)),
+        default=Value(2),
+        output_field=IntegerField(),
+    )
+
+    selection_step_order = Case(
+        When(user_info__selection_step="form", then=Value(1)),
+        When(user_info__selection_step="test", then=Value(2)),
+        When(user_info__selection_step="ml", then=Value(3)),
+        When(user_info__selection_step="video", then=Value(4)),
+        When(user_info__selection_step="interview_prep", then=Value(5)),
+        default=Value(99),
+        output_field=IntegerField(),
+    )
+
     qs = qs.annotate(
         docs_total=Count("documents", filter=Q(documents__is_deleted=False)),
         docs_pending=Count("documents", filter=Q(documents__is_deleted=False, documents__status="PENDING")),
@@ -675,6 +727,12 @@ def staff_users_list(request):
         has_completed_test=has_completed_test,
         next_test_due_at=next_test_due_at_sq,
         test_status=test_status_sq,
+
+        form_status_order=form_status_order,
+        test_status_order=test_status_order,
+        letter_status_order=letter_status_order,
+        video_status_order=video_status_order,
+        selection_step_order=selection_step_order,
     )
 
     if test_deadline == "overdue":
@@ -690,7 +748,42 @@ def staff_users_list(request):
     elif test_deadline == "active":
         qs = qs.filter(has_active_test=True)
 
-    qs = qs.distinct().order_by("-date_joined", "last_name", "first_name", "username")
+    SORT_MAP = {
+        "user": ["last_name", "first_name", "username"],
+        "-user": ["-last_name", "-first_name", "-username"],
+
+        "date_joined": ["date_joined", "last_name", "first_name", "username"],
+        "-date_joined": ["-date_joined", "last_name", "first_name", "username"],
+
+        "form": ["form_status_order", "last_name", "first_name", "username"],
+        "-form": ["-form_status_order", "last_name", "first_name", "username"],
+
+        "tests": ["test_status_order", "next_test_due_at", "last_name", "first_name", "username"],
+        "-tests": ["-test_status_order", "-next_test_due_at", "last_name", "first_name", "username"],
+
+        "letter": ["letter_status_order", "last_name", "first_name", "username"],
+        "-letter": ["-letter_status_order", "last_name", "first_name", "username"],
+
+        "video": ["video_status_order", "video_deadline_at", "last_name", "first_name", "username"],
+        "-video": ["-video_status_order", "-video_deadline_at", "last_name", "first_name", "username"],
+
+        "result": ["selection_step_order", "last_name", "first_name", "username"],
+        "-result": ["-selection_step_order", "last_name", "first_name", "username"],
+    }
+
+    order_by_fields = []
+    seen = set()
+
+    for key in sort_fields:
+        for field in SORT_MAP.get(key, []):
+            if field not in seen:
+                order_by_fields.append(field)
+                seen.add(field)
+
+    if not order_by_fields:
+        order_by_fields = ["-date_joined", "last_name", "first_name", "username"]
+
+    qs = qs.distinct().order_by(*order_by_fields)
 
     paginator = Paginator(qs, 30)
     page_obj = paginator.get_page(request.GET.get("page"))
@@ -724,6 +817,8 @@ def staff_users_list(request):
 
         "profiles_selected": profiles_selected,
         "profiles": profiles,
+
+        "sort": sort,
     })
 
 
