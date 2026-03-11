@@ -1,0 +1,298 @@
+from datetime import timedelta
+
+from django.contrib.auth import get_user_model
+from django.core.paginator import Paginator
+from django.db.models import (
+    Q, Count, OuterRef, Subquery, Exists,
+    Case, When, Value,
+    CharField, IntegerField,
+)
+from django.utils import timezone
+
+from core.models import MotivationLetter
+from review_by_tutor.models import TestAssignment
+from scholar_form.models import ScholarVideo
+
+User = get_user_model()
+
+
+def build_staff_users_queryset(request):
+    q = (request.GET.get("q") or "").strip()
+
+    school = (request.GET.get("school") or "").strip()
+    course = (request.GET.get("course") or "").strip()
+
+    form_status = (request.GET.get("form_status") or "").strip()
+
+    profiles_selected = [x.strip() for x in request.GET.getlist("profile") if x.strip()]
+    grades_selected = [x.strip() for x in request.GET.getlist("grade_group") if x.strip()]
+
+    curator_need = (request.GET.get("curator_need") or "").strip()
+    step = (request.GET.get("step") or "").strip()
+    test_deadline = (request.GET.get("test_deadline") or "").strip()
+
+    sort = (request.GET.get("sort") or "-date_joined").strip()
+    sort_fields = [s.strip() for s in sort.split(",") if s.strip()]
+
+    qs = (
+        User.objects
+        .all()
+        .select_related(
+            "user_info",
+            "telegram_account",
+            "motivation_letter",
+            "scholar_video",
+        )
+        .prefetch_related(
+            "user_info__planned_exams",
+            "test_assignments",
+        )
+    )
+
+    if profiles_selected:
+        qs = qs.filter(
+            user_info__isnull=False,
+            user_info__internal_study_profile__in=profiles_selected
+        )
+
+    if form_status:
+        if form_status == "no_profile":
+            qs = qs.filter(user_info__isnull=True)
+        else:
+            qs = qs.filter(
+                user_info__isnull=False,
+                user_info__form_status=form_status
+            )
+
+    if q:
+        qs = qs.filter(
+            Q(username__icontains=q) |
+            Q(email__icontains=q) |
+            Q(first_name__icontains=q) |
+            Q(last_name__icontains=q) |
+            Q(user_info__phone__icontains=q) |
+            Q(user_info__region__icontains=q)
+        )
+
+    if school:
+        qs = qs.filter(course_selections__course__school_id=school)
+
+    if course:
+        qs = qs.filter(course_selections__course_id=course)
+
+    if curator_need == "1":
+        qs = qs.filter(course_selections__need_tutor=True)
+    elif curator_need == "0":
+        qs = qs.filter(course_selections__need_tutor=False)
+
+    if step:
+        qs = qs.filter(user_info__selection_step=step)
+
+    if grades_selected:
+        grade_q = Q()
+
+        numeric_grades = [int(g) for g in grades_selected if g in {"9", "10", "11"}]
+        include_other = "other" in grades_selected
+
+        if numeric_grades:
+            grade_q |= Q(user_info__next_year_class_digit__in=numeric_grades)
+
+        if include_other:
+            grade_q |= (
+                Q(user_info__isnull=False) &
+                ~Q(user_info__next_year_class_digit__in=[9, 10, 11])
+            )
+
+        qs = qs.filter(grade_q)
+
+    letter_status_sq = Subquery(
+        MotivationLetter.objects
+        .filter(user_id=OuterRef("pk"))
+        .values("status")[:1]
+    )
+
+    video_qs = ScholarVideo.objects.filter(user_id=OuterRef("pk"))
+    video_has_file = Exists(video_qs.exclude(file="").exclude(file__isnull=True))
+    video_deadline_sq = Subquery(video_qs.values("deadline_at")[:1])
+
+    now = timezone.now()
+    user_tests = (
+        TestAssignment.objects
+        .filter(user_id=OuterRef("pk"))
+        .exclude(status=TestAssignment.Status.CANCELLED)
+    )
+
+    has_active_test = Exists(user_tests.filter(completed_at__isnull=True))
+    has_overdue_test = Exists(user_tests.filter(due_at__lt=now, completed_at__isnull=True))
+    has_due_soon_test = Exists(
+        user_tests.filter(
+            due_at__gte=now,
+            due_at__lte=now + timedelta(days=3),
+            completed_at__isnull=True
+        )
+    )
+    has_completed_test = Exists(user_tests.filter(completed_at__isnull=False))
+
+    next_test_due_at_sq = Subquery(
+        user_tests
+        .filter(completed_at__isnull=True)
+        .exclude(due_at__isnull=True)
+        .order_by("due_at")
+        .values("due_at")[:1]
+    )
+
+    test_status_sq = Case(
+        When(has_overdue_test=True, then=Value("overdue")),
+        When(has_due_soon_test=True, then=Value("due_soon")),
+        When(has_active_test=True, then=Value("active")),
+        When(has_completed_test=True, then=Value("completed")),
+        default=Value("none"),
+        output_field=CharField(),
+    )
+
+    form_status_order = Case(
+        When(user_info__isnull=True, then=Value(0)),
+        When(user_info__form_status="draft", then=Value(1)),
+        When(user_info__form_status="submitted", then=Value(2)),
+        When(user_info__form_status="revision", then=Value(3)),
+        When(user_info__form_status="approved", then=Value(4)),
+        default=Value(99),
+        output_field=IntegerField(),
+    )
+
+    test_status_order = Case(
+        When(has_overdue_test=True, then=Value(1)),
+        When(has_due_soon_test=True, then=Value(2)),
+        When(has_active_test=True, then=Value(3)),
+        When(has_completed_test=True, then=Value(4)),
+        default=Value(5),
+        output_field=IntegerField(),
+    )
+
+    letter_status_order = Case(
+        When(letter_status="draft", then=Value(1)),
+        When(letter_status="submitted", then=Value(2)),
+        default=Value(3),
+        output_field=IntegerField(),
+    )
+
+    video_status_order = Case(
+        When(video_has_file=True, then=Value(1)),
+        default=Value(2),
+        output_field=IntegerField(),
+    )
+
+    selection_step_order = Case(
+        When(user_info__selection_step="form", then=Value(1)),
+        When(user_info__selection_step="test", then=Value(2)),
+        When(user_info__selection_step="ml", then=Value(3)),
+        When(user_info__selection_step="video", then=Value(4)),
+        When(user_info__selection_step="interview_prep", then=Value(5)),
+        default=Value(99),
+        output_field=IntegerField(),
+    )
+
+    qs = qs.annotate(
+        docs_total=Count(
+            "documents",
+            filter=Q(documents__is_deleted=False)
+        ),
+        docs_pending=Count(
+            "documents",
+            filter=Q(documents__is_deleted=False, documents__status="PENDING")
+        ),
+
+        letter_status=letter_status_sq,
+
+        video_has_file=video_has_file,
+        video_deadline_at=video_deadline_sq,
+
+        has_active_test=has_active_test,
+        has_overdue_test=has_overdue_test,
+        has_due_soon_test=has_due_soon_test,
+        has_completed_test=has_completed_test,
+        next_test_due_at=next_test_due_at_sq,
+        test_status=test_status_sq,
+
+        form_status_order=form_status_order,
+        test_status_order=test_status_order,
+        letter_status_order=letter_status_order,
+        video_status_order=video_status_order,
+        selection_step_order=selection_step_order,
+    )
+
+    if test_deadline == "overdue":
+        qs = qs.filter(has_overdue_test=True)
+    elif test_deadline == "due_soon":
+        qs = qs.filter(has_due_soon_test=True)
+    elif test_deadline == "no_due":
+        qs = qs.filter(has_active_test=True, next_test_due_at__isnull=True)
+    elif test_deadline == "has_due":
+        qs = qs.filter(next_test_due_at__isnull=False)
+    elif test_deadline == "completed":
+        qs = qs.filter(has_completed_test=True)
+    elif test_deadline == "active":
+        qs = qs.filter(has_active_test=True)
+
+    SORT_MAP = {
+        "user": ["last_name", "first_name", "username"],
+        "-user": ["-last_name", "-first_name", "-username"],
+
+        "date_joined": ["date_joined", "last_name", "first_name", "username"],
+        "-date_joined": ["-date_joined", "last_name", "first_name", "username"],
+
+        "form": ["form_status_order", "last_name", "first_name", "username"],
+        "-form": ["-form_status_order", "last_name", "first_name", "username"],
+
+        "tests": ["test_status_order", "next_test_due_at", "last_name", "first_name", "username"],
+        "-tests": ["-test_status_order", "-next_test_due_at", "last_name", "first_name", "username"],
+
+        "letter": ["letter_status_order", "last_name", "first_name", "username"],
+        "-letter": ["-letter_status_order", "last_name", "first_name", "username"],
+
+        "video": ["video_status_order", "video_deadline_at", "last_name", "first_name", "username"],
+        "-video": ["-video_status_order", "-video_deadline_at", "last_name", "first_name", "username"],
+
+        "result": ["selection_step_order", "last_name", "first_name", "username"],
+        "-result": ["-selection_step_order", "last_name", "first_name", "username"],
+    }
+
+    order_by_fields = []
+    seen = set()
+
+    for key in sort_fields:
+        for field in SORT_MAP.get(key, []):
+            if field not in seen:
+                order_by_fields.append(field)
+                seen.add(field)
+
+    if not order_by_fields:
+        order_by_fields = ["-date_joined", "last_name", "first_name", "username"]
+
+    return qs.distinct().order_by(*order_by_fields)
+
+
+def get_staff_users_filters(request):
+    q = (request.GET.get("q") or "").strip()
+    school = (request.GET.get("school") or "").strip()
+    course = (request.GET.get("course") or "").strip()
+    form_status = (request.GET.get("form_status") or "").strip()
+    profiles_selected = [x.strip() for x in request.GET.getlist("profile") if x.strip()]
+    grades_selected = [x.strip() for x in request.GET.getlist("grade_group") if x.strip()]
+    curator_need = (request.GET.get("curator_need") or "").strip()
+    step = (request.GET.get("step") or "").strip()
+    test_deadline = (request.GET.get("test_deadline") or "").strip()
+    sort = (request.GET.get("sort") or "-date_joined").strip()
+
+    return {
+        "q": q,
+        "school": school,
+        "course": course,
+        "form_status": form_status,
+        "profiles_selected": profiles_selected,
+        "grades_selected": grades_selected,
+        "curator_need": curator_need,
+        "step": step,
+        "test_deadline": test_deadline,
+        "sort": sort,
+    }

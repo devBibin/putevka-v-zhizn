@@ -7,6 +7,12 @@
     <div class="container py-4">
         <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
             <h1 class="mb-0 me-auto">Пользователи</h1>
+
+            <a href="{% url 'staff_users_export_xlsx' %}?{{ request.GET.urlencode }}"
+               class="btn btn-success">
+                Выгрузить Excel
+            </a>
+
             <span class="text-muted small">Всего на странице: {{ page_obj.object_list|length }} · Стр. {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
         </div>
 
@@ -190,6 +196,8 @@
                 <button class="btn btn-primary">Применить</button>
                 <a class="btn btn-outline-secondary" href="{% url 'staff_users_list' %}">Сбросить</a>
             </div>
+
+
         </form>
 
         {% if page_obj.object_list %}
