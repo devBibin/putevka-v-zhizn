@@ -292,26 +292,38 @@ class ScholarVideoDeadlineForm(forms.ModelForm):
 class MotivationLetterRubricReviewStaffForm(forms.ModelForm):
     class Meta:
         model = MotivationLetterRubricReview
+
         fields = [
-            # computed/meta
+            # meta
             "total_score",
+            "char_count",
             "word_count",
 
-            # content
-            "specialty_choice",
-            "university_choice",
-            "current_preparation",
-            "next_year_plan",
-            "higher_ed_value",
-            "support_criticality",
+            # content scores
+            "specialty_choice_score",
+            "university_choice_score",
+            "current_preparation_score",
+            "admission_trajectory_score",
+            "next_year_preparation_score",
+            "higher_education_value_score",
+            "support_criticality_score",
 
-            # rhetoric
-            "composition",
-            "style_precision",
+            # rhetoric penalties
+            "composition_penalty",
+            "style_penalty",
 
-            # literacy
-            "orthography",
-            "syntax",
+            # literacy penalties
+            "orthography_penalty",
+            "syntax_penalty",
+
+            # flags
+            "is_too_short",
+            "score_capped_for_short_length",
+            "suspected_ai_generated",
+            "returned_for_revision",
+
+            # comment
+            "reviewer_comment",
 
             # extractions
             "family",
@@ -328,11 +340,14 @@ class MotivationLetterRubricReviewStaffForm(forms.ModelForm):
             "help_criticality",
             "extra",
 
-            # justification
+            # explanation
             "justification",
         ]
+
         widgets = {
+            "reviewer_comment": forms.Textarea(attrs={"rows": 4}),
             "justification": forms.Textarea(attrs={"rows": 6}),
+
             "family": forms.Textarea(attrs={"rows": 2}),
             "hobbies": forms.Textarea(attrs={"rows": 2}),
             "achievements": forms.Textarea(attrs={"rows": 2}),
