@@ -26,6 +26,21 @@
             </div>
 
             <div class="col-lg-2">
+                <label class="form-label d-block">Персонал</label>
+                <div class="form-check mt-2">
+                    <input class="form-check-input"
+                           type="checkbox"
+                           name="show_staff"
+                           value="1"
+                           id="showStaffCheckbox"
+                           {% if show_staff == "1" %}checked{% endif %}>
+                    <label class="form-check-label" for="showStaffCheckbox">
+                        Показывать персонал
+                    </label>
+                </div>
+            </div>
+
+            <div class="col-lg-2">
                 <label class="form-label">Класс</label>
 
                 <div class="dropdown w-100">
@@ -301,6 +316,10 @@
                                             {{ u.user_info.phone }}{% endif %}
                                     </div>
                                     <div class="mt-1">
+                                        {% if u.is_staff %}
+                                            <span class="badge text-bg-primary">Персонал</span>
+                                        {% endif %}
+
                                         {% if u.is_active %}
                                             {% if u.user_info.status == "CANDIDATE" %}
                                                 <span class="badge text-bg-warning">Кандидат</span>

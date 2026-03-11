@@ -19,6 +19,8 @@ User = get_user_model()
 def build_staff_users_queryset(request):
     q = (request.GET.get("q") or "").strip()
 
+    show_staff = (request.GET.get("show_staff") or "").strip()
+
     school = (request.GET.get("school") or "").strip()
     course = (request.GET.get("course") or "").strip()
 
@@ -48,6 +50,9 @@ def build_staff_users_queryset(request):
             "test_assignments",
         )
     )
+
+    if show_staff != "1":
+        qs = qs.filter(is_staff=False)
 
     if profiles_selected:
         qs = qs.filter(
@@ -274,6 +279,7 @@ def build_staff_users_queryset(request):
 
 def get_staff_users_filters(request):
     q = (request.GET.get("q") or "").strip()
+    show_staff = (request.GET.get("show_staff") or "").strip()
     school = (request.GET.get("school") or "").strip()
     course = (request.GET.get("course") or "").strip()
     form_status = (request.GET.get("form_status") or "").strip()
@@ -295,4 +301,5 @@ def get_staff_users_filters(request):
         "step": step,
         "test_deadline": test_deadline,
         "sort": sort,
+        "show_staff": show_staff
     }
