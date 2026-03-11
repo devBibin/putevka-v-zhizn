@@ -64,43 +64,43 @@ def remember_old_rating(sender, instance, **kwargs):
         instance._old_rating = type(instance).objects.filter(pk=instance.pk)\
                               .values_list('admin_rating', flat=True).first()
 
-@receiver(post_save, sender=MotivationLetter)
-def notify_on_rating_change(sender, instance, created, **kwargs):
-    old_rating = getattr(instance, "_old_rating", None)
-    new_rating = getattr(instance, "admin_rating", None)
-    rating_changed = (old_rating is None and new_rating is not None) or (old_rating != new_rating)
-
-    if created or not rating_changed:
-        return
-
-    user_url = f"{BASE_URL}/motivation/"
-
-    message = build_motivation_rating_message(instance, user_url)
-
-    try:
-        send_tg_notification_to_user(
-            instance.user,
-            message,
-            user_url,
-            button_text="📄 Посмотреть письмо"
-        )
-
-        send_email_to_user(
-            subject="Твоё мотивационное письмо оценено",
-            user=instance.user,
-            text=(
-                "Твоё мотивационное письмо оценено.\n"
-                f"Открыть письмо: {user_url}\n"
-            ),
-            html=(
-                "✅ <b>Твоё мотивационное письмо оценено!</b><br>"
-                f"Открыть письмо: <a href='{user_url}'>перейти к письму</a>"
-            )
-        )
-
-        logger.info(f"TG: уведомление об оценке письма {instance.pk} отправлено пользователю {instance.user}")
-    except Exception as e:
-        logger.warning(e)
+# @receiver(post_save, sender=MotivationLetter)
+# def notify_on_rating_change(sender, instance, created, **kwargs):
+#     old_rating = getattr(instance, "_old_rating", None)
+#     new_rating = getattr(instance, "admin_rating", None)
+#     rating_changed = (old_rating is None and new_rating is not None) or (old_rating != new_rating)
+#
+#     if created or not rating_changed:
+#         return
+#
+#     user_url = f"{BASE_URL}/motivation/"
+#
+#     message = build_motivation_rating_message(instance, user_url)
+#
+#     try:
+#         send_tg_notification_to_user(
+#             instance.user,
+#             message,
+#             user_url,
+#             button_text="📄 Посмотреть письмо"
+#         )
+#
+#         send_email_to_user(
+#             subject="Твоё мотивационное письмо оценено",
+#             user=instance.user,
+#             text=(
+#                 "Твоё мотивационное письмо оценено.\n"
+#                 f"Открыть письмо: {user_url}\n"
+#             ),
+#             html=(
+#                 "✅ <b>Твоё мотивационное письмо оценено!</b><br>"
+#                 f"Открыть письмо: <a href='{user_url}'>перейти к письму</a>"
+#             )
+#         )
+#
+#         logger.info(f"TG: уведомление об оценке письма {instance.pk} отправлено пользователю {instance.user}")
+#     except Exception as e:
+#         logger.warning(e)
 
 
 @receiver(post_save, sender=UserInfo)
@@ -129,7 +129,7 @@ def sync_userinfo_to_personal_data(sender, instance: UserInfo, **kwargs):
 
 def build_motivation_rating_message(letter, user_url: str) -> str:
     return (
-        "✅ <b>Ваше мотивационное письмо оценено!</b>\n"
+        "✅ <b>Твоё мотивационное письмо оценено!</b>\n"
         "👇 Откройте письмо по ссылке ниже\n"
         f"{user_url}"
     )

@@ -101,6 +101,14 @@ def staff_letter_detail(request, user_id: int):
                     "status", "revision_comment", "revision_requested_at",
                     "revision_requested_by", "is_done", "updated_at",
                 ])
+
+                notify_participant(
+                    user,
+                    "Мотивационное письмо отправлено на доработку",
+                    f"Твоё мотивационное письмо нужно доработать.\n\nКомментарий:\n{comment}",
+                    sender=request.user
+                )
+
                 messages.success(request, "Письмо отправлено на дописывание.")
                 return redirect("staff_letter_detail", user_id=user_id)
             else:
@@ -110,6 +118,16 @@ def staff_letter_detail(request, user_id: int):
             if deadline_form.is_valid():
                 letter.deadline_at = deadline_form.cleaned_data["deadline_at"]
                 letter.save(update_fields=["deadline_at"])
+
+                deadline_str = timezone.localtime(letter.deadline_at).strftime("%d.%m.%Y %H:%M")
+
+                notify_participant(
+                    user,
+                    "Установлен дедлайн по мотивационному письму",
+                    f"Для мотивационного письма установлен дедлайн: {deadline_str}.",
+                    sender=request.user
+                )
+
                 messages.success(request, "Дедлайн обновлён")
                 return redirect(request.path)
             else:
@@ -125,6 +143,18 @@ def staff_letter_detail(request, user_id: int):
             if form.is_valid():
                 updated = form.save(commit=False)
                 updated.save()
+
+                letter.status = MotivationLetter.Status.SUBMITTED
+
+                letter.save(update_fields=["status", "updated_at"])
+
+                notify_participant(
+                    user,
+                    "Мотивационное письмо принято",
+                    "Твоё мотивационное письмо проверено и принято.",
+                    sender=request.user
+                )
+
                 messages.success(request, "Оценка/фидбэк сохранены.")
                 return redirect("staff_letter_detail", user_id=user_id)
             else:

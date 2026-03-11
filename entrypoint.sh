@@ -14,8 +14,8 @@ python manage.py migrate
 python manage.py collectstatic --noinput
 
 #тестовые данные
-python manage.py loaddata my_study/fixtures/subjects.json
-python manage.py loaddata my_study/fixtures/schools_courses.json
+#python manage.py loaddata my_study/fixtures/subjects.json
+#python manage.py loaddata my_study/fixtures/schools_courses.json
 
 # Create superuser if it doesn't exist
 echo "
