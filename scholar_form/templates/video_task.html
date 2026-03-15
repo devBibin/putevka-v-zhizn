@@ -1,5 +1,6 @@
 {% extends "core/base.html" %}
 {% load static %}
+
 {% block content %}
     <div class="container py-4">
         <div class="d-flex flex-column gap-2 gap-md-3 mb-3">
@@ -13,17 +14,35 @@
                 </div>
             {% endif %}
 
+            {# Инструкция #}
+            {% if video_instruction and video_instruction.is_active %}
+                <div class="alert alert-info d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
+                    <div>
+                        <strong>{{ video_instruction.title }}</strong><br>
+                        {{ video_instruction.text|linebreaksbr }}
+                    </div>
+
+                    {% if video_instruction.url %}
+                        <a href="{{ video_instruction.url }}"
+                           target="_blank"
+                           rel="noopener"
+                           class="btn btn-primary">
+                            {{ video_instruction.button_text }}
+                        </a>
+                    {% endif %}
+                </div>
+            {% endif %}
+
             {% if video and video.deadline_at %}
                 <div class="alert
-        {% if video.deadline_at < now %}
-            alert-danger
-        {% elif video.deadline_at|timeuntil|slice:":2" == "0 " %}
-            alert-warning
-        {% else %}
-            alert-info
-        {% endif %}
-        mb-0"
-                >
+                    {% if video.deadline_at < now %}
+                        alert-danger
+                    {% elif video.deadline_at|timeuntil|slice:':2' == '0 ' %}
+                        alert-warning
+                    {% else %}
+                        alert-info
+                    {% endif %}
+                    mb-0">
                     <strong>Дедлайн сдачи видеовизитки:</strong>
                     {{ video.deadline_at|date:"d.m.Y H:i" }}
                     <br>
@@ -35,55 +54,104 @@
 
             <div class="row g-3 g-md-4">
                 {% if video %}
-    <div class="col-12 col-lg-6">
-        <div class="card h-100">
-            <div class="card-body">
-                <h5 class="card-title mb-1">Видеовизитка</h5>
-                <p class="text-muted mb-3">Рассказ о себе</p>
+                    <div class="col-12 col-lg-6">
+                        <div class="card h-100">
+                            <div class="card-body">
+                                <h5 class="card-title mb-1">Текущие данные</h5>
+                                <p class="text-muted mb-3">Все, что уже сохранено в системе</p>
 
-                {% if video.file %}
-                    <div class="ratio ratio-16x9 rounded overflow-hidden bg-black">
-                        <video controls preload="metadata" class="w-100 h-100">
-                            <source src="{{ video.file.url }}" type="video/mp4">
-                            <source src="{{ video.file.url }}" type="video/webm">
-                            Ваш браузер не поддерживает видео.
-                        </video>
-                    </div>
+                                <div class="mb-4">
+                                    <h6 class="mb-2">Видеовизитка</h6>
 
-                    <p class="text-muted mt-2 small">
-                        Обновлено: {{ video.updated_at|date:"d.m.Y H:i" }}
-                    </p>
+                                    {% if video.file %}
+                                        <div class="ratio ratio-16x9 rounded overflow-hidden bg-black">
+                                            <video controls preload="metadata" class="w-100 h-100">
+                                                <source src="{{ video.file.url }}" type="video/mp4">
+                                                <source src="{{ video.file.url }}" type="video/webm">
+                                                Ваш браузер не поддерживает видео.
+                                            </video>
+                                        </div>
 
-                    <div class="d-grid d-md-inline-flex gap-2 mt-2">
-                        <a class="btn btn-outline-secondary"
-                           href="{{ video.file.url }}" download>
-                            Скачать текущий файл
-                        </a>
-                    </div>
+                                        <p class="text-muted mt-2 small mb-2">
+                                            Обновлено: {{ video.updated_at|date:"d.m.Y H:i" }}
+                                        </p>
 
-                {% else %}
-                    <div class="alert alert-warning mb-0">
-                        Файл ещё не загружен.
+                                        <div class="d-grid d-md-inline-flex gap-2">
+                                            <a class="btn btn-outline-secondary"
+                                               href="{{ video.file.url }}"
+                                               download>
+                                                Скачать текущее видео
+                                            </a>
+                                        </div>
+                                    {% else %}
+                                        <div class="alert alert-warning mb-0">
+                                            Видео ещё не загружено.
+                                        </div>
+                                    {% endif %}
+                                </div>
+
+                                <div class="mb-4">
+                                    <h6 class="mb-2">График занятий</h6>
+
+                                    {% if video.schedule_file %}
+                                        <div class="d-grid d-sm-inline-flex gap-2">
+                                            <a class="btn btn-outline-secondary"
+                                               href="{{ video.schedule_file.url }}"
+                                               download>
+                                                Скачать файл графика
+                                            </a>
+                                        </div>
+                                    {% else %}
+                                        <div class="alert alert-warning mb-0">
+                                            Файл с графиком ещё не загружен.
+                                        </div>
+                                    {% endif %}
+                                </div>
+
+                                <div>
+                                    <h6 class="mb-2">Онлайн-школа и курс</h6>
+
+                                    {% if video.online_school_course %}
+                                        <div class="border rounded p-3 bg-light" style="white-space: pre-line;">
+                                            {{ video.online_school_course }}
+                                        </div>
+                                    {% else %}
+                                        <div class="alert alert-warning mb-0">
+                                            Информация об онлайн-школе и курсе ещё не указана.
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 {% endif %}
-            </div>
-        </div>
-    </div>
-{% endif %}
-
 
                 <div class="col-12 {% if video %}col-lg-6{% else %}col-lg-8 col-xl-7{% endif %}">
                     <form id="video-form" method="post" enctype="multipart/form-data" class="card">
                         <div class="card-body">
                             {% csrf_token %}
-                            <div class="mb-3">
-                                <label for="id_file" class="form-label">Видео (MP4/WebM, до 200 МБ)</label>
-                                <input type="file" name="file" id="id_file"
-                                       accept="video/mp4,video/webm"
-                                       class="form-control" required>
-                                <div class="form-text">Лучше горизонтальное видео, ≤ 200 МБ.</div>
 
-                                <!-- Превью выбранного файла -->
+                            {% if form.non_field_errors %}
+                                <div class="alert alert-danger">
+                                    {% for error in form.non_field_errors %}
+                                        <div>{{ error }}</div>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+
+                            <div class="mb-4">
+                                <label for="id_file" class="form-label">Видео (MP4/WebM, до 200 МБ)</label>
+                                <input type="file"
+                                       name="file"
+                                       id="id_file"
+                                       accept="video/mp4,video/webm"
+                                       class="form-control {% if form.file.errors %}is-invalid{% endif %}">
+                                <div class="form-text">Лучше горизонтальное видео, не больше 200 МБ.</div>
+
+                                {% for error in form.file.errors %}
+                                    <div class="invalid-feedback d-block">{{ error }}</div>
+                                {% endfor %}
+
                                 <div id="previewWrap" class="mt-3 d-none">
                                     <div class="ratio ratio-16x9 rounded overflow-hidden bg-black">
                                         <video id="preview" controls class="w-100 h-100"></video>
@@ -91,16 +159,60 @@
                                 </div>
                             </div>
 
+                            <div class="mb-4">
+                                <label for="id_schedule_file" class="form-label">
+                                    Файл с графиком занятий (PDF / DOC / DOCX, до 20 МБ)
+                                </label>
+                                <input type="file"
+                                       name="schedule_file"
+                                       id="id_schedule_file"
+                                       accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                                       class="form-control {% if form.schedule_file.errors %}is-invalid{% endif %}">
+                                <div class="form-text">
+                                    Прикрепи документ с расписанием или графиком курса.
+                                </div>
+
+                                {% for error in form.schedule_file.errors %}
+                                    <div class="invalid-feedback d-block">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+
+                            <div class="mb-4">
+                                <label for="id_online_school_course" class="form-label">
+                                    Онлайн-школа и курс
+                                </label>
+                                <textarea name="online_school_course"
+                                          id="id_online_school_course"
+                                          rows="4"
+                                          class="form-control {% if form.online_school_course.errors %}is-invalid{% endif %}"
+                                          placeholder="Например: Фоксфорд, курс подготовки к ЕГЭ по информатике и математике">{{ form.online_school_course.value|default_if_none:"" }}</textarea>
+                                <div class="form-text">
+                                    В свободной форме укажи онлайн-школу, курс, предметы или программу, которую хочешь выбрать.
+                                </div>
+
+                                {% for error in form.online_school_course.errors %}
+                                    <div class="invalid-feedback d-block">{{ error }}</div>
+                                {% endfor %}
+                            </div>
+
                             <div class="mb-3 d-none" id="progress-wrap">
                                 <label class="form-label">Загрузка</label>
-                                <div class="progress" role="progressbar" aria-label="Ход загрузки" aria-valuemin="0"
+                                <div class="progress"
+                                     role="progressbar"
+                                     aria-label="Ход загрузки"
+                                     aria-valuemin="0"
                                      aria-valuemax="100">
-                                    <div id="progress-bar" class="progress-bar" style="width: 0%">0%</div>
+                                    <div id="progress-bar"
+                                         class="progress-bar"
+                                         style="width: 0%"
+                                         aria-valuenow="0">0%</div>
                                 </div>
                             </div>
 
-                            <div class="d-grid d-sm-grid gap-2 gap-md-3 d-md-flex">
-                                <button type="submit" class="btn btn-primary flex-grow-1">Сохранить</button>
+                            <div class="d-grid d-md-flex gap-2 gap-md-3">
+                                <button type="submit" class="btn btn-primary flex-grow-1">
+                                    Сохранить
+                                </button>
                             </div>
                         </div>
                     </form>
@@ -109,7 +221,6 @@
         </div>
 
         <style>
-            /* Скролл-лента табов */
             .nav-scroller {
                 position: relative;
                 overflow: hidden;
@@ -132,7 +243,6 @@
                 border-radius: 3px;
             }
 
-            /* Уплотнение кнопок на мобильных */
             @media (max-width: 576px) {
                 .btn-tabs .btn {
                     white-space: nowrap;
@@ -142,7 +252,7 @@
         </style>
 
         <script>
-            const MAX_SIZE = 200 * 1024 * 1024; // 200MB
+            const MAX_VIDEO_SIZE = 200 * 1024 * 1024; // 200 MB
 
             const fileInput = document.getElementById('id_file');
             const preview = document.getElementById('preview');
@@ -150,92 +260,92 @@
             const form = document.getElementById('video-form');
             const progressWrap = document.getElementById('progress-wrap');
             const progressBar = document.getElementById('progress-bar');
-            const clearBtn = document.getElementById('clearBtn');
 
             function toMB(n) {
                 return (n / 1024 / 1024).toFixed(1);
             }
 
-            fileInput.addEventListener('change', () => {
-                const f = fileInput.files[0];
-                if (!f) {
-                    previewWrap.classList.add('d-none');
-                    return;
-                }
+            if (fileInput) {
+                fileInput.addEventListener('change', () => {
+                    const f = fileInput.files[0];
 
-                // Валидация типа и размера
-                const okType = ['video/mp4', 'video/webm'].includes(f.type);
-                if (!okType) {
-                    alert('Поддерживаются только MP4 и WebM.');
-                    fileInput.value = '';
-                    previewWrap.classList.add('d-none');
-                    return;
-                }
-                if (f.size > MAX_SIZE) {
-                    alert(`Файл ${toMB(f.size)} МБ больше лимита 200 МБ.`);
-                    fileInput.value = '';
-                    previewWrap.classList.add('d-none');
-                    return;
-                }
-
-                // Превью
-                const url = URL.createObjectURL(f);
-                preview.src = url;
-                previewWrap.classList.remove('d-none');
-            });
-
-            clearBtn.addEventListener('click', () => {
-                fileInput.value = '';
-                preview.src = '';
-                previewWrap.classList.add('d-none');
-            });
-
-            form.addEventListener('submit', (e) => {
-                e.preventDefault();
-
-                const f = fileInput.files[0];
-                if (!f) {
-                    alert('Выбери файл видео.');
-                    return;
-                }
-                if (f.size > MAX_SIZE) {
-                    alert('Файл превышает 200 МБ.');
-                    return;
-                }
-
-                const data = new FormData(form);
-                const xhr = new XMLHttpRequest();
-                xhr.open('POST', window.location.href, true);
-                xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
-
-                xhr.upload.addEventListener('progress', (ev) => {
-                    if (ev.lengthComputable) {
-                        const percent = Math.round(ev.loaded / ev.total * 100);
-                        progressWrap.classList.remove('d-none');
-                        progressBar.style.width = percent + '%';
-                        progressBar.textContent = percent + '%';
-                        progressBar.setAttribute('aria-valuenow', String(percent));
+                    if (!f) {
+                        previewWrap.classList.add('d-none');
+                        preview.src = '';
+                        return;
                     }
-                });
 
-                xhr.onload = () => {
-                    if (xhr.status >= 200 && xhr.status < 400) {
-                        window.location.reload();
-                    } else {
-                        alert('Ошибка загрузки. Попробуй ещё раз.');
+                    const okType = ['video/mp4', 'video/webm'].includes(f.type);
+                    if (!okType) {
+                        alert('Поддерживаются только MP4 и WebM.');
+                        fileInput.value = '';
+                        previewWrap.classList.add('d-none');
+                        preview.src = '';
+                        return;
+                    }
+
+                    if (f.size > MAX_VIDEO_SIZE) {
+                        alert(`Файл ${toMB(f.size)} МБ больше лимита 200 МБ.`);
+                        fileInput.value = '';
+                        previewWrap.classList.add('d-none');
+                        preview.src = '';
+                        return;
+                    }
+
+                    const url = URL.createObjectURL(f);
+                    preview.src = url;
+                    previewWrap.classList.remove('d-none');
+                });
+            }
+
+            if (form) {
+                form.addEventListener('submit', (e) => {
+                    e.preventDefault();
+
+                    const f = fileInput ? fileInput.files[0] : null;
+                    if (f && f.size > MAX_VIDEO_SIZE) {
+                        alert('Файл видео превышает 200 МБ.');
+                        return;
+                    }
+
+                    const data = new FormData(form);
+                    const xhr = new XMLHttpRequest();
+                    xhr.open('POST', window.location.href, true);
+                    xhr.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+
+                    xhr.upload.addEventListener('progress', (ev) => {
+                        if (ev.lengthComputable) {
+                            const percent = Math.round((ev.loaded / ev.total) * 100);
+                            progressWrap.classList.remove('d-none');
+                            progressBar.style.width = percent + '%';
+                            progressBar.textContent = percent + '%';
+                            progressBar.setAttribute('aria-valuenow', String(percent));
+                        }
+                    });
+
+                    xhr.onload = () => {
+                        if (xhr.status >= 200 && xhr.status < 400) {
+                            window.location.reload();
+                        } else {
+                            alert('Ошибка загрузки. Попробуй ещё раз.');
+                            progressWrap.classList.add('d-none');
+                            progressBar.style.width = '0%';
+                            progressBar.textContent = '0%';
+                            progressBar.setAttribute('aria-valuenow', '0');
+                        }
+                    };
+
+                    xhr.onerror = () => {
+                        alert('Сеть сказала «нет». Попробуй позже.');
                         progressWrap.classList.add('d-none');
                         progressBar.style.width = '0%';
                         progressBar.textContent = '0%';
-                    }
-                };
-                xhr.onerror = () => {
-                    alert('Сеть сказала «нет». Попробуй позже.');
-                    progressWrap.classList.add('d-none');
-                    progressBar.style.width = '0%';
-                    progressBar.textContent = '0%';
-                };
-                xhr.send(data);
-            });
+                        progressBar.setAttribute('aria-valuenow', '0');
+                    };
+
+                    xhr.send(data);
+                });
+            }
         </script>
     </div>
 {% endblock %}

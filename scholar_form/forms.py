@@ -1,5 +1,6 @@
 from django import forms
 from django.contrib import messages
+from django.core.exceptions import ValidationError
 from django.db import models
 from django.db import transaction
 from django.dispatch import Signal
@@ -500,12 +501,53 @@ class UserProfileForm(forms.ModelForm):
 class ScholarVideoForm(forms.ModelForm):
     class Meta:
         model = ScholarVideo
-        fields = ["file"]
+        fields = ["file", "schedule_file", "online_school_course"]
+        widgets = {
+            "online_school_course": forms.Textarea(
+                attrs={
+                    "class": "form-control",
+                    "rows": 4,
+                    "placeholder": "Например: Умскул, ЕГЭ по математике, преподаватель: Иванов Иван Иванович",
+                }
+            ),
+        }
 
     def clean_file(self):
         f = self.cleaned_data.get("file")
         if not f:
-            raise forms.ValidationError("Нужно выбрать видеофайл.")
+            return f
+
+        allowed_types = {
+            "video/mp4",
+            "video/webm",
+        }
+        if getattr(f, "content_type", None) not in allowed_types:
+            raise ValidationError("Видео должно быть в формате MP4 или WebM.")
+
+        max_size = 200 * 1024 * 1024
+        if f.size > max_size:
+            raise ValidationError("Видео не должно превышать 200 МБ.")
+
+        return f
+
+    def clean_schedule_file(self):
+        f = self.cleaned_data.get("schedule_file")
+        if not f:
+            return f
+
+        allowed_content_types = {
+            "application/pdf",
+            "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        }
+
+        if getattr(f, "content_type", None) not in allowed_content_types:
+            raise ValidationError("График должен быть в формате PDF, DOC или DOCX.")
+
+        max_size = 20 * 1024 * 1024
+        if f.size > max_size:
+            raise ValidationError("Файл графика не должен превышать 20 МБ.")
+
         return f
 
 
