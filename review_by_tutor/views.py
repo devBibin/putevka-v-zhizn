@@ -71,6 +71,11 @@ def staff_letter_detail(request, user_id: int):
         instance=rubric_review
     ) if rubric_review else None
 
+    if request.method == "POST" and request.POST.get("action") == "send_notification":
+        handle_send_notification(request, user)
+        logger.info("SADF")
+        return redirect("staff_letter_detail", user_id=user_id)
+
     if request.method == "POST":
         if letter is None:
             messages.error(request, "У пользователя ещё нет мотивационного письма — сохранять нечего.")
@@ -350,6 +355,11 @@ def staff_video_detail(request, user_id: int):
     staff_form = ScholarVideoStaffForm(instance=video) if video else None
     deadline_form = ScholarVideoDeadlineForm(instance=video)
 
+    if request.method == "POST" and request.POST.get("action") == "send_notification":
+        handle_send_notification(request, user_obj)
+        logger.info("SADF")
+        return redirect("staff_video_detail", user_id=user_id)
+
     if request.method == "POST":
         if "action_deadline_save" in request.POST:
             if not video:
@@ -411,6 +421,10 @@ def staff_documents_detail(request, user_id: int):
             .filter(user_id=user_id)
             .prefetch_related("related_documents")
             .order_by("-uploaded_at", "-id"))
+
+    if request.method == "POST" and request.POST.get("action") == "send_notification":
+        handle_send_notification(request, user_obj)
+        return redirect("staff_documents_detail", user_id=user_id)
 
     if request.method == "POST":
         form_type = request.POST.get("form_type")
@@ -474,6 +488,11 @@ def staff_documents_detail(request, user_id: int):
 def staff_study_detail(request, user_id: int):
     user_obj = get_object_or_404(User, pk=user_id)
     send_notification_form = handle_send_notification(request, user_obj)
+
+    if request.method == "POST" and request.POST.get("action") == "send_notification":
+        handle_send_notification(request, user_obj)
+        logger.info("SADF")
+        return redirect("staff_study_detail", user_id=user_id)
 
     selections = (
         CourseSelection.objects
@@ -795,6 +814,11 @@ def interview_detail(request, user_id: int):
 
     form = InterviewForm(instance=interview)
     result_form = InterviewResultForm(instance=result_obj)
+
+    if request.method == "POST" and request.POST.get("action") == "send_notification":
+        handle_send_notification(request, user_obj)
+        logger.info("SADF")
+        return redirect("interview_detail", user_id=user_id)
 
     if request.method == "POST":
         action = request.POST.get("op")
