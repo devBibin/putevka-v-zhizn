@@ -21,6 +21,7 @@ from Putevka import settings
 from config import BASE_URL
 from core.bot import send_tg_notification_to_user
 from core.decorators import ensure_registration_gate
+from core.forms import SendNotificationForm
 from core.models import MotivationLetter, Notification, UserNotification
 from core.services.email_service import send_email_to_user
 from documents.models import Document
@@ -69,6 +70,11 @@ def staff_letter_detail(request, user_id: int):
         request.POST or None,
         instance=rubric_review
     ) if rubric_review else None
+
+    if request.method == "POST" and request.POST.get("action") == "send_notification":
+        handle_send_notification(request, user)
+        logger.info("SADF")
+        return redirect("staff_letter_detail", user_id=user_id)
 
     if request.method == "POST":
         if letter is None:
@@ -193,8 +199,14 @@ def staff_letter_detail(request, user_id: int):
 @transaction.atomic
 def staff_profile_detail(request, user_id: int):
     user_obj = get_object_or_404(User, pk=user_id)
-    profile = get_object_or_404(UserInfo.objects.select_related("user"), user_id=user_id)
-    send_notification_form = handle_send_notification(request, user_obj)
+    profile = get_object_or_404(
+        UserInfo.objects.select_related("user"),
+        user_id=user_id
+    )
+
+    if request.method == "POST" and request.POST.get("action") == "send_notification":
+        handle_send_notification(request, user_obj)
+        return redirect("staff_profile_detail", user_id=user_id)
 
     if request.method == "POST":
         form = UserInfoStaffForm(request.POST, request.FILES, instance=profile)
@@ -207,27 +219,31 @@ def staff_profile_detail(request, user_id: int):
 
             if "action_revision" in request.POST:
                 obj = form.save(commit=False)
+                comment = (obj.revision_comment or "").strip()
+
+                if not comment:
+                    messages.error(request, "Нужно указать причину доработки (revision_comment).")
+                    return redirect("staff_profile_detail", user_id=user_id)
+
                 obj.form_status = "revision"
                 obj.revision_requested_at = timezone.now()
                 obj.save()
                 form.save_m2m()
 
-                comment = (obj.revision_comment or "").strip()
-                if not comment:
-                    messages.error(request, "Нужно указать причину доработки (revision_comment).")
-                    return redirect("staff_profile_detail", user_id=user_id)
-
                 def _notify():
-                    send_tg_notification_to_user(
-                        obj.user,
-                        (
-                            "✏️ Анкета отправлена на доработку.\n\n"
-                            f"Причина:\n{comment}\n\n"
-                            "Открой анкету и внеси правки."
-                        ),
-                        url=f"{BASE_URL}form/apply/",
-                        button_text="📝 Открыть анкету"
-                    )
+                    try:
+                        send_tg_notification_to_user(
+                            obj.user,
+                            (
+                                "✏️ Анкета отправлена на доработку.\n\n"
+                                f"Причина:\n{comment}\n\n"
+                                "Открой анкету и внеси правки."
+                            ),
+                            url=f"{BASE_URL}form/apply/",
+                            button_text="📝 Открыть анкету"
+                        )
+                    except Exception as e:
+                        logger.exception("Ошибка отправки Telegram уведомления (revision): %s", e)
 
                     user_email = obj.user.email or obj.email
 
@@ -247,11 +263,14 @@ def staff_profile_detail(request, user_id: int):
                                 fail_silently=False,
                             )
                         except Exception as e:
-                            logger.exception("Ошибка отправки Email уведомления: %s", e)
+                            logger.exception("Ошибка отправки Email уведомления (revision): %s", e)
 
                 transaction.on_commit(_notify)
 
-                messages.success(request, "Анкета отправлена на дописывание, уведомление будет отправлено в Telegram.")
+                messages.success(
+                    request,
+                    "Анкета отправлена на дописывание. Пользователь будет уведомлён."
+                )
                 return redirect("staff_profile_detail", user_id=user_id)
 
             if "action_approve" in request.POST:
@@ -271,7 +290,7 @@ def staff_profile_detail(request, user_id: int):
                         send_tg_notification_to_user(
                             obj.user,
                             message_text,
-                            url=f"{BASE_URL}/form/apply/",
+                            url=f"{BASE_URL}form/apply/",
                             button_text="📄 Открыть анкету"
                         )
                     except Exception as e:
@@ -310,6 +329,8 @@ def staff_profile_detail(request, user_id: int):
     else:
         form = UserInfoStaffForm(instance=profile)
 
+    send_notification_form = SendNotificationForm()
+
     return render(request, "staff_templates/profile_details.html", {
         "profile": profile,
         "user_obj": user_obj,
@@ -333,6 +354,11 @@ def staff_video_detail(request, user_id: int):
 
     staff_form = ScholarVideoStaffForm(instance=video) if video else None
     deadline_form = ScholarVideoDeadlineForm(instance=video)
+
+    if request.method == "POST" and request.POST.get("action") == "send_notification":
+        handle_send_notification(request, user_obj)
+        logger.info("SADF")
+        return redirect("staff_video_detail", user_id=user_id)
 
     if request.method == "POST":
         if "action_deadline_save" in request.POST:
@@ -396,6 +422,10 @@ def staff_documents_detail(request, user_id: int):
             .prefetch_related("related_documents")
             .order_by("-uploaded_at", "-id"))
 
+    if request.method == "POST" and request.POST.get("action") == "send_notification":
+        handle_send_notification(request, user_obj)
+        return redirect("staff_documents_detail", user_id=user_id)
+
     if request.method == "POST":
         form_type = request.POST.get("form_type")
         if form_type in {"update_status", "update_lock", "update_comment"}:
@@ -458,6 +488,11 @@ def staff_documents_detail(request, user_id: int):
 def staff_study_detail(request, user_id: int):
     user_obj = get_object_or_404(User, pk=user_id)
     send_notification_form = handle_send_notification(request, user_obj)
+
+    if request.method == "POST" and request.POST.get("action") == "send_notification":
+        handle_send_notification(request, user_obj)
+        logger.info("SADF")
+        return redirect("staff_study_detail", user_id=user_id)
 
     selections = (
         CourseSelection.objects
@@ -779,6 +814,11 @@ def interview_detail(request, user_id: int):
 
     form = InterviewForm(instance=interview)
     result_form = InterviewResultForm(instance=result_obj)
+
+    if request.method == "POST" and request.POST.get("action") == "send_notification":
+        handle_send_notification(request, user_obj)
+        logger.info("SADF")
+        return redirect("interview_detail", user_id=user_id)
 
     if request.method == "POST":
         action = request.POST.get("op")

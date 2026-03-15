@@ -8,7 +8,7 @@ from django.contrib.auth.models import User
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
-from django.core.validators import MinValueValidator, MaxValueValidator
+from django.core.validators import MinValueValidator, MaxValueValidator, URLValidator, FileExtensionValidator
 from django.db import models
 from django.utils import timezone
 
@@ -331,6 +331,23 @@ class ScholarVideo(models.Model):
     review = models.TextField(verbose_name="Отзыв", blank=True, null=True)
     score = models.PositiveIntegerField(verbose_name="Оценка в баллах", blank=True, null=True)
 
+    schedule_file = models.FileField(
+        upload_to="scholar_video_schedules/",
+        blank=True,
+        null=True,
+        validators=[
+            FileExtensionValidator(allowed_extensions=["pdf", "doc", "docx"])
+        ],
+        verbose_name="График занятий",
+    )
+
+    online_school_course = models.TextField(
+        blank=True,
+        default="",
+        verbose_name="Онлайн-школа и курс",
+        help_text="Укажи онлайн-школу и курс в свободной форме",
+    )
+
     deadline_at = models.DateTimeField(
         null=True,
         blank=True,
@@ -397,3 +414,27 @@ class UserPersonalData(models.Model):
 
     def __str__(self):
         return f"Персональные данные {self.user}"
+
+
+class VideoInstruction(models.Model):
+    is_active = models.BooleanField("Показывать плашку", default=True)
+
+    title = models.CharField("Заголовок", max_length=120, default="Инструкция к видеовизитке")
+    text = models.TextField("Текст", blank=True, default="Перед записью ознакомься с требованиями.")
+    url = models.URLField("Ссылка на инструкцию", validators=[URLValidator()])
+
+    button_text = models.CharField("Текст кнопки", max_length=60, default="Открыть инструкцию")
+
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Инструкция к видеовизитке"
+        verbose_name_plural = "Инструкция к видеовизитке"
+
+    def __str__(self):
+        return self.title
+
+    @classmethod
+    def get_current(cls):
+        obj = cls.objects.filter(is_active=True).order_by("-updated_at").first()
+        return obj

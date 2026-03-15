@@ -4,11 +4,11 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 
 from core.decorators import ensure_registration_gate
-from my_study.models import Subject
+from django.utils import timezone
 from review_by_tutor.models import TestAssignment
 from review_by_tutor.utils.selection_stages import require_selection_step
 from scholar_form.forms import UserProfileForm, ScholarVideoForm, UserPersonalDataForm
-from scholar_form.models import UserInfo, UserPersonalData, ScholarVideo
+from scholar_form.models import UserInfo, UserPersonalData, ScholarVideo, VideoInstruction
 
 
 @ensure_registration_gate('protected')
@@ -52,19 +52,32 @@ def personal_info(request):
 @login_required
 def my_video_page(request):
     instance, _ = ScholarVideo.objects.get_or_create(user=request.user)
+    video_instruction = VideoInstruction.get_current()
+
     if request.method == "POST":
         form = ScholarVideoForm(request.POST, request.FILES, instance=instance)
         if form.is_valid():
             obj = form.save(commit=False)
             obj.user = request.user
             obj.save()
-            messages.success(request, "Видеовизитка сохранена.")
+            messages.success(request, "Данные по видеовизитке сохранены.")
             return redirect("my_video_page")
         else:
-            messages.error(request, "Проверь форму. Видео должно быть MP4/WebM и не слишком большим.")
+            messages.error(request, "Проверь форму. Видео должно быть MP4/WebM, а график — PDF/DOC/DOCX.")
     else:
         form = ScholarVideoForm(instance=instance)
-    return render(request, "video_task.html", {"form": form, "video": instance, 'active': 'my_video_page'})
+
+    return render(
+        request,
+        "video_task.html",
+        {
+            "form": form,
+            "video": instance,
+            "video_instruction": video_instruction,
+            "active": "my_video_page",
+            "now": timezone.now(),
+        },
+    )
 
 
 @login_required
