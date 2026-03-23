@@ -1,9 +1,8 @@
+from django.contrib.auth import views as auth_views
 from django.urls import path
+
 from . import views
 from .views_helper import redirect_to_current_step
-
-from django.contrib.auth import views as auth_views
-
 from .views_staff import StaffScholarDossierView, staff_scholar_action
 
 urlpatterns = [

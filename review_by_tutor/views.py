@@ -1,5 +1,5 @@
 import logging
-import mimetypes
+from datetime import timedelta
 
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
@@ -8,30 +8,35 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.core.mail import send_mail
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.db import transaction
-from django.db.models import Q, Subquery, OuterRef, Count, Exists
-from django.http import Http404, FileResponse
+from django.db.models import Q, Subquery, OuterRef, Count, Exists, CharField, Value, When, Case, IntegerField
+from django.http import Http404, FileResponse, JsonResponse
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.encoding import smart_str
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_POST, require_GET
 
 from Putevka import settings
 from config import BASE_URL
 from core.bot import send_tg_notification_to_user
 from core.decorators import ensure_registration_gate
+from core.forms import SendNotificationForm
 from core.models import MotivationLetter, Notification, UserNotification
+from core.services.email_service import send_email_to_user
 from documents.models import Document
 from my_study.models import CourseSelection, UniversityPriority, AssessmentResult, School, Course
 from review_by_tutor.forms import MotivationLetterStaffForm, UserInfoStaffForm, ScholarVideoStaffForm, \
     DocumentStaffUploadForm, DocumentCommentForm, \
     DocumentStatusForm, InterviewForm, TestAssignmentCreateForm, TestAssignmentEditForm, TestResultForm, \
     LetterRevisionForm, MotivationLetterRubricReviewStaffForm, LetterDeadlineForm, ScholarVideoDeadlineForm, \
-    InterviewResultForm
-from review_by_tutor.models import Interview, TestAssignment, InterviewPreparation, InterviewTemplate, InterviewResult
+    InterviewResultForm, TestRevisionForm
+from review_by_tutor.models import Interview, TestAssignment, InterviewPreparation, InterviewTemplate, InterviewResult, \
+    TestTemplate, TestingInstruction
+from review_by_tutor.services.staff_users import build_staff_users_queryset, get_staff_users_filters
 from review_by_tutor.utils.contact_form import handle_send_notification
 from review_by_tutor.utils.selection_stages import require_selection_step
 from scholar_form.models import UserInfo, ScholarVideo, StaffNote
+from scholar_form.views import build_video_asset_context
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -66,6 +71,11 @@ def staff_letter_detail(request, user_id: int):
         instance=rubric_review
     ) if rubric_review else None
 
+    if request.method == "POST" and request.POST.get("action") == "send_notification":
+        handle_send_notification(request, user)
+        logger.info("SADF")
+        return redirect("staff_letter_detail", user_id=user_id)
+
     if request.method == "POST":
         if letter is None:
             messages.error(request, "У пользователя ещё нет мотивационного письма — сохранять нечего.")
@@ -97,6 +107,14 @@ def staff_letter_detail(request, user_id: int):
                     "status", "revision_comment", "revision_requested_at",
                     "revision_requested_by", "is_done", "updated_at",
                 ])
+
+                notify_participant(
+                    user,
+                    "Мотивационное письмо отправлено на доработку",
+                    f"Твоё мотивационное письмо нужно доработать.\n\nКомментарий:\n{comment}",
+                    sender=request.user
+                )
+
                 messages.success(request, "Письмо отправлено на дописывание.")
                 return redirect("staff_letter_detail", user_id=user_id)
             else:
@@ -106,6 +124,16 @@ def staff_letter_detail(request, user_id: int):
             if deadline_form.is_valid():
                 letter.deadline_at = deadline_form.cleaned_data["deadline_at"]
                 letter.save(update_fields=["deadline_at"])
+
+                deadline_str = timezone.localtime(letter.deadline_at).strftime("%d.%m.%Y %H:%M")
+
+                notify_participant(
+                    user,
+                    "Установлен дедлайн по мотивационному письму",
+                    f"Для мотивационного письма установлен дедлайн: {deadline_str}.",
+                    sender=request.user
+                )
+
                 messages.success(request, "Дедлайн обновлён")
                 return redirect(request.path)
             else:
@@ -121,6 +149,18 @@ def staff_letter_detail(request, user_id: int):
             if form.is_valid():
                 updated = form.save(commit=False)
                 updated.save()
+
+                letter.status = MotivationLetter.Status.SUBMITTED
+
+                letter.save(update_fields=["status", "updated_at"])
+
+                notify_participant(
+                    user,
+                    "Мотивационное письмо принято",
+                    "Твоё мотивационное письмо проверено и принято.",
+                    sender=request.user
+                )
+
                 messages.success(request, "Оценка/фидбэк сохранены.")
                 return redirect("staff_letter_detail", user_id=user_id)
             else:
@@ -159,8 +199,14 @@ def staff_letter_detail(request, user_id: int):
 @transaction.atomic
 def staff_profile_detail(request, user_id: int):
     user_obj = get_object_or_404(User, pk=user_id)
-    profile = get_object_or_404(UserInfo.objects.select_related("user"), user_id=user_id)
-    send_notification_form = handle_send_notification(request, user_obj)
+    profile = get_object_or_404(
+        UserInfo.objects.select_related("user"),
+        user_id=user_id
+    )
+
+    if request.method == "POST" and request.POST.get("action") == "send_notification":
+        handle_send_notification(request, user_obj)
+        return redirect("staff_profile_detail", user_id=user_id)
 
     if request.method == "POST":
         form = UserInfoStaffForm(request.POST, request.FILES, instance=profile)
@@ -173,27 +219,31 @@ def staff_profile_detail(request, user_id: int):
 
             if "action_revision" in request.POST:
                 obj = form.save(commit=False)
+                comment = (obj.revision_comment or "").strip()
+
+                if not comment:
+                    messages.error(request, "Нужно указать причину доработки (revision_comment).")
+                    return redirect("staff_profile_detail", user_id=user_id)
+
                 obj.form_status = "revision"
                 obj.revision_requested_at = timezone.now()
                 obj.save()
                 form.save_m2m()
 
-                comment = (obj.revision_comment or "").strip()
-                if not comment:
-                    messages.error(request, "Нужно указать причину доработки (revision_comment).")
-                    return redirect("staff_profile_detail", user_id=user_id)
-
                 def _notify():
-                    send_tg_notification_to_user(
-                        obj.user,
-                        (
-                            "✏️ Анкета отправлена на доработку.\n\n"
-                            f"Причина:\n{comment}\n\n"
-                            "Открой анкету и внеси правки."
-                        ),
-                        url=f"{BASE_URL}/apply/",
-                        button_text="📝 Открыть анкету"
-                    )
+                    try:
+                        send_tg_notification_to_user(
+                            obj.user,
+                            (
+                                "✏️ Анкета отправлена на доработку.\n\n"
+                                f"Причина:\n{comment}\n\n"
+                                "Открой анкету и внеси правки."
+                            ),
+                            url=f"{BASE_URL}form/apply/",
+                            button_text="📝 Открыть анкету"
+                        )
+                    except Exception as e:
+                        logger.exception("Ошибка отправки Telegram уведомления (revision): %s", e)
 
                     user_email = obj.user.email or obj.email
 
@@ -205,7 +255,7 @@ def staff_profile_detail(request, user_id: int):
                                     "Здравствуйте!\n\n"
                                     "Ваша анкета отправлена на доработку.\n\n"
                                     f"Причина:\n{comment}\n\n"
-                                    f"Перейдите по ссылке для редактирования:\n{BASE_URL}/apply/\n\n"
+                                    f"Перейдите по ссылке для редактирования:\n{BASE_URL}form/apply/\n\n"
                                     "С уважением,\nКоманда программы"
                                 ),
                                 from_email=settings.DEFAULT_FROM_EMAIL,
@@ -213,11 +263,14 @@ def staff_profile_detail(request, user_id: int):
                                 fail_silently=False,
                             )
                         except Exception as e:
-                            logger.exception("Ошибка отправки Email уведомления: %s", e)
+                            logger.exception("Ошибка отправки Email уведомления (revision): %s", e)
 
                 transaction.on_commit(_notify)
 
-                messages.success(request, "Анкета отправлена на дописывание, уведомление будет отправлено в Telegram.")
+                messages.success(
+                    request,
+                    "Анкета отправлена на дописывание. Пользователь будет уведомлён."
+                )
                 return redirect("staff_profile_detail", user_id=user_id)
 
             if "action_approve" in request.POST:
@@ -229,7 +282,7 @@ def staff_profile_detail(request, user_id: int):
                 def _notify():
                     message_text = (
                         "🎉 Анкета успешно принята!\n\n"
-                        "Поздравляем! Ваша анкета прошла проверку.\n\n"
+                        "Поздравляем! Твоя анкета прошла проверку.\n\n"
                         "Ожидайте дальнейшей информации."
                     )
 
@@ -237,7 +290,7 @@ def staff_profile_detail(request, user_id: int):
                         send_tg_notification_to_user(
                             obj.user,
                             message_text,
-                            url=f"{BASE_URL}/form/apply/",
+                            url=f"{BASE_URL}form/apply/",
                             button_text="📄 Открыть анкету"
                         )
                     except Exception as e:
@@ -253,7 +306,7 @@ def staff_profile_detail(request, user_id: int):
                                     "Здравствуйте!\n\n"
                                     "Ваша анкета успешно прошла проверку и принята.\n\n"
                                     "Мы свяжемся с вами для дальнейших шагов.\n\n"
-                                    f"Просмотреть анкету можно здесь:\n{BASE_URL}/apply/\n\n"
+                                    f"Просмотреть анкету можно здесь:\n{BASE_URL}form/apply/\n\n"
                                     "С уважением,\nКоманда программы"
                                 ),
                                 from_email=settings.DEFAULT_FROM_EMAIL,
@@ -275,6 +328,8 @@ def staff_profile_detail(request, user_id: int):
         messages.error(request, "Исправьте ошибки в форме.")
     else:
         form = UserInfoStaffForm(instance=profile)
+
+    send_notification_form = SendNotificationForm()
 
     return render(request, "staff_templates/profile_details.html", {
         "profile": profile,
@@ -299,6 +354,11 @@ def staff_video_detail(request, user_id: int):
 
     staff_form = ScholarVideoStaffForm(instance=video) if video else None
     deadline_form = ScholarVideoDeadlineForm(instance=video)
+
+    if request.method == "POST" and request.POST.get("action") == "send_notification":
+        handle_send_notification(request, user_obj)
+        logger.info("SADF")
+        return redirect("staff_video_detail", user_id=user_id)
 
     if request.method == "POST":
         if "action_deadline_save" in request.POST:
@@ -329,24 +389,22 @@ def staff_video_detail(request, user_id: int):
                 return redirect("staff_video_detail", user_id=user_id)
             messages.error(request, "Исправьте ошибки в форме.")
 
-    mime = None
-    if video:
-        try:
-            file_name = getattr(getattr(video, "file", None), "name", "") or ""
-            if file_name:
-                mime, _ = mimetypes.guess_type(file_name)
-        except Exception:
-            mime = None
+    asset_context = build_video_asset_context(video) if video else {
+        "video_download_url": None,
+        "schedule_download_url": None,
+        "video_name": "",
+        "schedule_name": "",
+        "video_mime": None,
+    }
 
     return render(request, "staff_templates/video_detail.html", {
         "user_obj": user_obj,
         "video": video,
-        "video_mime": mime,
         "form": staff_form,
         "deadline_form": deadline_form,
         "active": "my_video_page",
         "send_notification_form": send_notification_form,
-
+        **asset_context,
     })
 
 
@@ -361,6 +419,10 @@ def staff_documents_detail(request, user_id: int):
             .filter(user_id=user_id)
             .prefetch_related("related_documents")
             .order_by("-uploaded_at", "-id"))
+
+    if request.method == "POST" and request.POST.get("action") == "send_notification":
+        handle_send_notification(request, user_obj)
+        return redirect("staff_documents_detail", user_id=user_id)
 
     if request.method == "POST":
         form_type = request.POST.get("form_type")
@@ -424,6 +486,11 @@ def staff_documents_detail(request, user_id: int):
 def staff_study_detail(request, user_id: int):
     user_obj = get_object_or_404(User, pk=user_id)
     send_notification_form = handle_send_notification(request, user_obj)
+
+    if request.method == "POST" and request.POST.get("action") == "send_notification":
+        handle_send_notification(request, user_obj)
+        logger.info("SADF")
+        return redirect("staff_study_detail", user_id=user_id)
 
     selections = (
         CourseSelection.objects
@@ -544,16 +611,43 @@ def staff_note_toggle_favorite(request, user_id: int, note_id: int):
 @login_required
 @user_passes_test(_staff_check)
 def staff_users_list(request):
+    qs = build_staff_users_queryset(request)
+
+    paginator = Paginator(qs, 30)
+    page_obj = paginator.get_page(request.GET.get("page"))
+
+    filters_data = get_staff_users_filters(request)
+
+    schools = School.objects.all().order_by("name")
+    courses_qs = Course.objects.all()
+    if filters_data["school"]:
+        courses_qs = courses_qs.filter(school_id=filters_data["school"])
+    courses = courses_qs.order_by("title")
+
+    profiles = list(UserInfo.InternalStudyProfile.choices or [])
+    steps = getattr(UserInfo, "SELECTION_STEP_CHOICES", None) or UserInfo._meta.get_field("selection_step").choices
+
+    context = {
+        "page_obj": page_obj,
+        "schools": schools,
+        "courses": courses,
+        "profiles": profiles,
+        "steps": steps,
+        **filters_data,
+    }
+
+    return render(request, "staff_templates/users_list.html", context)
+
+
+def _staff_users_queryset_from_request(request):
     q = (request.GET.get("q") or "").strip()
     school = (request.GET.get("school") or "").strip()
     course = (request.GET.get("course") or "").strip()
     curator_paid = (request.GET.get("curator_need") or "").strip()
     grade = (request.GET.get("grade") or "").strip()
+    step = (request.GET.get("step") or "").strip()
 
-    qs = (User.objects
-          .all()
-          .select_related("user_info")
-          )
+    qs = User.objects.all().select_related("user_info")
 
     if q:
         qs = qs.filter(
@@ -579,46 +673,19 @@ def staff_users_list(request):
     elif curator_paid == "0":
         qs = qs.filter(course_selections__need_tutor=False)
 
-    qs = qs.distinct()
+    if step:
+        qs = qs.filter(user_info__selection_step=step)
 
-    letter_status_sq = Subquery(
-        MotivationLetter.objects.filter(user_id=OuterRef("pk"))
-        .values("status")[:1]
-    )
+    return qs.distinct()
 
-    qs = qs.annotate(
-        docs_total=Count("documents", filter=Q(documents__is_deleted=False)),
-        docs_pending=Count("documents", filter=Q(documents__is_deleted=False, documents__status="PENDING")),
-        docs_question=Count("documents", filter=Q(documents__is_deleted=False, documents__status="QUESTION")),
-        docs_signed=Count("documents", filter=Q(documents__is_deleted=False, documents__status="SIGNED")),
-        has_profile=Exists(UserInfo.objects.filter(user_id=OuterRef("pk"))),
-        has_video=Exists(ScholarVideo.objects.filter(user_id=OuterRef("pk"))),
-        letter_status=letter_status_sq,
-    ).order_by("last_name", "first_name", "username")
 
-    paginator = Paginator(qs, 20)
-    page_obj = paginator.get_page(request.GET.get("page"))
-
-    schools = School.objects.all().order_by("name")
-    courses_qs = Course.objects.all()
-    if school:
-        courses_qs = courses_qs.filter(school_id=school)
-    courses = courses_qs.order_by("title")
-
-    grades = list(range(9, 12))
-
-    return render(request, "staff_templates/users_list.html", {
-        "page_obj": page_obj,
-
-        "q": q,
-        "school": school,
-        "course": course,
-        "curator_need": curator_paid,
-        "grade": grade,
-        "grades": grades,
-        "schools": schools,
-        "courses": courses,
-    })
+@login_required
+@user_passes_test(_staff_check)
+@require_GET
+def staff_users_ids(request):
+    qs = _staff_users_queryset_from_request(request)
+    ids = list(qs.values_list("id", flat=True))
+    return JsonResponse({"ids": ids})
 
 
 @staff_member_required
@@ -746,6 +813,11 @@ def interview_detail(request, user_id: int):
     form = InterviewForm(instance=interview)
     result_form = InterviewResultForm(instance=result_obj)
 
+    if request.method == "POST" and request.POST.get("action") == "send_notification":
+        handle_send_notification(request, user_obj)
+        logger.info("SADF")
+        return redirect("interview_detail", user_id=user_id)
+
     if request.method == "POST":
         action = request.POST.get("op")
 
@@ -827,13 +899,14 @@ def download_interview_template(request, user_id: int):
     return response
 
 
-@require_selection_step(UserInfo.SelectionStep.TEST)
+
 @login_required
+@require_selection_step(UserInfo.SelectionStep.TEST)
 def testing_list_for_candidate(request):
     items = (TestAssignment.objects
              .filter(user=request.user)
              .order_by("-assigned_at", "-id"))
-    return render(request, "testing.html", {"items": items, "user_obj": request.user, "active": "testing"})
+    return render(request, "testing.html", {"items": items, "user_obj": request.user, "active": "testing", "testing_instruction": TestingInstruction.get_current()})
 
 
 @user_passes_test(_staff_check)
@@ -855,16 +928,35 @@ def testing_create(request):
 
     fixed_user = None
     if fixed_user_id:
-        fixed_user = User.objects.filter(pk=fixed_user_id).only("id").first()
+        fixed_user = User.objects.filter(pk=fixed_user_id).only("id", "username").first()
 
     if request.method == "POST":
         form = TestAssignmentCreateForm(request.POST)
         if form.is_valid():
             obj = form.save(commit=False)
+
+
             if fixed_user:
                 obj.user = fixed_user
+
+                if fixed_user.user_info.selection_step == UserInfo.SelectionStep.FORM:
+                    fixed_user.user_info.selection_step = UserInfo.SelectionStep.TEST
+                    fixed_user.user_info.save()
+
             obj.assigned_by = request.user
             obj.save()
+
+            notify_participant(
+                user=obj.user,
+                subject="Назначен новый тест",
+                message=(
+                    f"Тебе назначен тест: «{obj.title}».\n"
+                    f"{'Дедлайн: ' + obj.due_at.strftime('%d.%m.%Y %H:%M') if obj.due_at else ''}\n"
+                    f"Ссылка: {BASE_URL + '/form/testing'}\n"
+                    f"{'Комментарий: ' + obj.instructions if obj.instructions else ''}"
+                ).strip(),
+                sender=request.user,
+            )
             return redirect("staff_testing_list_for_user", user_id=obj.user_id)
     else:
         if fixed_user:
@@ -876,8 +968,8 @@ def testing_create(request):
         "form": form,
         "title": "Назначить тест",
         "fixed_user": fixed_user,
-
     })
+
 
 
 @user_passes_test(_staff_check)
@@ -894,26 +986,88 @@ def testing_edit(request, pk):
                   {"form": form, "title": "Редактировать тест", "user_obj": get_object_or_404(User, pk=obj.user.id)})
 
 
+def notify_participant(user, subject: str, message: str, sender=None):
+    notif = Notification.objects.create(
+        message=message,
+        sender=sender
+    )
+    UserNotification.objects.create(notification=notif, recipient=user)
+
 @user_passes_test(_staff_check)
 def testing_fill_result(request, pk):
     obj = get_object_or_404(TestAssignment, pk=pk)
+
+    res_form = TestResultForm(instance=obj)
+    rev_form = TestRevisionForm(instance=obj)
+
     if request.method == "POST":
-        form = TestResultForm(request.POST, instance=obj)
-        if form.is_valid():
-            filled = form.save(commit=False)
-            filled.result_filled_by = request.user
-            filled.result_filled_at = timezone.now()
-            filled.mark_completed()
-            filled.save()
-            return redirect("staff_testing_list_for_user", user_id=obj.user_id)
+        action = (request.POST.get("action") or "").strip()
+
+        if action == "revision":
+            rev_form = TestRevisionForm(request.POST, instance=obj)
+
+            if rev_form.is_valid():
+                old_status = obj.status
+
+                comment = rev_form.cleaned_data["revision_comment"]
+                obj.mark_needs_revision(by_user=request.user, comment=comment)
+                obj.save()
+
+                if old_status != obj.Status.NEEDS_REVISION:
+                    notify_participant(
+                        user=obj.user,
+                        subject="Тест отправлен на дописывание",
+                        message=(
+                            f"✍️ Тест «{obj.title}» отправлен на дописывание.\n\n"
+                            f"Комментарий:\n{obj.revision_comment}"
+                        ),
+                        sender=request.user,
+                    )
+
+                return redirect("staff_testing_list_for_user", user_id=obj.user_id)
+
+
+        else:
+            res_form = TestResultForm(request.POST, instance=obj)
+            rev_form = TestRevisionForm(instance=obj)
+            if res_form.is_valid():
+                filled = res_form.save(commit=False)
+                filled.result_filled_by = request.user
+                filled.result_filled_at = timezone.now()
+                filled.mark_completed()
+                filled.save()
+                notify_participant(
+                    user=filled.user,
+                    subject="Результат теста внесён",
+                    message=(
+                        f"✅ По тесту «{filled.title}» внесён результат.\n\n"
+                        f"{'Комментарий: ' + filled.result_text if filled.result_text else ''}"
+                    ).strip(),
+                    sender=request.user,
+                )
+
+                return redirect("staff_testing_list_for_user", user_id=obj.user_id)
+
     else:
-        form = TestResultForm(instance=obj)
-    return render(request, "staff_templates/testing/result_form.html",
-                  {"form": form, "obj": obj, "user_obj": get_object_or_404(User, pk=obj.user.id), "active": "testing"})
+        res_form = TestResultForm(instance=obj)
+        rev_form = TestRevisionForm(instance=obj)
+
+    return render(
+        request,
+        "staff_templates/testing/result_form.html",
+        {
+            "form": res_form,
+            "rev_form": rev_form,
+            "obj": obj,
+            "user_obj": get_object_or_404(User, pk=obj.user_id),
+            "active": "testing",
+        }
+    )
 
 
-@require_selection_step(UserInfo.SelectionStep.INTERVIEW_PREP)
+
 @ensure_registration_gate('protected')
+@require_selection_step(UserInfo.SelectionStep.INTERVIEW_PREP)
 @login_required
 def interview_preparation_view(request):
     prep = (
@@ -924,3 +1078,28 @@ def interview_preparation_view(request):
     )
 
     return render(request, "interview_preparation.html", {"prep": prep, "active": "interview"})
+
+
+@user_passes_test(_staff_check)
+@require_GET
+def testing_template_payload(request):
+    template_id = (request.GET.get("template_id") or "").strip()
+    if not template_id:
+        return JsonResponse({"ok": False, "error": "template_id required"}, status=400)
+
+    tpl = TestTemplate.objects.filter(pk=template_id, is_active=True).first()
+    if not tpl:
+        return JsonResponse({"ok": False, "error": "not found"}, status=404)
+
+    due_at_str = ""
+    if tpl.default_due_days:
+        dt = timezone.localtime(timezone.now() + timedelta(days=tpl.default_due_days))
+        due_at_str = dt.strftime("%Y-%m-%dT%H:%M")
+
+    return JsonResponse({
+        "ok": True,
+        "title": tpl.title or "",
+        "external_url": tpl.external_url or "",
+        "instructions": tpl.instructions or "",
+        "due_at": due_at_str,
+    })

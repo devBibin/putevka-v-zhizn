@@ -1,7 +1,7 @@
 from django.urls import path
 
 from documents import views as docviews
-from . import views
+from . import views, service_views
 
 urlpatterns = [
     path("letters/<int:user_id>/", views.staff_letter_detail, name="staff_letter_detail"),
@@ -32,4 +32,14 @@ urlpatterns = [
     path("staff/notes/<int:user_id>/favorite/<int:note_id>/", views.staff_note_toggle_favorite,
          name="staff_note_toggle_favorite"),
     path("staff/notes/<int:user_id>/delete/<int:note_id>/", views.staff_note_delete, name="staff_note_delete"),
+
+    path("staff/users/ids/", views.staff_users_ids, name="staff_users_ids"),
+
+    path("testing/template-payload/", views.testing_template_payload, name="staff_testing_template_payload"),
+
+    path(
+        "staff/users/export-xlsx/",
+        service_views.export_users_xlsx,
+        name="staff_users_export_xlsx"
+    ),
 ]

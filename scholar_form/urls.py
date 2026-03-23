@@ -14,6 +14,7 @@ urlpatterns = [
     path('thank-you/', lambda request: render(request, 'thank_you.html'), name='thank_you'),
     path('personal-info/', views.personal_info, name='personal_info'),
     path("video/", views.my_video_page, name="my_video_page"),
+    path("video/upload-status/", views.my_video_upload_status, name="my_video_upload_status"),
     path("testing/", testing_list_for_candidate, name="candidate_testing_list"),
     path("preparation/", review_by_tutor.views.interview_preparation_view, name="preparation"),
 

@@ -9,6 +9,7 @@ from django.urls import reverse
 from django.utils.decorators import method_decorator
 from django.views.generic import TemplateView
 
+from config import BASE_URL
 from core.models import UserNotification, Notification
 from documents.models import Document
 from review_by_tutor.forms import StatusChangeForm, ProfileChangeForm, SelectionStepUpdateForm
@@ -67,9 +68,11 @@ class StaffScholarDossierView(TemplateView):
 
         ml_exists = ml is not None
         ml_needs_review = bool(
-            ml_exists and getattr(ml, "status", None) in ("submitted", "under_review") and not getattr(ml,
-                                                                                                       "admin_rating",
-                                                                                                       None))
+            ml_exists
+            and ml.status == ml.Status.SUBMITTED
+            and ml.admin_score is None
+            and not (ml.admin_rating or "").strip()
+        )
 
         documents_qs = Document.objects.filter(user=user, is_deleted=False).order_by("-uploaded_at") if Document else []
 
@@ -210,18 +213,32 @@ def staff_scholar_action(request, user_id: int):
         else:
             messages.error(request, "Не удалось обновить профиль. Проверьте данные.")
 
+
     elif action == "change_selection_step":
         uinfo = user.user_info
+        old_step = uinfo.selection_step
         form = SelectionStepUpdateForm(request.POST, instance=uinfo)
-
         if form.is_valid():
-            form.save()
+            updated_obj = form.save(commit=False)
+            new_step = updated_obj.selection_step
+            send_url = BASE_URL
+            if new_step == "test":
+                send_url += "/form/testing"
+
+            updated_obj.save()
+            if old_step != new_step:
+                notif = Notification.objects.create(
+                    message=f"Теперь ты на этапе отбора: {uinfo.get_selection_step_display()}, проверь свой кабинет {send_url}",
+                    sender=request.user
+                )
+                UserNotification.objects.create(
+                    notification=notif,
+                    recipient=user
+                )
             messages.success(request, "Этап отбора обновлён.")
         else:
             messages.error(request, "Ошибка обновления этапа.")
-
         return redirect(request.META.get("HTTP_REFERER", "/"))
-
     else:
         messages.error(request, "Неизвестное действие.")
 

@@ -1,14 +1,14 @@
 import mimetypes
 import re
 from datetime import timedelta
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.contrib.contenttypes.fields import GenericForeignKey, GenericRelation
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
-from django.core.validators import MinValueValidator, MaxValueValidator
+from django.core.validators import MinValueValidator, MaxValueValidator, URLValidator, FileExtensionValidator
 from django.db import models
 from django.utils import timezone
 
@@ -62,7 +62,7 @@ class UserInfo(models.Model):
 
     class SelectionStep(models.TextChoices):
         FORM = "form", "Анкета"
-        TEST = "test", "Тестирование"
+        TEST = "test", "Тестирование способностей"
         ML = "ml", "Мотивационное письмо"
         VIDEO = "video", "Видеовизитка"
         INTERVIEW_PREP = "interview_prep", "Подготовка к собеседованию"
@@ -113,7 +113,7 @@ class UserInfo(models.Model):
     phone = models.CharField(max_length=20, verbose_name="Телефон", blank=True)
     email = models.EmailField(verbose_name="Email", blank=True)
     region = models.CharField(max_length=1000, verbose_name="Регион проживания", blank=True)
-    city = models.CharField(max_length=1000, verbose_name="Город проживания", blank=True)
+    city = models.CharField(max_length=1000, verbose_name="Населенный пункт", blank=True)
     address = models.CharField(max_length=1000, verbose_name="Адрес проживания", blank=True)
 
     # Step 2: Education
@@ -121,23 +121,23 @@ class UserInfo(models.Model):
     school_address = models.CharField(max_length=1000, verbose_name="Адрес школы", blank=True)
     class_teacher = models.CharField(max_length=1000, verbose_name="Классный руководитель", blank=True)
 
-    next_year_class_digit = models.IntegerField(verbose_name="Класс в следующем учебном году", blank=True, null=True,
+    next_year_class_digit = models.IntegerField(verbose_name="Класс в 2026-2027 учебном году", blank=True, null=True,
                                                 validators=[
                                                     MinValueValidator(1),
                                                     MaxValueValidator(11)
                                                 ])
 
-    class_profile = models.CharField(max_length=255, blank=True, verbose_name="Профиль класса")
+    class_profile = models.CharField(max_length=255, blank=True, verbose_name="Профиль класса", help_text="при наличии")
     planned_exams = models.ManyToManyField(
         Subject,
         verbose_name="Планируемые экзамены",
         blank=True,
         related_name="planned_by_users"
     )
-    subject_grades = models.CharField(max_length=1000, verbose_name="Средние оценки по предметам", blank=True)
+    subject_grades = models.CharField(max_length=1000, verbose_name="Средний балл по профильным предметам за последние 2 отчетных периода", blank=True)
 
     # Step 3: Admission Plans
-    olympiad_plans = models.CharField(max_length=10000, verbose_name="Планы участия в олимпиадах", blank=True)
+    olympiad_plans = models.CharField(max_length=10000, verbose_name="Планы участия в олимпиадах", blank=True, help_text='Если не планируешь участвовать, поставь прочерк')
     admission_path = models.CharField(max_length=10000, verbose_name="Ты планируешь поступать по ЕГЭ или олимпиадам?", blank=True)
     target_universities = models.CharField(max_length=10000, verbose_name="Приоритетные вузы", blank=True)
     specializations = models.CharField(max_length=10000, verbose_name="Интересующие направления", blank=True)
@@ -152,58 +152,51 @@ class UserInfo(models.Model):
     income_per_member = models.CharField(max_length=255, verbose_name="Среднемесячный доход на 1 члена семьи за последние 12 месяцев (руб.)", blank=True)
     is_low_income = models.CharField(max_length=10, verbose_name="Имеет ли семья статус малоимущей?", blank=True)
     receives_subsidy = models.CharField(max_length=255, verbose_name="Получает ли семья субсидии от государства? ", blank=True)
-    other_factors = models.CharField(max_length=10000, blank=True, verbose_name="Есть какие-либо иные обстоятельства, о которых ты хотел(-a) бы сообщить?")
-    has_pc_with_internet = models.CharField(max_length=1000, verbose_name="Есть ли дома компьютер с интернетом",
+    other_factors = models.CharField(max_length=10000, blank=True, verbose_name="Какие-либо иные обстоятельства, о которых ты хотел(-а) бы сообщить")
+    has_pc_with_internet = models.CharField(max_length=1000, verbose_name="Есть ли у тебя компьютер/ноутбук с доступом в интернет?",
                                             blank=True)
 
     # Step 5: Additional
     vk = models.URLField(max_length=500, verbose_name="Ссылка на вк", blank=True, null=True, validators=[validate_vk_id_url])
     achievements = models.CharField(max_length=10000, verbose_name="Кратко опиши свои достижения за последние два года", blank=True)
-    preparation_plan = models.CharField(max_length=10000, verbose_name="План подготовки к поступлению", blank=True)
-    foundation_help = models.CharField(max_length=10000, verbose_name="Какая помощь от фонда нужна", blank=True)
-    heard_about_program = models.CharField(max_length=255, verbose_name="Как узнали о программе", blank=True)
+    preparation_plan = models.CharField(max_length=10000, verbose_name="Как ты планируешь свою подготовку к поступлению на следующий год?", blank=True)
+    foundation_help = models.CharField(max_length=10000, verbose_name="Какую помощь ты хочешь получить от Фонда?", blank=True)
+    heard_about_program = models.CharField(max_length=255, verbose_name="Как ты узнал(-а) о программе Фонда?", blank=True)
     willing_to_participate = models.CharField(max_length=10, verbose_name="Готов(-а) ли ты активно принимать участие в программе Фонда?",
                                               blank=True)
-    agree_processing = models.BooleanField(verbose_name="Согласие на обработку данных", null=True)
-    agree_documents = models.BooleanField(verbose_name="Согласие на предоставление документов", null=True)
+
+    agree_program_conditions = models.BooleanField(
+        verbose_name="Ознакомился(-ась) с условиями Благотворительной программы “Поддержи таланты” (ссылка: https://disk.yandex.ru/d/ESiT-bmIM6r6dQ)",
+        null=True
+    )
+
+    agree_privacy_policy = models.BooleanField(
+        verbose_name="Согласен(-на) с Политикой конфиденциальности (ссылка: https://disk.yandex.ru/d/I2-TWTBEYwWdXw)",
+        null=True
+    )
+
+    agree_processing = models.BooleanField(
+        verbose_name="Даю согласие на обработку персональных данных (ссылка: https://disk.yandex.ru/d/kme9vXodYjntrA)",
+        null=True
+    )
+
+    agree_documents = models.BooleanField(
+        verbose_name="В случае утверждения участия в программе обязуюсь предоставить в Фонд документы, подтверждающие предоставленные данные",
+        null=True
+    )
 
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата заполнения анкеты")
 
     tutor_summary = models.TextField(verbose_name="Заметки куратора", blank=True, null=True)
 
     avg_grade_last_period = models.DecimalField(
-        verbose_name="Средний балл успеваемости (все предметы) за последний отчётный период",
+        verbose_name="Средний балл успеваемости за последний отчетный период",
         max_digits=6,
         decimal_places=2,
         null=True,
         blank=True,
         validators=[MinValueValidator(1), MaxValueValidator(100)],
         help_text="Например: 4.57 или 8.92 (зависит от шкалы в школе).",
-    )
-
-    avg_russian_last_2_periods = models.DecimalField(
-        verbose_name="Средний балл по русскому за последние 2 отчётных периода",
-        max_digits=6,
-        decimal_places=2,
-        null=True,
-        blank=True,
-        validators=[MinValueValidator(1), MaxValueValidator(100)],
-    )
-
-    avg_math_last_2_periods = models.DecimalField(
-        verbose_name="Средний балл по математике за последние 2 отчётных периода",
-        max_digits=6,
-        decimal_places=2,
-        null=True,
-        blank=True,
-        validators=[MinValueValidator(1), MaxValueValidator(100)],
-    )
-
-    avg_profile_subjects_last_2_periods = models.CharField(
-        verbose_name="Средний балл по профильным предметам за последние 2 отчётных периода",
-        null=True,
-        blank=True,
-        help_text="Профильные — те, которые важны для поступления по выбранному направлению.",
     )
 
     class FamilyMaterialStatus(models.TextChoices):
@@ -220,7 +213,7 @@ class UserInfo(models.Model):
         choices=FamilyMaterialStatus.choices,
         blank=True,
         null=True,
-        verbose_name="Как бы вы оценили материальное положение вашей семьи?",
+        verbose_name="Как бы ты оценил(-а) материальное положение вашей семьи?",
         db_index=True,
     )
 
@@ -338,6 +331,23 @@ class ScholarVideo(models.Model):
     review = models.TextField(verbose_name="Отзыв", blank=True, null=True)
     score = models.PositiveIntegerField(verbose_name="Оценка в баллах", blank=True, null=True)
 
+    schedule_file = models.FileField(
+        upload_to="scholar_video_schedules/",
+        blank=True,
+        null=True,
+        validators=[
+            FileExtensionValidator(allowed_extensions=["pdf", "doc", "docx"])
+        ],
+        verbose_name="График занятий",
+    )
+
+    online_school_course = models.TextField(
+        blank=True,
+        default="",
+        verbose_name="Онлайн-школа и курс",
+        help_text="Укажи онлайн-школу и курс в свободной форме",
+    )
+
     deadline_at = models.DateTimeField(
         null=True,
         blank=True,
@@ -354,6 +364,38 @@ class ScholarVideo(models.Model):
         blank=True,
         null=True,
     )
+    yandex_disk_path = models.CharField(
+        max_length=1024,
+        blank=True,
+        default="",
+        verbose_name="РџСѓС‚СЊ РЅР° РЇРЅРґРµРєСЃ Р”РёСЃРєРµ",
+    )
+    yandex_disk_uploaded_at = models.DateTimeField(
+        blank=True,
+        null=True,
+        verbose_name="Р—Р°РіСЂСѓР¶РµРЅРѕ РЅР° РЇРЅРґРµРєСЃ Р”РёСЃРє",
+    )
+    yandex_disk_error = models.TextField(
+        blank=True,
+        default="",
+        verbose_name="РћС€РёР±РєР° РІС‹РіСЂСѓР·РєРё РЅР° РЇРЅРґРµРєСЃ Р”РёСЃРє",
+    )
+    schedule_yandex_disk_path = models.CharField(
+        max_length=1024,
+        blank=True,
+        default="",
+        verbose_name="РџСѓС‚СЊ РіСЂР°С„РёРєР° РЅР° РЇРЅРґРµРєСЃ Р”РёСЃРєРµ",
+    )
+    schedule_yandex_disk_uploaded_at = models.DateTimeField(
+        blank=True,
+        null=True,
+        verbose_name="Р“СЂР°С„РёРє Р·Р°РіСЂСѓР¶РµРЅ РЅР° РЇРЅРґРµРєСЃ Р”РёСЃРє",
+    )
+    schedule_yandex_disk_error = models.TextField(
+        blank=True,
+        default="",
+        verbose_name="РћС€РёР±РєР° РІС‹РіСЂСѓР·РєРё РіСЂР°С„РёРєР° РЅР° РЇРЅРґРµРєСЃ Р”РёСЃРє",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -365,6 +407,36 @@ class ScholarVideo(models.Model):
 
     def __str__(self):
         return f"Видеовизитка {self.user.get_full_name() or self.user.username}"
+
+
+    @staticmethod
+    def _storage_name(remote_path: str, local_field) -> str:
+        if remote_path:
+            remote_value = remote_path.replace("disk:/", "", 1).strip("/")
+            if remote_value:
+                return PurePosixPath(remote_value).name
+
+        local_name = getattr(local_field, "name", "") or ""
+        if local_name:
+            return PurePosixPath(local_name).name
+
+        return ""
+
+    @property
+    def has_video_file(self) -> bool:
+        return bool(self.yandex_disk_path or getattr(self.file, "name", ""))
+
+    @property
+    def has_schedule_file(self) -> bool:
+        return bool(self.schedule_yandex_disk_path or getattr(self.schedule_file, "name", ""))
+
+    @property
+    def video_storage_name(self) -> str:
+        return self._storage_name(self.yandex_disk_path, self.file)
+
+    @property
+    def schedule_storage_name(self) -> str:
+        return self._storage_name(self.schedule_yandex_disk_path, self.schedule_file)
 
 
 class UserPersonalData(models.Model):
@@ -404,3 +476,27 @@ class UserPersonalData(models.Model):
 
     def __str__(self):
         return f"Персональные данные {self.user}"
+
+
+class VideoInstruction(models.Model):
+    is_active = models.BooleanField("Показывать плашку", default=True)
+
+    title = models.CharField("Заголовок", max_length=120, default="Инструкция к видеовизитке")
+    text = models.TextField("Текст", blank=True, default="Перед записью ознакомься с требованиями.")
+    url = models.URLField("Ссылка на инструкцию", validators=[URLValidator()])
+
+    button_text = models.CharField("Текст кнопки", max_length=60, default="Открыть инструкцию")
+
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Инструкция к видеовизитке"
+        verbose_name_plural = "Инструкция к видеовизитке"
+
+    def __str__(self):
+        return self.title
+
+    @classmethod
+    def get_current(cls):
+        obj = cls.objects.filter(is_active=True).order_by("-updated_at").first()
+        return obj

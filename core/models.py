@@ -191,8 +191,8 @@ class MotivationLetter(models.Model):
 
     admin_score = models.PositiveSmallIntegerField(
         verbose_name='Итоговый балл',
-        validators=[MinValueValidator(0), MaxValueValidator(60)],
-        help_text="Введите значение от 0 до 60",
+        validators=[MinValueValidator(0), MaxValueValidator(85)],
+        help_text="Введите значение от 0 до 85",
         blank=True,
         null=True
     )
@@ -315,33 +315,30 @@ class MotivationLetter(models.Model):
 
 
 class MotivationLetterRubricReview(models.Model):
-    class ContentGrade(models.TextChoices):
-        FULL = "full", "Полное раскрытие"
-        PARTIAL = "partial", "Частично"
-        NONE = "none", "Не раскрыто"
+    class Topic15Grade(models.TextChoices):
+        FULL_WITH_MATERIALS = "15", "Да, развёрнуто и материалы учтены — 15"
+        BRIEF_WITH_MATERIALS = "8", "Да, но кратко/гипотетически, материалы учтены — 8"
+        BRIEF_NO_MATERIALS = "3", "Да, но кратко/гипотетически, материалы не учтены — 3"
+        NONE = "0", "Нет — 0"
 
-    class CompositionGrade(models.TextChoices):
-        GOOD = "good", "Хорошая"
-        MINOR = "minor_issue", "Незначительные проблемы"
-        MAJOR = "major_issue", "Серьёзные проблемы"
+    class Topic15TrajectoryGrade(models.TextChoices):
+        FULL_WITH_REASON_AND_MATERIALS = "15", "Да, развёрнуто; есть обоснование; материалы учтены — 15"
+        BRIEF_WITH_REASON_AND_MATERIALS = "10", "Да, кратко/гипотетически; есть обоснование; материалы учтены — 10"
+        BRIEF_NO_REASON_OR_NO_MATERIALS = "5", "Да, кратко/гипотетически; нет обоснования ИЛИ материалы не учтены — 5"
+        NONE = "0", "Нет — 0"
 
-    class StylePrecisionGrade(models.TextChoices):
-        GOOD = "good", "Точный стиль"
-        ONE_DIM = "one_dimensional_or_imprecise", "Однообразный / неточный"
-        POOR = "poor", "Плохой стиль"
+    class Topic10Grade(models.TextChoices):
+        FULL = "10", "Да, развёрнуто и по существу — 10"
+        BRIEF = "5", "Да, но кратко/гипотетически — 5"
+        NONE = "0", "Нет — 0"
 
-    class OrthographyGrade(models.TextChoices):
-        NONE = "none", "Ошибок нет"
-        ONE_TWO = "one_two", "1–2 ошибки"
-        THREE_PLUS = "three_plus", "3 и более ошибок"
-
-    class SyntaxGrade(models.TextChoices):
-        NONE = "none", "Ошибок нет"
-        ONE = "one", "1 ошибка"
-        TWO_PLUS = "two_plus", "2 и более ошибок"
+    class Penalty02or5(models.TextChoices):
+        NONE = "0", "Нет замечаний — 0"
+        MINOR = "-2", "Незначительные проблемы — -2"
+        MAJOR = "-5", "Серьёзные проблемы — -5"
 
     letter = models.OneToOneField(
-        MotivationLetter,
+        "MotivationLetter",
         on_delete=models.CASCADE,
         related_name="rubric_review",
         verbose_name="Мотивационное письмо",
@@ -362,8 +359,14 @@ class MotivationLetterRubricReview(models.Model):
     schema_version = models.CharField(
         max_length=32,
         blank=True,
-        default="v1",
+        default="v2",
         verbose_name="Версия рубрики",
+    )
+
+    char_count = models.PositiveIntegerField(
+        default=0,
+        verbose_name="Количество символов",
+        help_text="По новой рубрике важен объём письма в символах",
     )
 
     word_count = models.PositiveIntegerField(
@@ -376,72 +379,123 @@ class MotivationLetterRubricReview(models.Model):
         verbose_name="Итоговый балл",
     )
 
-    specialty_choice = models.CharField(
-        max_length=16,
-        choices=ContentGrade.choices,
-        verbose_name="Выбор специальности",
-    )
-    university_choice = models.CharField(
-        max_length=16,
-        choices=ContentGrade.choices,
-        verbose_name="Выбор университета",
-    )
-    current_preparation = models.CharField(
-        max_length=16,
-        choices=ContentGrade.choices,
-        verbose_name="Текущая подготовка",
-    )
-    next_year_plan = models.CharField(
-        max_length=16,
-        choices=ContentGrade.choices,
-        verbose_name="План на следующий год",
-    )
-    higher_ed_value = models.CharField(
-        max_length=16,
-        choices=ContentGrade.choices,
-        verbose_name="Ценность высшего образования",
-    )
-    support_criticality = models.CharField(
-        max_length=16,
-        choices=ContentGrade.choices,
-        verbose_name="Критичность поддержки",
+    specialty_choice_score = models.CharField(
+        max_length=2,
+        choices=Topic15Grade.choices,
+        default=Topic15Grade.NONE,
+        verbose_name="Тема №2: выбор специальности",
     )
 
-    composition = models.CharField(
-        max_length=16,
-        choices=CompositionGrade.choices,
-        verbose_name="Композиция текста",
-    )
-    style_precision = models.CharField(
-        max_length=32,
-        choices=StylePrecisionGrade.choices,
-        verbose_name="Точность стиля",
+    university_choice_score = models.CharField(
+        max_length=2,
+        choices=Topic15Grade.choices,
+        default=Topic15Grade.NONE,
+        verbose_name="Тема №3: выбор вуза",
     )
 
-    orthography = models.CharField(
-        max_length=16,
-        choices=OrthographyGrade.choices,
+    current_preparation_score = models.CharField(
+        max_length=2,
+        choices=Topic10Grade.choices,
+        default=Topic10Grade.NONE,
+        verbose_name="Тема №4: текущая подготовка",
+    )
+
+    admission_trajectory_score = models.CharField(
+        max_length=2,
+        choices=Topic15TrajectoryGrade.choices,
+        default=Topic15TrajectoryGrade.NONE,
+        verbose_name="Тема №5: траектория поступления",
+    )
+
+    next_year_preparation_score = models.CharField(
+        max_length=2,
+        choices=Topic10Grade.choices,
+        default=Topic10Grade.NONE,
+        verbose_name="Тема №6: подготовка в следующем учебном году",
+    )
+
+    higher_education_value_score = models.CharField(
+        max_length=2,
+        choices=Topic10Grade.choices,
+        default=Topic10Grade.NONE,
+        verbose_name="Тема №7: значимость высшего образования",
+    )
+
+    support_criticality_score = models.CharField(
+        max_length=2,
+        choices=Topic10Grade.choices,
+        default=Topic10Grade.NONE,
+        verbose_name="Тема №8: критичность поддержки",
+    )
+
+    composition_penalty = models.CharField(
+        max_length=2,
+        choices=Penalty02or5.choices,
+        default=Penalty02or5.NONE,
+        verbose_name="Последовательность изложения и композиция",
+    )
+
+    style_penalty = models.CharField(
+        max_length=2,
+        choices=Penalty02or5.choices,
+        default=Penalty02or5.NONE,
+        verbose_name="Точность и выразительность речи",
+    )
+
+    orthography_penalty = models.CharField(
+        max_length=2,
+        choices=Penalty02or5.choices,
+        default=Penalty02or5.NONE,
         verbose_name="Орфография",
     )
-    syntax = models.CharField(
-        max_length=16,
-        choices=SyntaxGrade.choices,
+
+    syntax_penalty = models.CharField(
+        max_length=2,
+        choices=Penalty02or5.choices,
+        default=Penalty02or5.NONE,
         verbose_name="Синтаксис",
     )
 
+    is_too_short = models.BooleanField(
+        default=False,
+        verbose_name="Менее 1000 символов",
+    )
+
+    score_capped_for_short_length = models.BooleanField(
+        default=False,
+        verbose_name="Для текста 1000–1500 символов применён потолок оценки",
+        help_text="По критериям максимум 85 для такого объёма не ставится",
+    )
+
+    suspected_ai_generated = models.BooleanField(
+        default=False,
+        verbose_name="Есть признаки написания нейросетью",
+    )
+
+    returned_for_revision = models.BooleanField(
+        default=False,
+        verbose_name="Рекомендовано вернуть на доработку",
+    )
+
+    reviewer_comment = models.TextField(
+        blank=True,
+        default="",
+        verbose_name="Комментарий проверяющего",
+    )
+
     family = models.TextField(blank=True, default="", verbose_name="Семья")
-    hobbies = models.TextField(blank=True, default="", verbose_name="Хобби")
+    hobbies = models.TextField(blank=True, default="", verbose_name="Увлечения")
     achievements = models.TextField(blank=True, default="", verbose_name="Достижения")
     traits = models.TextField(blank=True, default="", verbose_name="Личные качества")
-    school_teachers = models.TextField(blank=True, default="", verbose_name="Учителя")
-    prep_subjects = models.TextField(blank=True, default="", verbose_name="Предметы подготовки")
-    specialty = models.TextField(blank=True, default="", verbose_name="Предполагаемая специальность")
-    preferred_universities = models.TextField(blank=True, default="", verbose_name="Предпочтительные вузы")
-    relocation = models.TextField(blank=True, default="", verbose_name="Готовность к переезду")
-    olympiads = models.TextField(blank=True, default="", verbose_name="Олимпиады")
+    school_teachers = models.TextField(blank=True, default="", verbose_name="Школа и преподаватели")
+    prep_subjects = models.TextField(blank=True, default="", verbose_name="Предметы для подготовки")
+    specialty = models.TextField(blank=True, default="", verbose_name="Специальность")
+    preferred_universities = models.TextField(blank=True, default="", verbose_name="Предпочитаемые вузы")
+    relocation = models.TextField(blank=True, default="", verbose_name="Возможность переезда")
+    olympiads = models.TextField(blank=True, default="", verbose_name="Участие в олимпиадах")
     motivation = models.TextField(blank=True, default="", verbose_name="Мотивация")
     help_criticality = models.TextField(blank=True, default="", verbose_name="Критичность помощи")
-    extra = models.TextField(blank=True, default="", verbose_name="Дополнительная информация")
+    extra = models.TextField(blank=True, default="", verbose_name="Дополнительные данные")
 
     justification = models.TextField(
         blank=True,
@@ -456,7 +510,49 @@ class MotivationLetterRubricReview(models.Model):
             models.Index(fields=["total_score"]),
             models.Index(fields=["created_at"]),
             models.Index(fields=["schema_version"]),
+            models.Index(fields=["is_too_short"]),
+            models.Index(fields=["suspected_ai_generated"]),
         ]
+
+    @staticmethod
+    def _to_int(value) -> int:
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return 0
+
+    def calculate_total_score(self) -> int:
+        if self.suspected_ai_generated:
+            return 0
+
+        if self.is_too_short or self.char_count < 1000:
+            return 0
+
+        total = 0
+
+        total += self._to_int(self.specialty_choice_score)
+        total += self._to_int(self.university_choice_score)
+        total += self._to_int(self.current_preparation_score)
+        total += self._to_int(self.admission_trajectory_score)
+        total += self._to_int(self.next_year_preparation_score)
+        total += self._to_int(self.higher_education_value_score)
+        total += self._to_int(self.support_criticality_score)
+
+        total += self._to_int(self.composition_penalty)
+        total += self._to_int(self.style_penalty)
+        total += self._to_int(self.orthography_penalty)
+        total += self._to_int(self.syntax_penalty)
+
+        if 1000 <= self.char_count < 1500 and total >= 85:
+            self.score_capped_for_short_length = True
+            total = 84
+
+        return max(total, 0)
+
+    def save(self, *args, **kwargs):
+        self.is_too_short = self.char_count < 1000
+        self.total_score = self.calculate_total_score()
+        super().save(*args, **kwargs)
 
     def __str__(self) -> str:
         return f"Рубрика: письмо #{self.letter_id}, {self.total_score} баллов"
@@ -522,6 +618,14 @@ class UserNotification(models.Model):
         on_delete=models.CASCADE,
         verbose_name="Пользователь"
     )
+
+    tg_sent_at = models.DateTimeField(null=True, blank=True)
+    email_sent_at = models.DateTimeField(null=True, blank=True)
+
+    send_attempts = models.PositiveIntegerField(default=0)
+    last_error = models.TextField(blank=True, default="")
+
+    created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
 
     is_seen = models.BooleanField(default=False, verbose_name="Просмотрено")
 

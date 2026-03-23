@@ -234,7 +234,7 @@ class InterviewForm(forms.ModelForm):
 class TestAssignmentCreateForm(forms.ModelForm):
     class Meta:
         model = TestAssignment
-        fields = ("user", "title", "external_url", "instructions", "due_at", "status")
+        fields = ("template", "user", "title", "instructions", "due_at", "status")
         widgets = {
             "due_at": forms.DateTimeInput(attrs={"type": "datetime-local"}),
             "instructions": forms.Textarea(attrs={"rows": 3}),
@@ -244,13 +244,13 @@ class TestAssignmentCreateForm(forms.ModelForm):
 class TestAssignmentEditForm(forms.ModelForm):
     class Meta:
         model = TestAssignment
-        fields = ("title", "external_url", "instructions", "due_at", "status")
+        fields = ("title", "instructions", "due_at", "status")
 
 
 class TestResultForm(forms.ModelForm):
     class Meta:
         model = TestAssignment
-        fields = ("result_score", "percentile", "result_text", "passed")
+        fields = ("score_a", "percentile_a", "score_b", "percentile_b", "score_c", "percentile_c", "result_text", "passed")
         widgets = {
             "result_text": forms.Textarea(attrs={"rows": 4}),
             "percentile": forms.NumberInput(attrs={"step": "0.01", "min": "0", "max": "100"}),
@@ -292,26 +292,38 @@ class ScholarVideoDeadlineForm(forms.ModelForm):
 class MotivationLetterRubricReviewStaffForm(forms.ModelForm):
     class Meta:
         model = MotivationLetterRubricReview
+
         fields = [
-            # computed/meta
+            # meta
             "total_score",
+            "char_count",
             "word_count",
 
-            # content
-            "specialty_choice",
-            "university_choice",
-            "current_preparation",
-            "next_year_plan",
-            "higher_ed_value",
-            "support_criticality",
+            # content scores
+            "specialty_choice_score",
+            "university_choice_score",
+            "current_preparation_score",
+            "admission_trajectory_score",
+            "next_year_preparation_score",
+            "higher_education_value_score",
+            "support_criticality_score",
 
-            # rhetoric
-            "composition",
-            "style_precision",
+            # rhetoric penalties
+            "composition_penalty",
+            "style_penalty",
 
-            # literacy
-            "orthography",
-            "syntax",
+            # literacy penalties
+            "orthography_penalty",
+            "syntax_penalty",
+
+            # flags
+            "is_too_short",
+            "score_capped_for_short_length",
+            "suspected_ai_generated",
+            "returned_for_revision",
+
+            # comment
+            "reviewer_comment",
 
             # extractions
             "family",
@@ -328,11 +340,14 @@ class MotivationLetterRubricReviewStaffForm(forms.ModelForm):
             "help_criticality",
             "extra",
 
-            # justification
+            # explanation
             "justification",
         ]
+
         widgets = {
+            "reviewer_comment": forms.Textarea(attrs={"rows": 4}),
             "justification": forms.Textarea(attrs={"rows": 6}),
+
             "family": forms.Textarea(attrs={"rows": 2}),
             "hobbies": forms.Textarea(attrs={"rows": 2}),
             "achievements": forms.Textarea(attrs={"rows": 2}),
@@ -364,3 +379,19 @@ class InterviewResultForm(forms.ModelForm):
 
             if isinstance(widget, forms.Textarea) and "rows" not in widget.attrs:
                 widget.attrs["rows"] = 1
+
+
+
+class TestRevisionForm(forms.ModelForm):
+    class Meta:
+        model = TestAssignment
+        fields = ["revision_comment"]
+        widgets = {
+            "revision_comment": forms.Textarea(attrs={"rows": 4}),
+        }
+
+    def clean_revision_comment(self):
+        txt = (self.cleaned_data.get("revision_comment") or "").strip()
+        if not txt:
+            raise forms.ValidationError("Нужно написать комментарий, что именно дописать.")
+        return txt

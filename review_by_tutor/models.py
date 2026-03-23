@@ -1,16 +1,78 @@
 from django.contrib.auth import get_user_model
+from django.core.validators import URLValidator
 from django.db import models
 from django.utils import timezone
 
 User = get_user_model()
 
 
+class TestTemplate(models.Model):
+    title = models.CharField("Название теста", max_length=200)
+    external_url = models.URLField("Ссылка на прохождение", blank=True)
+    instructions = models.TextField("Инструкции/Комментарий", blank=True)
+
+    default_due_days = models.PositiveIntegerField(
+        "Дедлайн (дней от назначения)",
+        null=True, blank=True,
+        help_text="Если задано, дедлайн посчитается как assigned_at + N дней",
+    )
+
+    is_active = models.BooleanField("Активен", default=True)
+
+    created_by = models.ForeignKey(
+        User, on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="created_test_templates",
+        verbose_name="Создал",
+    )
+    created_at = models.DateTimeField("Создано", default=timezone.now)
+
+    class Meta:
+        ordering = ["-id"]
+        verbose_name = "Шаблон теста"
+        verbose_name_plural = "Шаблоны тестов"
+
+    def __str__(self):
+        return self.title
+
+class TestingInstruction(models.Model):
+    is_active = models.BooleanField("Показывать плашку", default=True)
+
+    title = models.CharField("Заголовок", max_length=120, default="Инструкция к тестированию")
+    text = models.TextField("Текст", blank=True, default="Перед выполнением теста ознакомьтесь с инструкцией.")
+    url = models.URLField("Ссылка на инструкцию", validators=[URLValidator()])
+
+    button_text = models.CharField("Текст кнопки", max_length=60, default="Открыть инструкцию")
+
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Инструкция к тестированию"
+        verbose_name_plural = "Инструкция к тестированию"
+
+    def __str__(self):
+        return self.title
+
+    @classmethod
+    def get_current(cls):
+        obj = cls.objects.filter(is_active=True).order_by("-updated_at").first()
+        return obj
+
 class TestAssignment(models.Model):
     class Status(models.TextChoices):
         ASSIGNED = "assigned", "Назначено"
         IN_PROGRESS = "in_progress", "В процессе"
+        NEEDS_REVISION = "needs_revision", "На дописывание"
         COMPLETED = "completed", "Завершено"
         CANCELLED = "cancelled", "Отменено"
+
+    template = models.ForeignKey(
+        "TestTemplate",
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="assignments",
+        verbose_name="Шаблон",
+    )
 
     user = models.ForeignKey(
         User,
@@ -40,15 +102,35 @@ class TestAssignment(models.Model):
         db_index=True,
     )
 
-    result_score = models.DecimalField("Баллы", max_digits=6, decimal_places=2, null=True, blank=True)
+    score_a = models.DecimalField("Баллы A", max_digits=6, decimal_places=2, null=True, blank=True)
+    score_b = models.DecimalField("Баллы B", max_digits=6, decimal_places=2, null=True, blank=True)
+    score_c = models.DecimalField("Баллы C", max_digits=6, decimal_places=2, null=True, blank=True)
 
-    percentile = models.DecimalField(
-        "Перцентиль",
+    percentile_a = models.DecimalField(
+        "Перцентиль A",
         max_digits=5,
         decimal_places=2,
         null=True,
         blank=True,
-        help_text="Результат в перцентилях (0–100)",
+        help_text="Перцентиль по шкале A (0–100)",
+    )
+
+    percentile_b = models.DecimalField(
+        "Перцентиль B",
+        max_digits=5,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Перцентиль по шкале B (0–100)",
+    )
+
+    percentile_c = models.DecimalField(
+        "Перцентиль C",
+        max_digits=5,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Перцентиль по шкале C (0–100)",
     )
 
     result_text = models.TextField("Комментарий/результат", blank=True)
@@ -63,6 +145,16 @@ class TestAssignment(models.Model):
         verbose_name="Результат внёс",
     )
     result_filled_at = models.DateTimeField("Результат внесён", null=True, blank=True)
+
+    revision_comment = models.TextField("Комментарий для дописывания", blank=True)
+    revision_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name="revision_requested_tests",
+        verbose_name="Отправил на дописывание",
+    )
+    revision_at = models.DateTimeField("Отправлено на дописывание", null=True, blank=True)
 
     class Meta:
         ordering = ["-assigned_at", "-id"]
@@ -80,6 +172,35 @@ class TestAssignment(models.Model):
             self.completed_at = timezone.now()
         if self.status != self.Status.COMPLETED:
             self.status = self.Status.COMPLETED
+
+    def mark_needs_revision(self, by_user: User, comment: str):
+        self.status = self.Status.NEEDS_REVISION
+        self.revision_by = by_user
+        self.revision_at = timezone.now()
+        self.revision_comment = (comment or "").strip()
+
+        self.completed_at = None
+        self.passed = None
+
+    @property
+    def is_overdue(self) -> bool:
+        return bool(self.due_at and not self.completed_at and timezone.now() > self.due_at)
+
+    @property
+    def on_time(self):
+        if not self.due_at or not self.completed_at:
+            return None
+        return self.completed_at <= self.due_at
+
+    @property
+    def timing_label(self) -> str:
+        if self.on_time is True:
+            return "Успел"
+        if self.on_time is False:
+            return "Не успел"
+        if self.is_overdue:
+            return "Просрочено (ещё не сдано)"
+        return "Не определено"
 
 
 class InterviewPreparation(models.Model):
@@ -353,7 +474,8 @@ class InterviewResult(models.Model):
 
     admission_way = models.CharField(
         max_length=255, blank=True, default="", db_index=True,
-        verbose_name="Планируемый способ поступления"
+        verbose_name="Планируемая траектория поступления",
+        help_text="Существует несколько траекторий поступления, опиши ту, которую планируешь использовать сейчас"
     )
 
     ege_subjects = models.CharField(

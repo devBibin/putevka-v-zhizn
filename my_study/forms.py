@@ -45,7 +45,7 @@ class UniversityPriorityForm(forms.ModelForm):
             "priority": forms.Select(choices=[(i, str(i)) for i in range(1, 6)]),
             "notes": forms.Textarea(attrs={"rows": 6, "placeholder": "Почему вы выбрали этот вуз?"}),
             "university": forms.TextInput(attrs={"placeholder": "ВМиП (вуз милых и прикольных)"}),
-            "city": forms.TextInput(attrs={"placeholder": "Город N"}),
+            "city": forms.TextInput(attrs={"placeholder": "поселок городского типа Шаранга"}),
             "specialty": forms.TextInput(attrs={"placeholder": "Программная инженерия"}),
             "is_targeted": forms.CheckboxInput(),
         }
