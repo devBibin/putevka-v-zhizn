@@ -318,7 +318,7 @@ def export_users_xlsx(request):
                   video.review if video else "",
                   video.score if video else "",
                   _dt(video.deadline_at) if video else "",
-                  video.file.url if video and video.file else "",
+                  video.yandex_disk_path if video and video.yandex_disk_path else (video.file.url if video and video.file else ""),
               ] + test_cells
 
         ws.append(row)

@@ -1,5 +1,4 @@
 import logging
-import mimetypes
 from datetime import timedelta
 
 from django.contrib import messages
@@ -37,6 +36,7 @@ from review_by_tutor.services.staff_users import build_staff_users_queryset, get
 from review_by_tutor.utils.contact_form import handle_send_notification
 from review_by_tutor.utils.selection_stages import require_selection_step
 from scholar_form.models import UserInfo, ScholarVideo, StaffNote
+from scholar_form.views import build_video_asset_context
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -389,24 +389,22 @@ def staff_video_detail(request, user_id: int):
                 return redirect("staff_video_detail", user_id=user_id)
             messages.error(request, "Исправьте ошибки в форме.")
 
-    mime = None
-    if video:
-        try:
-            file_name = getattr(getattr(video, "file", None), "name", "") or ""
-            if file_name:
-                mime, _ = mimetypes.guess_type(file_name)
-        except Exception:
-            mime = None
+    asset_context = build_video_asset_context(video) if video else {
+        "video_download_url": None,
+        "schedule_download_url": None,
+        "video_name": "",
+        "schedule_name": "",
+        "video_mime": None,
+    }
 
     return render(request, "staff_templates/video_detail.html", {
         "user_obj": user_obj,
         "video": video,
-        "video_mime": mime,
         "form": staff_form,
         "deadline_form": deadline_form,
         "active": "my_video_page",
         "send_notification_form": send_notification_form,
-
+        **asset_context,
     })
 
 

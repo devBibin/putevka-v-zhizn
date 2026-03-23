@@ -1,7 +1,7 @@
 import mimetypes
 import re
 from datetime import timedelta
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -364,6 +364,38 @@ class ScholarVideo(models.Model):
         blank=True,
         null=True,
     )
+    yandex_disk_path = models.CharField(
+        max_length=1024,
+        blank=True,
+        default="",
+        verbose_name="РџСѓС‚СЊ РЅР° РЇРЅРґРµРєСЃ Р”РёСЃРєРµ",
+    )
+    yandex_disk_uploaded_at = models.DateTimeField(
+        blank=True,
+        null=True,
+        verbose_name="Р—Р°РіСЂСѓР¶РµРЅРѕ РЅР° РЇРЅРґРµРєСЃ Р”РёСЃРє",
+    )
+    yandex_disk_error = models.TextField(
+        blank=True,
+        default="",
+        verbose_name="РћС€РёР±РєР° РІС‹РіСЂСѓР·РєРё РЅР° РЇРЅРґРµРєСЃ Р”РёСЃРє",
+    )
+    schedule_yandex_disk_path = models.CharField(
+        max_length=1024,
+        blank=True,
+        default="",
+        verbose_name="РџСѓС‚СЊ РіСЂР°С„РёРєР° РЅР° РЇРЅРґРµРєСЃ Р”РёСЃРєРµ",
+    )
+    schedule_yandex_disk_uploaded_at = models.DateTimeField(
+        blank=True,
+        null=True,
+        verbose_name="Р“СЂР°С„РёРє Р·Р°РіСЂСѓР¶РµРЅ РЅР° РЇРЅРґРµРєСЃ Р”РёСЃРє",
+    )
+    schedule_yandex_disk_error = models.TextField(
+        blank=True,
+        default="",
+        verbose_name="РћС€РёР±РєР° РІС‹РіСЂСѓР·РєРё РіСЂР°С„РёРєР° РЅР° РЇРЅРґРµРєСЃ Р”РёСЃРє",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -375,6 +407,36 @@ class ScholarVideo(models.Model):
 
     def __str__(self):
         return f"Видеовизитка {self.user.get_full_name() or self.user.username}"
+
+
+    @staticmethod
+    def _storage_name(remote_path: str, local_field) -> str:
+        if remote_path:
+            remote_value = remote_path.replace("disk:/", "", 1).strip("/")
+            if remote_value:
+                return PurePosixPath(remote_value).name
+
+        local_name = getattr(local_field, "name", "") or ""
+        if local_name:
+            return PurePosixPath(local_name).name
+
+        return ""
+
+    @property
+    def has_video_file(self) -> bool:
+        return bool(self.yandex_disk_path or getattr(self.file, "name", ""))
+
+    @property
+    def has_schedule_file(self) -> bool:
+        return bool(self.schedule_yandex_disk_path or getattr(self.schedule_file, "name", ""))
+
+    @property
+    def video_storage_name(self) -> str:
+        return self._storage_name(self.yandex_disk_path, self.file)
+
+    @property
+    def schedule_storage_name(self) -> str:
+        return self._storage_name(self.schedule_yandex_disk_path, self.schedule_file)
 
 
 class UserPersonalData(models.Model):

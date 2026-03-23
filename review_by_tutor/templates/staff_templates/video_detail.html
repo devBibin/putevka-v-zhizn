@@ -16,22 +16,28 @@
   {% endif %}
 
   <div class="row g-4">
-    <!-- Левая колонка: материалы пользователя -->
     <div class="col-lg-7">
       <div class="card shadow-sm mb-4">
         <div class="card-header">Видео</div>
         <div class="card-body">
 
           {% if video %}
-            {% if video.file %}
+            {% if video.has_video_file and video_download_url %}
               <video controls preload="metadata" style="width: 100%; max-height: 480px;">
-                <source src="{{ video.file.url }}"{% if video_mime %} type="{{ video_mime }}"{% endif %}>
-                Ваш браузер не поддерживает воспроизведение видео-тега.
+                <source src="{{ video_download_url }}"{% if video_mime %} type="{{ video_mime }}"{% endif %}>
+                Ваш браузер не поддерживает воспроизведение видео.
               </video>
               <div class="mt-2">
-                <a class="btn btn-outline-secondary btn-sm" href="{{ video.file.url }}" download>
+                <a class="btn btn-outline-secondary btn-sm" href="{{ video_download_url }}" download>
                   Скачать файл
                 </a>
+              </div>
+              {% if video_name %}
+                <div class="small text-muted mt-2">{{ video_name }}</div>
+              {% endif %}
+            {% elif video.has_video_file %}
+              <div class="alert alert-warning mb-0">
+                Видео есть, но временная ссылка на него сейчас не получена.
               </div>
             {% else %}
               <div class="alert alert-warning mb-0">
@@ -54,19 +60,26 @@
             <div class="mb-4">
               <h6 class="mb-2">График занятий</h6>
 
-              {% if video.schedule_file %}
+              {% if video.has_schedule_file and schedule_download_url %}
                 <div class="d-flex flex-wrap gap-2">
                   <a class="btn btn-outline-secondary btn-sm"
-                     href="{{ video.schedule_file.url }}"
+                     href="{{ schedule_download_url }}"
                      target="_blank"
                      rel="noopener">
                     Открыть файл
                   </a>
                   <a class="btn btn-outline-secondary btn-sm"
-                     href="{{ video.schedule_file.url }}"
+                     href="{{ schedule_download_url }}"
                      download>
                     Скачать файл
                   </a>
+                </div>
+                {% if schedule_name %}
+                  <div class="small text-muted mt-2">{{ schedule_name }}</div>
+                {% endif %}
+              {% elif video.has_schedule_file %}
+                <div class="alert alert-warning mb-0">
+                  График загружен, но временная ссылка сейчас недоступна.
                 </div>
               {% else %}
                 <div class="alert alert-warning mb-0">
@@ -126,7 +139,6 @@
       </div>
     </div>
 
-    <!-- Правая колонка: управление -->
     <div class="col-lg-5">
 
       <div class="card shadow-sm mb-4">
@@ -191,7 +203,7 @@
                 <label class="form-label">{{ form.score.label }}</label>
                 {{ form.score|add_class:"form-control" }}
                 <div class="form-text">
-                  Целое число. Подстрой под свою шкалу, без шаманства.
+                  Целое число. Подстрой под свою шкалу.
                 </div>
                 {% if form.score.errors %}
                   <div class="text-danger small mt-1">{{ form.score.errors }}</div>
