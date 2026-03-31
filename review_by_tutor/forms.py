@@ -65,6 +65,9 @@ class UserInfoStaffForm(forms.ModelForm):
         exclude = ("user", "created_at", "updated_at", "avatar", "email")
 
         widgets = {
+            "mother": forms.Textarea(attrs={"rows": 2}),
+            "father": forms.Textarea(attrs={"rows": 2}),
+            "legal_guardian": forms.Textarea(attrs={"rows": 2}),
             "address": forms.Textarea(attrs={"rows": 2}),
             "school_address": forms.Textarea(attrs={"rows": 2}),
             "subject_grades": forms.Textarea(attrs={"rows": 3}),
