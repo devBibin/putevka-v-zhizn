@@ -1,11 +1,11 @@
 from logging import getLogger
 
 import config
-import telebot
+from core.telegram_proxy import create_telegram_bot
 
 logger = getLogger(__name__)
 
-_bot = telebot.TeleBot(config.TG_TOKEN_MAIL, parse_mode="HTML")
+_bot = create_telegram_bot(config.TG_TOKEN_MAIL, parse_mode="HTML")
 
 def send_telegram_feedback_message(text: str) -> None:
     MAX_LEN = 4000

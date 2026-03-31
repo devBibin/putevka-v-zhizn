@@ -4,20 +4,20 @@ from django.core.mail import EmailMultiAlternatives
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 from django.urls import reverse
-from telebot import TeleBot
 
 import config
 from Putevka import settings
 from core.bot import send_tg_notification_to_user
 from core.models import MotivationLetter
 from core.services.email_service import send_email_to_user
+from core.telegram_proxy import create_telegram_bot
 from scholar_form.models import UserInfo, UserPersonalData
 
 TELEGRAM_STAFF_CHAT_IDS = config.TELEGRAM_STAFF_CHAT_IDS
 TG_TOKEN = config.TG_TOKEN_ADMIN
 
 try:
-    bot = TeleBot(TG_TOKEN)
+    bot = create_telegram_bot(TG_TOKEN)
 except:
     bot = None
 

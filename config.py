@@ -31,6 +31,7 @@ TG_TOKEN_MAIL = get_variable('TG_TOKEN_MAIL')
 TG_CHAT_ID_MAIL = get_variable('TG_CHAT_ID_MAIL')
 
 GPT_TOKEN = get_variable('GPT_TOKEN')
+TELEGRAM_PROXY = os.getenv("TELEGRAM_PROXY") or os.getenv("OPENAI_PROXY")
 
 PUBLIC_KEY_CALL = get_variable('PUBLIC_KEY_CALL')
 CAMPAIGN_ID = get_variable('CAMPAIGN_ID')

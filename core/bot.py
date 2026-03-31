@@ -8,15 +8,17 @@ from django.core.files.base import ContentFile
 from django.core.files.storage import default_storage
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
-from telebot import TeleBot, types
+from telebot import types
 
 import config
 from core.models import TelegramAccount, RegistrationPersonalData
+from core.telegram_proxy import create_telegram_bot
 from scholar_form.models import UserInfo
 
 logger = logging.getLogger(__name__)
 
 bot_instances = {}
+_bot_messenger = None
 
 def send_message_to_user(chat_id, message_text, token):
     try:
@@ -30,14 +32,14 @@ def get_bot_messenger():
         if not config.TG_TOKEN_USERS:
             logger.error("TG_TOKEN_USERS не установлен в config.py")
             return None
-        _bot_messenger = telebot.TeleBot(config.TG_TOKEN_USERS)
+        _bot_messenger = create_telegram_bot(config.TG_TOKEN_USERS)
     return _bot_messenger
 
 
 def get_bot_instance(token):
     if token not in bot_instances:
         try:
-            bot_instances[token] = telebot.TeleBot(token, parse_mode='HTML')
+            bot_instances[token] = create_telegram_bot(token, parse_mode='HTML')
         except Exception as e:
             logger.error(f'Невозможно подключиться к телеграмм-боту: {e}')
             return None
@@ -226,7 +228,7 @@ def send_tg_notification_to_user(
         markup = None
 
     try:
-        bot_user = TeleBot(config.TG_TOKEN_USERS)
+        bot_user = create_telegram_bot(config.TG_TOKEN_USERS, parse_mode="HTML")
         bot_user.send_message(
             tg_id,
             message,

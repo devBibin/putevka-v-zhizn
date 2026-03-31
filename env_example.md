@@ -27,6 +27,11 @@ TG_BOT_USERS_USERNAME= # @username бота для пользователей (e
 BASE_URL= # Базовый URL приложения (например, https://example.com)  
 
 
+# Telegram proxy
+
+TELEGRAM_PROXY= # URL proxy for Telegram API; if empty, OPENAI_PROXY will be used
+
+
 # GPT
 
 GPT_TOKEN= # API-токен для ChatGPT интеграции
