@@ -4,15 +4,12 @@ import uuid
 
 import requests
 
-import telebot
-
 from django.contrib import messages
 from django.contrib.auth import authenticate, login
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.hashers import make_password
 from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password, password_validators_help_text_html
-from django.core.mail import send_mail
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
@@ -20,7 +17,6 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST, require_http_methods
 
 import config
-from Putevka import settings
 from review_by_tutor.utils.selection_stages import require_selection_step
 from .decorators import ensure_registration_gate
 from .forms import CustomUserCreationForm, RegistrationForm, VerifyEmailForm, PhoneNumberForm, MotivationLetterForm, \
@@ -42,8 +38,7 @@ from .forms import SendNotificationForm
 from .models import UserNotification, Notification
 
 from .bot import webhook
-from .services.email_service import send_email_verification_code
-from .services.tg_service import send_telegram_feedback_message
+from .services.email_service import send_email_message, send_email_verification_code
 from .services.zvonok_service import initiate_zvonok_verification, poll_zvonok_status
 from django.db import transaction
 from django.utils import timezone
@@ -54,6 +49,7 @@ logger = logging.getLogger(__name__)
 @login_required
 @require_http_methods(["GET", "POST"])
 def feedback_view(request):
+    feedback_email = "talents@putevka-v-zhizn.ru"
     if request.method == "POST":
         form = FeedbackForm(request.POST)
         if form.is_valid():
@@ -63,28 +59,43 @@ def feedback_view(request):
             user_info = getattr(user, "user_info", None)
 
             full_name = user.get_full_name() or user.username
-            email = user.email or "—"
-            phone = getattr(user_info, "phone", "—") if user_info else "—"
+            email = user.email or "-"
+            phone = getattr(user_info, "phone", "-") if user_info else "-"
 
             tg = getattr(user, "telegram_account", None)
             tg_user = getattr(tg, "username", None)
+            tg_display = f"@{tg_user}" if tg_user else "-"
+            subject = f"Обратная связь с сайта от пользователя #{user.id}"
 
             text = (
-                "📝 <b>Обратная связь с сайта</b>\n\n"
-                f"👤 <b>Пользователь:</b> {full_name} (id={user.id})\n"
-                f"📧 <b>Email:</b> {email}\n"
-                f"📱 <b>Телефон:</b> {phone}\n"
-                f"📱 <b>Телеграм:</b> @{tg_user}\n\n"
-                f"💬 <b>Сообщение:</b>\n{cd['message']}"
+                "Обратная связь с сайта\n\n"
+                f"Пользователь: {full_name} (id={user.id})\n"
+                f"Email: {email}\n"
+                f"Телефон: {phone}\n"
+                f"Телеграм: {tg_display}\n\n"
+                f"Сообщение:\n{cd['message']}"
+            )
+            html = (
+                "<b>Обратная связь с сайта</b><br><br>"
+                f"<b>Пользователь:</b> {full_name} (id={user.id})<br>"
+                f"<b>Email:</b> {email}<br>"
+                f"<b>Телефон:</b> {phone}<br>"
+                f"<b>Телеграм:</b> {tg_display}<br><br>"
+                f"<b>Сообщение:</b><br>{cd['message'].replace(chr(10), '<br>')}"
             )
 
-            logger.info(f"Получена обратная связь от user_id={user.id}")
+            logger.info("Получена обратная связь от user_id=%s", user.id)
 
             try:
-                send_telegram_feedback_message(text)
+                send_email_message(
+                    subject=subject,
+                    to=[feedback_email],
+                    text=text,
+                    html=html,
+                )
             except Exception:
                 messages.error(request, "Не удалось отправить сообщение. Попробуйте позже.")
-                return render(request, "feedback.html", {"form": form})
+                return render(request, "feedback.html", {"form": form, "active": "feedback"})
 
             messages.success(request, "Спасибо! Сообщение отправлено.")
             return redirect("feedback")
