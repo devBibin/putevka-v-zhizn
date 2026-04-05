@@ -50,7 +50,11 @@
                 {% for field in form %}
                     <div class="col-12">
                         <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
-                        {{ field|add_class:"form-control" }}
+                        {% if field.field.widget.input_type == "select" %}
+                            {{ field|add_class:"form-select" }}
+                        {% else %}
+                            {{ field|add_class:"form-control" }}
+                        {% endif %}
                         {% for e in field.errors %}
                             <div class="invalid-feedback d-block">{{ e }}</div>{% endfor %}
                     </div>

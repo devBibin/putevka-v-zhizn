@@ -15,7 +15,18 @@ class InterviewNoteAdmin(admin.ModelAdmin):
 
 @admin.register(TestAssignment)
 class TestAssignmentAdmin(admin.ModelAdmin):
-    list_display = ("title", "user", "status", "assigned_by", "assigned_at", "due_at", "passed")
+    list_display = (
+        "title",
+        "user",
+        "status",
+        "numeric_grade",
+        "verbal_grade",
+        "logical_grade",
+        "assigned_by",
+        "assigned_at",
+        "due_at",
+        "passed",
+    )
     list_filter = ("status", "passed")
     search_fields = ("title", "user__username", "user__first_name", "user__last_name")
     autocomplete_fields = ("user", "assigned_by", "result_filled_by")
