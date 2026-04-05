@@ -1,9 +1,12 @@
 import logging
 import mimetypes
+import re
 from pathlib import Path, PurePosixPath
 
 import requests
 from django.conf import settings
+from django.core.exceptions import ObjectDoesNotExist
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
 
@@ -11,6 +14,8 @@ YANDEX_DISK_API_BASE = "https://cloud-api.yandex.net/v1/disk"
 DEFAULT_VIDEO_FOLDER = "Путевка/Видеовизитки"
 DEFAULT_TIMEOUT_SECONDS = 60
 DEFAULT_UPLOAD_TIMEOUT_SECONDS = 900
+INVALID_DISK_NAME_RE = re.compile(r'[\\/:*?"<>|]+')
+SPACE_RE = re.compile(r"\s+")
 
 
 class YandexDiskError(RuntimeError):
@@ -226,19 +231,81 @@ def _clean_extension(file_name: str, fallback: str) -> str:
     return ext or fallback
 
 
-def build_video_disk_path(user_id: int, file_name: str) -> str:
+def _clean_name_part(value: str, fallback: str = "") -> str:
+    cleaned = INVALID_DISK_NAME_RE.sub(" ", (value or "").strip())
+    cleaned = SPACE_RE.sub(" ", cleaned).strip(" .")
+    return cleaned or fallback
+
+
+def _user_label_parts(user_or_id):
+    if hasattr(user_or_id, "pk"):
+        user_id = user_or_id.pk
+        try:
+            user_info = user_or_id.user_info
+        except ObjectDoesNotExist:
+            user_info = None
+        last_name = _clean_name_part(getattr(user_info, "last_name", "") or getattr(user_or_id, "last_name", ""))
+        first_name = _clean_name_part(getattr(user_info, "first_name", "") or getattr(user_or_id, "first_name", ""))
+        middle_name = _clean_name_part(getattr(user_info, "middle_name", ""))
+        username = _clean_name_part(getattr(user_or_id, "username", ""))
+    else:
+        user_id = int(user_or_id)
+        last_name = ""
+        first_name = ""
+        middle_name = ""
+        username = ""
+
+    fallback_slug = username or f"user_{user_id}"
+    return {
+        "user_id": user_id,
+        "last_name": last_name,
+        "first_name": first_name,
+        "middle_name": middle_name,
+        "fallback_slug": fallback_slug,
+    }
+
+
+def _candidate_folder_name(user_or_id) -> str:
+    parts = _user_label_parts(user_or_id)
+    full_name = " ".join(part for part in (parts["last_name"], parts["first_name"]) if part)
+    folder_label = full_name or parts["fallback_slug"]
+    return _clean_name_part(f"{folder_label} ({parts['user_id']})", f"user_{parts['user_id']}")
+
+
+def _candidate_short_name(user_or_id) -> str:
+    parts = _user_label_parts(user_or_id)
+    initials = "".join(part[:1].upper() for part in (parts["first_name"], parts["middle_name"]) if part)
+
+    if parts["last_name"] and initials:
+        return _clean_name_part(f"{parts['last_name']} {initials}", parts["fallback_slug"])
+    if parts["last_name"]:
+        return parts["last_name"]
+    if parts["first_name"]:
+        return parts["first_name"]
+    return parts["fallback_slug"]
+
+
+def _dated_candidate_filename(label: str, user_or_id, ext: str) -> str:
+    date_prefix = timezone.localdate().strftime("%y%m%d")
+    candidate_name = _candidate_short_name(user_or_id)
+    return _clean_name_part(f"{date_prefix} {label} {candidate_name}", f"{date_prefix} {label}") + ext
+
+
+def build_video_disk_path(user_or_id, file_name: str) -> str:
     ext = _clean_extension(file_name, ".mp4")
     return _join_disk_path(
         _setting("YANDEX_DISK_VIDEO_FOLDER", DEFAULT_VIDEO_FOLDER) or DEFAULT_VIDEO_FOLDER,
-        f"user_{user_id}",
-        f"videovizitka{ext}",
+        str(timezone.localdate().year),
+        _candidate_folder_name(user_or_id),
+        _dated_candidate_filename("Видеовизитка", user_or_id, ext),
     )
 
 
-def build_schedule_disk_path(user_id: int, file_name: str) -> str:
+def build_schedule_disk_path(user_or_id, file_name: str) -> str:
     ext = _clean_extension(file_name, ".pdf")
     return _join_disk_path(
         _setting("YANDEX_DISK_VIDEO_FOLDER", DEFAULT_VIDEO_FOLDER) or DEFAULT_VIDEO_FOLDER,
-        f"user_{user_id}",
-        f"grafik_zanyatii{ext}",
+        str(timezone.localdate().year),
+        _candidate_folder_name(user_or_id),
+        _dated_candidate_filename("График занятий", user_or_id, ext),
     )

@@ -314,13 +314,12 @@ def validate_video_size(f):
 
 
 def validate_video_ext(f):
-    allowed_ext = {".mp4", ".webm"}
+    allowed_ext = {".mp4", ".webm", ".mov"}
     name = getattr(f, "name", "") or ""
     ext = Path(name).suffix.lower()
     ctype = getattr(f, "content_type", "") or mimetypes.guess_type(name)[0] or ""
-    if ext not in allowed_ext and ctype not in {"video/mp4", "video/webm"}:
-        raise ValidationError("Допустимы только MP4 или WebM.")
-
+    if ext not in allowed_ext and ctype not in {"video/mp4", "video/webm", "video/quicktime", "video/x-quicktime"}:
+        raise ValidationError("Допустимы только MP4, WebM или MOV.")
 
 def default_video_deadline():
     return timezone.now() + timedelta(days=30)
