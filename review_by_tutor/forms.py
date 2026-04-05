@@ -253,10 +253,21 @@ class TestAssignmentEditForm(forms.ModelForm):
 class TestResultForm(forms.ModelForm):
     class Meta:
         model = TestAssignment
-        fields = ("score_a", "percentile_a", "score_b", "percentile_b", "score_c", "percentile_c", "result_text", "passed")
+        fields = (
+            "numeric_grade",
+            "numeric_percentile",
+            "verbal_grade",
+            "verbal_percentile",
+            "logical_grade",
+            "logical_percentile",
+            "result_text",
+            "passed",
+        )
         widgets = {
             "result_text": forms.Textarea(attrs={"rows": 4}),
-            "percentile": forms.NumberInput(attrs={"step": "0.01", "min": "0", "max": "100"}),
+            "numeric_percentile": forms.NumberInput(attrs={"min": "1", "max": "99", "step": "1"}),
+            "verbal_percentile": forms.NumberInput(attrs={"min": "1", "max": "99", "step": "1"}),
+            "logical_percentile": forms.NumberInput(attrs={"min": "1", "max": "99", "step": "1"}),
         }
 
 class LetterRevisionForm(forms.Form):

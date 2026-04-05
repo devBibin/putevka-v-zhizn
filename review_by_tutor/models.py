@@ -1,9 +1,16 @@
 from django.contrib.auth import get_user_model
-from django.core.validators import URLValidator
+from django.core.validators import MaxValueValidator, MinValueValidator, URLValidator
 from django.db import models
 from django.utils import timezone
 
 User = get_user_model()
+TEST_GRADE_CHOICES = (
+    ("A", "A"),
+    ("B", "B"),
+    ("C", "C"),
+    ("D", "D"),
+    ("E", "E"),
+)
 
 
 class TestTemplate(models.Model):
@@ -155,6 +162,59 @@ class TestAssignment(models.Model):
         verbose_name="Отправил на дописывание",
     )
     revision_at = models.DateTimeField("Отправлено на дописывание", null=True, blank=True)
+
+    numeric_grade = models.CharField(
+        "Грейд числового теста",
+        max_length=1,
+        choices=TEST_GRADE_CHOICES,
+        blank=True,
+        default="",
+    )
+    verbal_grade = models.CharField(
+        "Грейд вербального теста",
+        max_length=1,
+        choices=TEST_GRADE_CHOICES,
+        blank=True,
+        default="",
+    )
+    logical_grade = models.CharField(
+        "Грейд логического теста",
+        max_length=1,
+        choices=TEST_GRADE_CHOICES,
+        blank=True,
+        default="",
+    )
+
+    numeric_percentile = models.PositiveSmallIntegerField(
+        "Перцентиль числового теста",
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1), MaxValueValidator(99)],
+        help_text="Значение от 1 до 99",
+    )
+    verbal_percentile = models.PositiveSmallIntegerField(
+        "Перцентиль вербального теста",
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1), MaxValueValidator(99)],
+        help_text="Значение от 1 до 99",
+    )
+    logical_percentile = models.PositiveSmallIntegerField(
+        "Перцентиль логического теста",
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(1), MaxValueValidator(99)],
+        help_text="Значение от 1 до 99",
+    )
+
+    score_a = None
+    score_b = None
+    score_c = None
+    result_score = None
+    percentile = None
+    percentile_a = None
+    percentile_b = None
+    percentile_c = None
 
     class Meta:
         ordering = ["-assigned_at", "-id"]

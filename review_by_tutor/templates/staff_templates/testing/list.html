@@ -123,6 +123,36 @@
                                             </div>
                                         {% endif %}
 
+                                        {% if t.numeric_grade or t.numeric_percentile is not None or t.verbal_grade or t.verbal_percentile is not None or t.logical_grade or t.logical_percentile is not None %}
+                                            <div class="border-top pt-2 mt-2">
+                                                <div class="text-muted fw-semibold mb-1">Результаты по тестам</div>
+
+                                                {% if t.numeric_grade or t.numeric_percentile is not None %}
+                                                    <div>
+                                                        <strong>Числовой:</strong>
+                                                        {% if t.numeric_grade %} грейд <strong>{{ t.numeric_grade }}</strong>{% endif %}
+                                                        {% if t.numeric_percentile is not None %}{% if t.numeric_grade %} • {% endif %}перцентиль <strong>{{ t.numeric_percentile }}</strong>{% endif %}
+                                                    </div>
+                                                {% endif %}
+
+                                                {% if t.verbal_grade or t.verbal_percentile is not None %}
+                                                    <div>
+                                                        <strong>Вербальный:</strong>
+                                                        {% if t.verbal_grade %} грейд <strong>{{ t.verbal_grade }}</strong>{% endif %}
+                                                        {% if t.verbal_percentile is not None %}{% if t.verbal_grade %} • {% endif %}перцентиль <strong>{{ t.verbal_percentile }}</strong>{% endif %}
+                                                    </div>
+                                                {% endif %}
+
+                                                {% if t.logical_grade or t.logical_percentile is not None %}
+                                                    <div>
+                                                        <strong>Логический:</strong>
+                                                        {% if t.logical_grade %} грейд <strong>{{ t.logical_grade }}</strong>{% endif %}
+                                                        {% if t.logical_percentile is not None %}{% if t.logical_grade %} • {% endif %}перцентиль <strong>{{ t.logical_percentile }}</strong>{% endif %}
+                                                    </div>
+                                                {% endif %}
+                                            </div>
+                                        {% endif %}
+
                                         {% if t.result_text %}
                                             <div class="mt-2 text-muted">
                                                 {{ t.result_text|linebreaksbr }}

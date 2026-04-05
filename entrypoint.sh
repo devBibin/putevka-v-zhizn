@@ -19,14 +19,16 @@ python manage.py collectstatic --noinput
 
 # Create superuser if it doesn't exist
 echo "
+import os
 from django.contrib.auth import get_user_model
+
 User = get_user_model()
 
 username = os.environ.get('DJANGO_SUPERUSER_USERNAME', 'admin')
 email = os.environ.get('DJANGO_SUPERUSER_EMAIL', '')
 password = os.environ.get('DJANGO_SUPERUSER_PASSWORD', '0000')
 
-if not User.objects.filter(username='admin').exists():
+if not User.objects.filter(username=username).exists():
     User.objects.create_superuser(username, email, password)
 " | python manage.py shell
 
@@ -34,13 +36,9 @@ if not User.objects.filter(username='admin').exists():
 #TODO: включить в проде, когда понадобится перевод на русский (очень долго грузит пакеты)
 
 python Shadows/notification_worker.py &
-
 python telegram_bot_polling.py &
-
 python Shadows/gpt_reviewer.py &
-
 python Shadows/gpt_transcriber.py &
-
 python Shadows/gpt_fill_form.py &
 
 # Start Gunicorn server
