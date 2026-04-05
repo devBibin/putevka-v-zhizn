@@ -145,11 +145,11 @@
                             {% endif %}
 
                             <div class="mb-4">
-                                <label for="id_file" class="form-label">Видео (MP4/WebM, до 200 МБ)</label>
+                                <label for="id_file" class="form-label">Видео (MP4/WebM/MOV, до 200 МБ)</label>
                                 <input type="file"
                                        name="file"
                                        id="id_file"
-                                       accept="video/mp4,video/webm"
+                                       accept="video/mp4,video/webm,video/quicktime,video/x-quicktime,.mov"
                                        class="form-control {% if form.file.errors %}is-invalid{% endif %}">
                                 <div class="form-text">Лучше горизонтальное видео, не больше 200 МБ.</div>
 
@@ -411,9 +411,12 @@
                         return;
                     }
 
-                    const okType = ['video/mp4', 'video/webm'].includes(f.type);
+                    const allowedTypes = ['video/mp4', 'video/webm', 'video/quicktime', 'video/x-quicktime'];
+                    const allowedExt = ['.mp4', '.webm', '.mov'];
+                    const fileName = (f.name || '').toLowerCase();
+                    const okType = allowedTypes.includes(f.type) || allowedExt.some((ext) => fileName.endsWith(ext));
                     if (!okType) {
-                        alert('Поддерживаются только MP4 и WebM.');
+                        alert('Поддерживаются только MP4, WebM и MOV.');
                         fileInput.value = '';
                         previewWrap.classList.add('d-none');
                         preview.src = '';

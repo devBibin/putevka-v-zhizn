@@ -129,7 +129,7 @@ def _upload_scholar_video_assets(obj, form, *, upload_id=""):
     uploaded_schedule = form.cleaned_data.get("schedule_file")
 
     if uploaded_video:
-        disk_path = build_video_disk_path(obj.user_id, uploaded_video.name)
+        disk_path = build_video_disk_path(obj.user, uploaded_video.name)
         _set_upload_status(
             obj.user_id,
             upload_id,
@@ -157,7 +157,7 @@ def _upload_scholar_video_assets(obj, form, *, upload_id=""):
         obj.yandex_disk_error = ""
 
     if uploaded_schedule:
-        disk_path = build_schedule_disk_path(obj.user_id, uploaded_schedule.name)
+        disk_path = build_schedule_disk_path(obj.user, uploaded_schedule.name)
         _set_upload_status(
             obj.user_id,
             upload_id,
@@ -348,9 +348,9 @@ def my_video_page(request):
                 request.user.pk,
                 upload_id,
                 state="error",
-                message="Проверьте форму. Видео должно быть MP4/WebM, а график — PDF/DOC/DOCX.",
+                message="Проверьте форму. Видео должно быть MP4/WebM/MOV, а график — PDF/DOC/DOCX.",
             )
-            messages.error(request, "Проверь форму. Видео должно быть MP4/WebM, а график — PDF/DOC/DOCX.")
+            messages.error(request, "Проверь форму. Видео должно быть MP4/WebM/MOV, а график — PDF/DOC/DOCX.")
             if is_ajax:
                 return JsonResponse(
                     {

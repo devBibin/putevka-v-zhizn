@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from django import forms
 from django.contrib import messages
 from django.core.exceptions import ValidationError
@@ -520,9 +522,15 @@ class ScholarVideoForm(forms.ModelForm):
         allowed_types = {
             "video/mp4",
             "video/webm",
+            "video/quicktime",
+            "video/x-quicktime",
         }
-        if getattr(f, "content_type", None) not in allowed_types:
-            raise ValidationError("Видео должно быть в формате MP4 или WebM.")
+        allowed_ext = {".mp4", ".webm", ".mov"}
+        content_type = getattr(f, "content_type", None) or ""
+        ext = Path(getattr(f, "name", "") or "").suffix.lower()
+
+        if content_type not in allowed_types and ext not in allowed_ext:
+            raise ValidationError("Видео должно быть в формате MP4, WebM или MOV.")
 
         max_size = 200 * 1024 * 1024
         if f.size > max_size:
