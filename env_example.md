@@ -19,6 +19,7 @@ TG_TOKEN_USERS= # Telegram bot token for users
 TELEGRAM_STAFF_CHAT_IDS='{"developer": 000000000}' # JSON with staff chat ids
 TELEGRAM_LOG_CHAT_ID= # Telegram chat id for logs
 TG_BOT_USERS_USERNAME= # Telegram username for the users bot
+TELEGRAM_SOCKS5_PROXY= # Optional SOCKS5 proxy for Telegram Bot API, example socks5h://user:pass@host:1080
 
 
 # Common Settings
