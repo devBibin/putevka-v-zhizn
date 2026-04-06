@@ -1,15 +1,15 @@
 import logging
 
 from django.dispatch import receiver
-from telebot import TeleBot
 
 import config
 from core.bot import send_tg_notification_to_user
 from core.signals import TELEGRAM_CHAT_IDS
+from core.telegram_proxy import create_telegram_bot
 from scholar_form.forms import wizard_done
 
 try:
-    bot_admin = TeleBot(config.TG_TOKEN_ADMIN)
+    bot_admin = create_telegram_bot(config.TG_TOKEN_ADMIN)
 except:
     bot_admin = None
 

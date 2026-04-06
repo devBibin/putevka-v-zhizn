@@ -3,18 +3,18 @@ import os
 
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
-from telebot import TeleBot
 
 import config
 from core.bot import send_tg_notification_to_user
 from core.models import UserNotification
 from core.services.email_service import send_email_to_user
+from core.telegram_proxy import create_telegram_bot
 from .models import Document
 
 TG_TOKEN_ADMIN = config.TG_TOKEN_ADMIN
 
 try:
-    bot_admin = TeleBot(TG_TOKEN_ADMIN)
+    bot_admin = create_telegram_bot(TG_TOKEN_ADMIN)
 except:
     bot_admin = None
 
