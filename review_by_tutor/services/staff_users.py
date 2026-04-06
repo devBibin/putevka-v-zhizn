@@ -117,7 +117,12 @@ def build_staff_users_queryset(request):
     )
 
     video_qs = ScholarVideo.objects.filter(user_id=OuterRef("pk"))
-    video_has_file = Exists(video_qs.exclude(file="").exclude(file__isnull=True))
+    video_has_file = Exists(
+        video_qs.filter(
+            Q(yandex_disk_path__gt="") |
+            (Q(file__isnull=False) & ~Q(file=""))
+        )
+    )
     video_deadline_sq = Subquery(video_qs.values("deadline_at")[:1])
 
     now = timezone.now()

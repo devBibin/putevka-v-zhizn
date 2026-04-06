@@ -1,30 +1,30 @@
+# Django Admin
 
-# Django Admin (суперпользователь)
-
-DJANGO_SUPERUSER_USERNAME= # Логин суперпользователя Django  
-DJANGO_SUPERUSER_EMAIL=    # Email суперпользователя Django  
-DJANGO_SUPERUSER_PASSWORD= # Пароль суперпользователя Django
+DJANGO_SUPERUSER_USERNAME= # Django superuser login
+DJANGO_SUPERUSER_EMAIL=    # Django superuser email
+DJANGO_SUPERUSER_PASSWORD= # Django superuser password
 
 
 # PostgreSQL
 
-POSTGRES_DB=       # Название базы данных  
-POSTGRES_USER=     # Пользователь PostgreSQL  
-POSTGRES_PASSWORD= # Пароль PostgreSQL
+POSTGRES_DB=       # Database name
+POSTGRES_USER=     # Database user
+POSTGRES_PASSWORD= # Database password
 
 
 # Telegram Bots
 
-TG_TOKEN_ADMIN= # Токен Telegram-бота для администраторов  
-TG_TOKEN_USERS= # Токен Telegram-бота для пользователей  
-TELEGRAM_STAFF_CHAT_IDS='{"developer": 000000000}' # JSON с ID чатов сотрудников (пример: {"admin":12345})  
-TELEGRAM_LOG_CHAT_ID= # ID чата для логов  
-TG_BOT_USERS_USERNAME= # @username бота для пользователей (example_bot)
+TG_TOKEN_ADMIN= # Telegram bot token for staff
+TG_TOKEN_USERS= # Telegram bot token for users
+TELEGRAM_STAFF_CHAT_IDS='{"developer": 000000000}' # JSON with staff chat ids
+TELEGRAM_LOG_CHAT_ID= # Telegram chat id for logs
+TG_BOT_USERS_USERNAME= # Telegram username for the users bot
+TELEGRAM_SOCKS5_PROXY= # Optional SOCKS5 proxy for Telegram Bot API, example socks5h://user:pass@host:1080
 
 
-# Общие настройки
+# Common Settings
 
-BASE_URL= # Базовый URL приложения (например, https://example.com)  
+BASE_URL= # Base app URL, for example https://example.com
 
 
 # Telegram proxy
@@ -34,12 +34,20 @@ TELEGRAM_PROXY= # URL proxy for Telegram API; if empty, OPENAI_PROXY will be use
 
 # GPT
 
-GPT_TOKEN= # API-токен для ChatGPT интеграции
+GPT_TOKEN= # API token for OpenAI integration
 
 
-# Интеграция сервиса ZVONOK
+# ZVONOK
 
-PUBLIC_KEY_CALL=         # Публичный ключ API Zvonok  
-CAMPAIGN_ID=             # ID кампании обзвона  
-ZVONOK_API_INITIATE_URL= # URL API для инициации звонка  
-ZVONOK_API_POLLING_URL=  # URL API для проверки статуса звонка
+PUBLIC_KEY_CALL=         # Public API key
+CAMPAIGN_ID=             # Campaign id
+ZVONOK_API_INITIATE_URL= # Call initiation URL
+ZVONOK_API_POLLING_URL=  # Call status URL
+
+
+# Yandex Disk for video business cards
+
+YANDEX_DISK_OAUTH_TOKEN=               # OAuth token for Yandex Disk
+YANDEX_DISK_VIDEO_FOLDER=              # Base folder, for example Putevka/VideoBusinessCards
+YANDEX_DISK_TIMEOUT_SECONDS=60         # API metadata timeout
+YANDEX_DISK_UPLOAD_TIMEOUT_SECONDS=900 # Large upload timeout

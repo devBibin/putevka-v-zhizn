@@ -4,6 +4,7 @@ python-dotenv
 gunicorn
 pyTelegramBotAPI
 requests
+PySocks
 django-formtools
 django-widget-tweaks
 openai>=1.52.0

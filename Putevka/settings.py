@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import os
 from pathlib import Path
 
 import dj_database_url
@@ -153,6 +154,19 @@ POSTBOX_SERVICE = "ses"
 
 POSTBOX_ACCESS_KEY_ID = os.getenv("YC_EMAIL_USER")
 POSTBOX_SECRET_ACCESS_KEY = os.getenv("YC_EMAIL_PASSWORD")
+YANDEX_DISK_OAUTH_TOKEN = os.getenv("YANDEX_DISK_OAUTH_TOKEN", "").strip()
+YANDEX_DISK_VIDEO_FOLDER = os.getenv("YANDEX_DISK_VIDEO_FOLDER", "Путевка/Видеовизитки").strip() or "Путевка/Видеовизитки"
+YANDEX_DISK_TIMEOUT_SECONDS = int(os.getenv("YANDEX_DISK_TIMEOUT_SECONDS", "60"))
+YANDEX_DISK_UPLOAD_TIMEOUT_SECONDS = int(os.getenv("YANDEX_DISK_UPLOAD_TIMEOUT_SECONDS", "900"))
+
+# Keep candidate uploads in memory so Django does not write temp files to disk.
+FILE_UPLOAD_HANDLERS = [
+    "django.core.files.uploadhandler.MemoryFileUploadHandler",
+]
+FILE_UPLOAD_MAX_MEMORY_SIZE = 250 * 1024 * 1024
+DATA_UPLOAD_MAX_MEMORY_SIZE = 275 * 1024 * 1024
+
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 
 EMAIL_HOST = 'postbox.cloud.yandex.net'
 EMAIL_PORT = 465
