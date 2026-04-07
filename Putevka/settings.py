@@ -166,8 +166,6 @@ FILE_UPLOAD_HANDLERS = [
 FILE_UPLOAD_MAX_MEMORY_SIZE = 250 * 1024 * 1024
 DATA_UPLOAD_MAX_MEMORY_SIZE = 275 * 1024 * 1024
 
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-
 EMAIL_HOST = 'postbox.cloud.yandex.net'
 EMAIL_PORT = 465
 EMAIL_USE_TLS = True
