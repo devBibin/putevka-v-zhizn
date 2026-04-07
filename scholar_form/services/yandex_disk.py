@@ -1,6 +1,7 @@
 import logging
 import mimetypes
 import re
+import time
 from pathlib import Path, PurePosixPath
 
 import requests
@@ -14,6 +15,13 @@ YANDEX_DISK_API_BASE = "https://cloud-api.yandex.net/v1/disk"
 DEFAULT_VIDEO_FOLDER = "Путевка/Видеовизитки"
 DEFAULT_TIMEOUT_SECONDS = 60
 DEFAULT_UPLOAD_TIMEOUT_SECONDS = 900
+DEFAULT_API_RETRIES = 3
+DEFAULT_UPLOAD_RETRIES = 3
+DEFAULT_RETRY_BACKOFF_SECONDS = 2.0
+DEFAULT_VERIFY_RETRIES = 5
+DEFAULT_VERIFY_DELAY_SECONDS = 1.0
+RETRYABLE_API_STATUS_CODES = {408, 423, 429, 500, 502, 503, 504}
+RETRYABLE_UPLOAD_STATUS_CODES = RETRYABLE_API_STATUS_CODES | {409}
 INVALID_DISK_NAME_RE = re.compile(r'[\\/:*?"<>|]+')
 SPACE_RE = re.compile(r"\s+")
 
@@ -92,18 +100,130 @@ def _join_disk_path(*parts: str) -> str:
     return _normalize_disk_path("/".join(chunks))
 
 
-def _request(method: str, resource: str, *, timeout=None, **kwargs):
-    try:
-        response = requests.request(
-            method=method,
-            url=f"{YANDEX_DISK_API_BASE}{resource}",
-            headers={**_auth_headers(), **kwargs.pop("headers", {})},
-            timeout=timeout or _setting("YANDEX_DISK_TIMEOUT_SECONDS", DEFAULT_TIMEOUT_SECONDS),
-            **kwargs,
-        )
-    except requests.RequestException as exc:
-        raise YandexDiskError("Не удалось связаться с API Яндекс Диска.") from exc
-    return response
+def _log_context(log_context=None, **extra):
+    payload = {}
+    if log_context:
+        payload.update(log_context)
+    for key, value in extra.items():
+        if value not in (None, ""):
+            payload[key] = value
+    return payload
+
+
+def _log_context_suffix(log_context=None) -> str:
+    payload = _log_context(log_context)
+    if not payload:
+        return ""
+    return " " + " ".join(f"{key}={value}" for key, value in payload.items())
+
+
+def _response_excerpt(response, limit: int = 300) -> str:
+    body = (getattr(response, "text", "") or "").replace("\n", " ").strip()
+    if len(body) <= limit:
+        return body
+    return body[:limit] + "..."
+
+
+def _retry_delay(attempt: int) -> float:
+    base = float(_setting("YANDEX_DISK_RETRY_BACKOFF_SECONDS", DEFAULT_RETRY_BACKOFF_SECONDS) or 0)
+    if base <= 0:
+        return 0
+    return base * attempt
+
+
+def _notify_retry(retry_callback, next_attempt: int, max_attempts: int, message: str):
+    if retry_callback:
+        retry_callback(next_attempt, max_attempts, message)
+
+
+def _request(method: str, resource: str, *, timeout=None, operation="request", request_error_message="Не удалось связаться с API Яндекс Диска.", retry_statuses=None, max_attempts=None, log_context=None, retry_callback=None, **kwargs):
+    allowed_retry_statuses = set(retry_statuses or RETRYABLE_API_STATUS_CODES)
+    total_attempts = max(int(max_attempts or _setting("YANDEX_DISK_API_RETRIES", DEFAULT_API_RETRIES) or 1), 1)
+    request_timeout = timeout or _setting("YANDEX_DISK_TIMEOUT_SECONDS", DEFAULT_TIMEOUT_SECONDS)
+    extra_headers = kwargs.pop("headers", {})
+
+    for attempt in range(1, total_attempts + 1):
+        started_at = time.monotonic()
+        try:
+            response = requests.request(
+                method=method,
+                url=f"{YANDEX_DISK_API_BASE}{resource}",
+                headers={**_auth_headers(), **extra_headers},
+                timeout=request_timeout,
+                **kwargs,
+            )
+        except requests.RequestException as exc:
+            elapsed = time.monotonic() - started_at
+            if attempt >= total_attempts:
+                logger.error(
+                    "Yandex Disk %s failed after %s/%s attempts elapsed=%.2fs%s error=%s",
+                    operation,
+                    attempt,
+                    total_attempts,
+                    elapsed,
+                    _log_context_suffix(log_context),
+                    exc,
+                )
+                raise YandexDiskError(request_error_message) from exc
+
+            next_attempt = attempt + 1
+            logger.warning(
+                "Yandex Disk %s network error on attempt %s/%s elapsed=%.2fs%s error=%s",
+                operation,
+                attempt,
+                total_attempts,
+                elapsed,
+                _log_context_suffix(log_context),
+                exc,
+            )
+            _notify_retry(
+                retry_callback,
+                next_attempt,
+                total_attempts,
+                f"Временный сбой связи с Яндекс Диском, повторяем попытку {next_attempt}/{total_attempts}",
+            )
+            delay = _retry_delay(attempt)
+            if delay:
+                time.sleep(delay)
+            continue
+
+        elapsed = time.monotonic() - started_at
+        if response.status_code in allowed_retry_statuses and attempt < total_attempts:
+            next_attempt = attempt + 1
+            logger.warning(
+                "Yandex Disk %s returned transient status=%s on attempt %s/%s elapsed=%.2fs%s body=%s",
+                operation,
+                response.status_code,
+                attempt,
+                total_attempts,
+                elapsed,
+                _log_context_suffix(log_context),
+                _response_excerpt(response),
+            )
+            _notify_retry(
+                retry_callback,
+                next_attempt,
+                total_attempts,
+                f"Яндекс Диск временно недоступен, повторяем попытку {next_attempt}/{total_attempts}",
+            )
+            delay = _retry_delay(attempt)
+            if delay:
+                time.sleep(delay)
+            continue
+
+        if attempt > 1:
+            logger.info(
+                "Yandex Disk %s succeeded on attempt %s/%s status=%s elapsed=%.2fs%s",
+                operation,
+                attempt,
+                total_attempts,
+                response.status_code,
+                elapsed,
+                _log_context_suffix(log_context),
+            )
+        return response
+
+    raise YandexDiskError(request_error_message)
 
 
 def _raise_api_error(response, default_message: str):
@@ -116,7 +236,7 @@ def _raise_api_error(response, default_message: str):
     raise YandexDiskError(message)
 
 
-def ensure_folder(path: str):
+def ensure_folder(path: str, *, log_context=None, retry_callback=None):
     normalized = _normalize_disk_path(path)
     tail = normalized.replace("disk:/", "", 1).strip("/")
     if not tail:
@@ -129,13 +249,17 @@ def ensure_folder(path: str):
             "PUT",
             "/resources",
             params={"path": current},
+            operation="ensure folder",
+            request_error_message="Не удалось создать папку на Яндекс Диске.",
+            log_context=_log_context(log_context, current_path=current),
+            retry_callback=retry_callback,
         )
         if response.status_code in {201, 409}:
             continue
         _raise_api_error(response, f"Не удалось создать папку {current} на Яндекс Диске.")
 
 
-def delete_resource(path: str):
+def delete_resource(path: str, *, log_context=None, retry_callback=None):
     normalized = _normalize_disk_path(path)
     if normalized == "disk:/":
         return
@@ -144,17 +268,25 @@ def delete_resource(path: str):
         "DELETE",
         "/resources",
         params={"path": normalized, "permanently": "true"},
+        operation="delete resource",
+        request_error_message="Не удалось удалить файл с Яндекс Диска.",
+        log_context=_log_context(log_context, disk_path=normalized),
+        retry_callback=retry_callback,
     )
     if response.status_code in {202, 204, 404}:
         return
     _raise_api_error(response, f"Не удалось удалить {normalized} с Яндекс Диска.")
 
 
-def _get_upload_link(path: str) -> str:
+def _get_upload_link(path: str, *, log_context=None, retry_callback=None) -> str:
     response = _request(
         "GET",
         "/resources/upload",
         params={"path": _normalize_disk_path(path), "overwrite": "true"},
+        operation="get upload link",
+        request_error_message="Не удалось получить ссылку для загрузки на Яндекс Диск.",
+        log_context=_log_context(log_context, disk_path=_normalize_disk_path(path)),
+        retry_callback=retry_callback,
     )
     if response.status_code != 200:
         _raise_api_error(response, "Не удалось получить ссылку для загрузки на Яндекс Диск.")
@@ -165,11 +297,14 @@ def _get_upload_link(path: str) -> str:
     return href
 
 
-def get_download_url(path: str) -> str:
+def get_download_url(path: str, *, log_context=None) -> str:
     response = _request(
         "GET",
         "/resources/download",
         params={"path": _normalize_disk_path(path)},
+        operation="get download link",
+        request_error_message="Не удалось получить ссылку для скачивания с Яндекс Диска.",
+        log_context=_log_context(log_context, disk_path=_normalize_disk_path(path)),
     )
     if response.status_code != 200:
         _raise_api_error(response, "Не удалось получить ссылку для скачивания с Яндекс Диска.")
@@ -188,42 +323,187 @@ def _content_type(uploaded_file) -> str:
     return guessed or "application/octet-stream"
 
 
-def upload_file_to_yandex_disk(*, uploaded_file, disk_path: str, previous_path: str = "", progress_callback=None):
+def _rewind_stream(stream, *, attempt: int, total_attempts: int, log_context=None):
+    if not hasattr(stream, "seek"):
+        if attempt > 1:
+            raise YandexDiskError("Не удалось повторить загрузку: поток файла не поддерживает перемотку.")
+        return
+    try:
+        stream.seek(0)
+    except (OSError, ValueError) as exc:
+        logger.error(
+            "Failed to rewind upload stream before attempt %s/%s%s error=%s",
+            attempt,
+            total_attempts,
+            _log_context_suffix(log_context),
+            exc,
+        )
+        raise YandexDiskError("Не удалось подготовить файл к повторной отправке на Яндекс Диск.") from exc
+
+
+def _verify_uploaded_resource(path: str, *, log_context=None, retry_callback=None):
+    normalized_path = _normalize_disk_path(path)
+    total_attempts = max(int(_setting("YANDEX_DISK_VERIFY_RETRIES", DEFAULT_VERIFY_RETRIES) or 1), 1)
+    delay = max(float(_setting("YANDEX_DISK_VERIFY_DELAY_SECONDS", DEFAULT_VERIFY_DELAY_SECONDS) or 0), 0)
+
+    for attempt in range(1, total_attempts + 1):
+        response = _request(
+            "GET",
+            "/resources",
+            params={"path": normalized_path},
+            operation="verify uploaded resource",
+            request_error_message="Не удалось проверить загруженный файл на Яндекс Диске.",
+            max_attempts=1,
+            log_context=_log_context(log_context, disk_path=normalized_path),
+        )
+        if response.status_code == 200:
+            return
+        if response.status_code == 404 and attempt < total_attempts:
+            next_attempt = attempt + 1
+            logger.warning(
+                "Uploaded resource not visible yet on attempt %s/%s%s",
+                attempt,
+                total_attempts,
+                _log_context_suffix(_log_context(log_context, disk_path=normalized_path)),
+            )
+            _notify_retry(
+                retry_callback,
+                next_attempt,
+                total_attempts,
+                f"Проверяем появление файла на Яндекс Диске, попытка {next_attempt}/{total_attempts}",
+            )
+            if delay:
+                time.sleep(delay)
+            continue
+        if response.status_code == 404:
+            raise YandexDiskError("Файл отправлен, но не появился на Яндекс Диске. Попробуйте повторить загрузку.")
+        _raise_api_error(response, "Не удалось проверить загруженный файл на Яндекс Диске.")
+
+
+def upload_file_to_yandex_disk(*, uploaded_file, disk_path: str, progress_callback=None, log_context=None, retry_callback=None):
     normalized_path = _normalize_disk_path(disk_path)
     parent = str(PurePosixPath(normalized_path.replace("disk:/", "", 1)).parent)
-    ensure_folder(parent)
-
-    upload_href = _get_upload_link(normalized_path)
+    file_name = getattr(uploaded_file, "name", "") or ""
     stream = getattr(uploaded_file, "file", uploaded_file)
-
-    if hasattr(stream, "seek"):
-        stream.seek(0)
-
     total_size = int(getattr(uploaded_file, "size", 0) or 0)
-    payload = _ProgressReader(stream, total_size, progress_callback) if progress_callback else stream
+    content_type = _content_type(uploaded_file)
+    context = _log_context(
+        log_context,
+        disk_path=normalized_path,
+        file_name=file_name,
+        file_size=total_size,
+        content_type=content_type,
+    )
 
-    try:
-        response = requests.put(
-            upload_href,
-            data=payload,
-            headers={
-                "Content-Type": _content_type(uploaded_file),
-                "Content-Length": str(total_size),
-            },
-            timeout=_setting("YANDEX_DISK_UPLOAD_TIMEOUT_SECONDS", DEFAULT_UPLOAD_TIMEOUT_SECONDS),
+    logger.info("Yandex Disk upload started%s", _log_context_suffix(context))
+    ensure_folder(parent, log_context=context, retry_callback=retry_callback)
+    logger.info("Yandex Disk folder ensured%s", _log_context_suffix(context))
+    upload_href = _get_upload_link(normalized_path, log_context=context, retry_callback=retry_callback)
+    logger.info("Yandex Disk upload link received%s", _log_context_suffix(context))
+
+    total_attempts = max(int(_setting("YANDEX_DISK_UPLOAD_RETRIES", DEFAULT_UPLOAD_RETRIES) or 1), 1)
+    response = None
+    for attempt in range(1, total_attempts + 1):
+        _rewind_stream(stream, attempt=attempt, total_attempts=total_attempts, log_context=context)
+        payload = _ProgressReader(stream, total_size, progress_callback) if progress_callback else stream
+        started_at = time.monotonic()
+
+        logger.info(
+            "Yandex Disk binary upload attempt %s/%s started%s",
+            attempt,
+            total_attempts,
+            _log_context_suffix(context),
         )
-    except requests.RequestException as exc:
-        raise YandexDiskError("Не удалось загрузить файл на Яндекс Диск.") from exc
+        try:
+            response = requests.put(
+                upload_href,
+                data=payload,
+                headers={
+                    "Content-Type": content_type,
+                    "Content-Length": str(total_size),
+                },
+                timeout=_setting("YANDEX_DISK_UPLOAD_TIMEOUT_SECONDS", DEFAULT_UPLOAD_TIMEOUT_SECONDS),
+            )
+        except requests.RequestException as exc:
+            elapsed = time.monotonic() - started_at
+            if attempt >= total_attempts:
+                logger.error(
+                    "Yandex Disk binary upload failed after %s/%s attempts elapsed=%.2fs%s error=%s",
+                    attempt,
+                    total_attempts,
+                    elapsed,
+                    _log_context_suffix(context),
+                    exc,
+                )
+                raise YandexDiskError("Не удалось загрузить файл на Яндекс Диск.") from exc
 
-    if response.status_code not in {201, 202}:
+            next_attempt = attempt + 1
+            logger.warning(
+                "Yandex Disk binary upload network error on attempt %s/%s elapsed=%.2fs%s error=%s",
+                attempt,
+                total_attempts,
+                elapsed,
+                _log_context_suffix(context),
+                exc,
+            )
+            _notify_retry(
+                retry_callback,
+                next_attempt,
+                total_attempts,
+                f"Сбой при отправке файла на Яндекс Диск, повторяем попытку {next_attempt}/{total_attempts}",
+            )
+            delay = _retry_delay(attempt)
+            if delay:
+                time.sleep(delay)
+            continue
+
+        elapsed = time.monotonic() - started_at
+        if response.status_code in {201, 202}:
+            logger.info(
+                "Yandex Disk binary upload attempt %s/%s finished status=%s elapsed=%.2fs%s",
+                attempt,
+                total_attempts,
+                response.status_code,
+                elapsed,
+                _log_context_suffix(context),
+            )
+            break
+
+        if response.status_code in RETRYABLE_UPLOAD_STATUS_CODES and attempt < total_attempts:
+            next_attempt = attempt + 1
+            logger.warning(
+                "Yandex Disk binary upload got transient status=%s on attempt %s/%s elapsed=%.2fs%s body=%s",
+                response.status_code,
+                attempt,
+                total_attempts,
+                elapsed,
+                _log_context_suffix(context),
+                _response_excerpt(response),
+            )
+            _notify_retry(
+                retry_callback,
+                next_attempt,
+                total_attempts,
+                f"Яндекс Диск временно отклонил файл, повторяем попытку {next_attempt}/{total_attempts}",
+            )
+            delay = _retry_delay(attempt)
+            if delay:
+                time.sleep(delay)
+            continue
+
+        logger.error(
+            "Yandex Disk binary upload failed with status=%s on attempt %s/%s elapsed=%.2fs%s body=%s",
+            response.status_code,
+            attempt,
+            total_attempts,
+            elapsed,
+            _log_context_suffix(context),
+            _response_excerpt(response),
+        )
         _raise_api_error(response, "Не удалось загрузить файл на Яндекс Диск.")
 
-    previous_normalized = _normalize_disk_path(previous_path) if previous_path else ""
-    if previous_normalized and previous_normalized != normalized_path:
-        try:
-            delete_resource(previous_normalized)
-        except YandexDiskError as exc:
-            logger.warning("Failed to delete old Yandex Disk file %s: %s", previous_normalized, exc)
+    _verify_uploaded_resource(normalized_path, log_context=context, retry_callback=retry_callback)
+    logger.info("Yandex Disk upload verified%s", _log_context_suffix(context))
 
 
 def _clean_extension(file_name: str, fallback: str) -> str:

@@ -1,5 +1,6 @@
 import logging
 import mimetypes
+import time
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -19,6 +20,7 @@ from scholar_form.services.yandex_disk import (
     YandexDiskError,
     build_schedule_disk_path,
     build_video_disk_path,
+    delete_resource,
     get_download_url,
     upload_file_to_yandex_disk,
 )
@@ -124,65 +126,233 @@ def _form_error_payload(form):
     return payload
 
 
+def _make_upload_retry_callback(*, user_id, upload_id, asset):
+    return lambda next_attempt, total_attempts, message: _set_upload_status(
+        user_id,
+        upload_id,
+        state="retrying",
+        message=message,
+        percent=None,
+        asset=asset,
+    )
+
+
+def _rollback_uploaded_assets(uploaded_assets, *, user_id, upload_id):
+    for item in reversed(uploaded_assets):
+        new_path = item.get("new_path") or ""
+        asset = item.get("asset") or ""
+        if not new_path:
+            continue
+
+        _set_upload_status(
+            user_id,
+            upload_id,
+            state="rollback",
+            message="Откатываем загруженные файлы после ошибки",
+            percent=None,
+            asset=asset,
+        )
+        try:
+            logger.warning(
+                "Rolling back uploaded scholar asset user_id=%s upload_id=%s asset=%s disk_path=%s",
+                user_id,
+                upload_id,
+                asset,
+                new_path,
+            )
+            delete_resource(
+                new_path,
+                log_context={"user_id": user_id, "upload_id": upload_id, "asset": asset, "disk_path": new_path},
+            )
+        except YandexDiskError as exc:
+            logger.warning(
+                "Failed to roll back scholar asset user_id=%s upload_id=%s asset=%s disk_path=%s error=%s",
+                user_id,
+                upload_id,
+                asset,
+                new_path,
+                exc,
+            )
+        else:
+            logger.info(
+                "Rolled back scholar asset user_id=%s upload_id=%s asset=%s disk_path=%s",
+                user_id,
+                upload_id,
+                asset,
+                new_path,
+            )
+
+
+def _delete_replaced_assets(uploaded_assets, *, user_id, upload_id):
+    for item in uploaded_assets:
+        previous_path = item.get("previous_path") or ""
+        new_path = item.get("new_path") or ""
+        asset = item.get("asset") or ""
+        if not previous_path or previous_path == new_path:
+            continue
+
+        try:
+            logger.info(
+                "Deleting replaced scholar asset user_id=%s upload_id=%s asset=%s old_path=%s new_path=%s",
+                user_id,
+                upload_id,
+                asset,
+                previous_path,
+                new_path,
+            )
+            delete_resource(
+                previous_path,
+                log_context={"user_id": user_id, "upload_id": upload_id, "asset": asset, "disk_path": previous_path},
+            )
+        except YandexDiskError as exc:
+            logger.warning(
+                "Failed to delete replaced scholar asset user_id=%s upload_id=%s asset=%s old_path=%s error=%s",
+                user_id,
+                upload_id,
+                asset,
+                previous_path,
+                exc,
+            )
+        else:
+            logger.info(
+                "Deleted replaced scholar asset user_id=%s upload_id=%s asset=%s old_path=%s",
+                user_id,
+                upload_id,
+                asset,
+                previous_path,
+            )
+
+
 def _upload_scholar_video_assets(obj, form, *, upload_id=""):
     uploaded_video = form.cleaned_data.get("file")
     uploaded_schedule = form.cleaned_data.get("schedule_file")
+    previous_video_path = obj.yandex_disk_path
+    previous_schedule_path = obj.schedule_yandex_disk_path
+    previous_video_uploaded_at = obj.yandex_disk_uploaded_at
+    previous_schedule_uploaded_at = obj.schedule_yandex_disk_uploaded_at
+    previous_video_error = obj.yandex_disk_error
+    previous_schedule_error = obj.schedule_yandex_disk_error
+    uploaded_assets = []
 
-    if uploaded_video:
-        disk_path = build_video_disk_path(obj.user, uploaded_video.name)
-        _set_upload_status(
-            obj.user_id,
-            upload_id,
-            state="uploading_to_yandex",
-            message="Сервер загружает видео на Яндекс Диск",
-            percent=0,
-            asset="video",
-        )
-        upload_file_to_yandex_disk(
-            uploaded_file=uploaded_video,
-            disk_path=disk_path,
-            previous_path=obj.yandex_disk_path,
-            progress_callback=lambda sent, total: _set_upload_status(
+    try:
+        if uploaded_video:
+            disk_path = build_video_disk_path(obj.user, uploaded_video.name)
+            logger.info(
+                "Uploading scholar video asset user_id=%s upload_id=%s asset=video file_name=%s size=%s disk_path=%s",
+                obj.user_id,
+                upload_id,
+                uploaded_video.name,
+                getattr(uploaded_video, "size", None),
+                disk_path,
+            )
+            _set_upload_status(
                 obj.user_id,
                 upload_id,
                 state="uploading_to_yandex",
                 message="Сервер загружает видео на Яндекс Диск",
-                percent=round((sent / total) * 100) if total else None,
+                percent=0,
                 asset="video",
-            ),
-        )
-        obj.file = None
-        obj.yandex_disk_path = disk_path
-        obj.yandex_disk_uploaded_at = timezone.now()
-        obj.yandex_disk_error = ""
+            )
+            upload_file_to_yandex_disk(
+                uploaded_file=uploaded_video,
+                disk_path=disk_path,
+                progress_callback=lambda sent, total: _set_upload_status(
+                    obj.user_id,
+                    upload_id,
+                    state="uploading_to_yandex",
+                    message="Сервер загружает видео на Яндекс Диск",
+                    percent=round((sent / total) * 100) if total else None,
+                    asset="video",
+                ),
+                log_context={
+                    "user_id": obj.user_id,
+                    "upload_id": upload_id,
+                    "asset": "video",
+                },
+                retry_callback=_make_upload_retry_callback(user_id=obj.user_id, upload_id=upload_id, asset="video"),
+            )
+            obj.file = None
+            obj.yandex_disk_path = disk_path
+            obj.yandex_disk_uploaded_at = timezone.now()
+            obj.yandex_disk_error = ""
+            uploaded_assets.append(
+                {
+                    "asset": "video",
+                    "new_path": disk_path,
+                    "previous_path": previous_video_path,
+                }
+            )
+            logger.info(
+                "Scholar video asset uploaded user_id=%s upload_id=%s asset=video disk_path=%s",
+                obj.user_id,
+                upload_id,
+                disk_path,
+            )
 
-    if uploaded_schedule:
-        disk_path = build_schedule_disk_path(obj.user, uploaded_schedule.name)
-        _set_upload_status(
-            obj.user_id,
-            upload_id,
-            state="uploading_to_yandex",
-            message="Сервер загружает график на Яндекс Диск",
-            percent=0,
-            asset="schedule",
-        )
-        upload_file_to_yandex_disk(
-            uploaded_file=uploaded_schedule,
-            disk_path=disk_path,
-            previous_path=obj.schedule_yandex_disk_path,
-            progress_callback=lambda sent, total: _set_upload_status(
+        if uploaded_schedule:
+            disk_path = build_schedule_disk_path(obj.user, uploaded_schedule.name)
+            logger.info(
+                "Uploading scholar video asset user_id=%s upload_id=%s asset=schedule file_name=%s size=%s disk_path=%s",
+                obj.user_id,
+                upload_id,
+                uploaded_schedule.name,
+                getattr(uploaded_schedule, "size", None),
+                disk_path,
+            )
+            _set_upload_status(
                 obj.user_id,
                 upload_id,
                 state="uploading_to_yandex",
                 message="Сервер загружает график на Яндекс Диск",
-                percent=round((sent / total) * 100) if total else None,
+                percent=0,
                 asset="schedule",
-            ),
-        )
-        obj.schedule_file = None
-        obj.schedule_yandex_disk_path = disk_path
-        obj.schedule_yandex_disk_uploaded_at = timezone.now()
-        obj.schedule_yandex_disk_error = ""
+            )
+            upload_file_to_yandex_disk(
+                uploaded_file=uploaded_schedule,
+                disk_path=disk_path,
+                progress_callback=lambda sent, total: _set_upload_status(
+                    obj.user_id,
+                    upload_id,
+                    state="uploading_to_yandex",
+                    message="Сервер загружает график на Яндекс Диск",
+                    percent=round((sent / total) * 100) if total else None,
+                    asset="schedule",
+                ),
+                log_context={
+                    "user_id": obj.user_id,
+                    "upload_id": upload_id,
+                    "asset": "schedule",
+                },
+                retry_callback=_make_upload_retry_callback(user_id=obj.user_id, upload_id=upload_id, asset="schedule"),
+            )
+            obj.schedule_file = None
+            obj.schedule_yandex_disk_path = disk_path
+            obj.schedule_yandex_disk_uploaded_at = timezone.now()
+            obj.schedule_yandex_disk_error = ""
+            uploaded_assets.append(
+                {
+                    "asset": "schedule",
+                    "new_path": disk_path,
+                    "previous_path": previous_schedule_path,
+                }
+            )
+            logger.info(
+                "Scholar video asset uploaded user_id=%s upload_id=%s asset=schedule disk_path=%s",
+                obj.user_id,
+                upload_id,
+                disk_path,
+            )
+    except Exception:
+        _rollback_uploaded_assets(uploaded_assets, user_id=obj.user_id, upload_id=upload_id)
+        obj.yandex_disk_path = previous_video_path
+        obj.schedule_yandex_disk_path = previous_schedule_path
+        obj.yandex_disk_uploaded_at = previous_video_uploaded_at
+        obj.schedule_yandex_disk_uploaded_at = previous_schedule_uploaded_at
+        obj.yandex_disk_error = previous_video_error
+        obj.schedule_yandex_disk_error = previous_schedule_error
+        raise
+
+    return uploaded_assets
 
 
 @login_required
@@ -235,10 +405,19 @@ def my_video_page(request):
             obj.user = request.user
             uploaded_video = form.cleaned_data.get("file")
             uploaded_schedule = form.cleaned_data.get("schedule_file")
+            previous_video_path = instance.yandex_disk_path
+            previous_schedule_path = instance.schedule_yandex_disk_path
+            previous_video_uploaded_at = instance.yandex_disk_uploaded_at
+            previous_schedule_uploaded_at = instance.schedule_yandex_disk_uploaded_at
+            previous_video_error = instance.yandex_disk_error
+            previous_schedule_error = instance.schedule_yandex_disk_error
+            uploaded_assets = []
+            started_at = time.monotonic()
 
             logger.info(
-                "Scholar video upload started for user_id=%s video=%s schedule=%s",
+                "Scholar video upload started for user_id=%s upload_id=%s video=%s schedule=%s",
                 request.user.pk,
+                upload_id,
                 bool(uploaded_video),
                 bool(uploaded_schedule),
             )
@@ -251,7 +430,7 @@ def my_video_page(request):
             )
 
             try:
-                _upload_scholar_video_assets(obj, form, upload_id=upload_id)
+                uploaded_assets = _upload_scholar_video_assets(obj, form, upload_id=upload_id)
                 _set_upload_status(
                     request.user.pk,
                     upload_id,
@@ -277,10 +456,12 @@ def my_video_page(request):
                         update_kwargs["yandex_disk_error"] = str(exc)
                     ScholarVideo.objects.filter(pk=obj.pk).update(**update_kwargs)
                 logger.exception(
-                    "Scholar video upload to Yandex Disk failed for user_id=%s video=%s schedule=%s",
+                    "Scholar video upload to Yandex Disk failed for user_id=%s upload_id=%s video=%s schedule=%s elapsed=%.2fs",
                     request.user.pk,
+                    upload_id,
                     bool(uploaded_video),
                     bool(uploaded_schedule),
+                    time.monotonic() - started_at,
                 )
                 _set_upload_status(
                     request.user.pk,
@@ -288,7 +469,7 @@ def my_video_page(request):
                     state="error",
                     message=str(exc),
                 )
-                messages.error(request, "Не удалось загрузить файл на Яндекс Диск.")
+                messages.error(request, str(exc))
                 if is_ajax:
                     return JsonResponse(
                         {
@@ -298,11 +479,21 @@ def my_video_page(request):
                         status=502,
                     )
             except Exception:
+                if uploaded_assets:
+                    _rollback_uploaded_assets(uploaded_assets, user_id=request.user.pk, upload_id=upload_id)
+                    obj.yandex_disk_path = previous_video_path
+                    obj.schedule_yandex_disk_path = previous_schedule_path
+                    obj.yandex_disk_uploaded_at = previous_video_uploaded_at
+                    obj.schedule_yandex_disk_uploaded_at = previous_schedule_uploaded_at
+                    obj.yandex_disk_error = previous_video_error
+                    obj.schedule_yandex_disk_error = previous_schedule_error
                 logger.exception(
-                    "Unexpected scholar video upload failure for user_id=%s video=%s schedule=%s",
+                    "Unexpected scholar video upload failure for user_id=%s upload_id=%s video=%s schedule=%s elapsed=%.2fs",
                     request.user.pk,
+                    upload_id,
                     bool(uploaded_video),
                     bool(uploaded_schedule),
+                    time.monotonic() - started_at,
                 )
                 _set_upload_status(
                     request.user.pk,
@@ -321,11 +512,14 @@ def my_video_page(request):
                         status=500,
                     )
             else:
+                _delete_replaced_assets(uploaded_assets, user_id=request.user.pk, upload_id=upload_id)
                 logger.info(
-                    "Scholar video saved for user_id=%s video_path=%s schedule_path=%s",
+                    "Scholar video saved for user_id=%s upload_id=%s video_path=%s schedule_path=%s elapsed=%.2fs",
                     request.user.pk,
+                    upload_id,
                     obj.yandex_disk_path,
                     obj.schedule_yandex_disk_path,
+                    time.monotonic() - started_at,
                 )
                 _set_upload_status(
                     request.user.pk,
