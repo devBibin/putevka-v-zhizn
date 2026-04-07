@@ -640,43 +640,7 @@ def staff_users_list(request):
 
 
 def _staff_users_queryset_from_request(request):
-    q = (request.GET.get("q") or "").strip()
-    school = (request.GET.get("school") or "").strip()
-    course = (request.GET.get("course") or "").strip()
-    curator_paid = (request.GET.get("curator_need") or "").strip()
-    grade = (request.GET.get("grade") or "").strip()
-    step = (request.GET.get("step") or "").strip()
-
-    qs = User.objects.all().select_related("user_info")
-
-    if q:
-        qs = qs.filter(
-            Q(username__icontains=q) |
-            Q(email__icontains=q) |
-            Q(first_name__icontains=q) |
-            Q(last_name__icontains=q) |
-            Q(user_info__phone__icontains=q) |
-            Q(user_info__region__icontains=q)
-        )
-
-    if school:
-        qs = qs.filter(course_selections__course__school_id=school)
-
-    if course:
-        qs = qs.filter(course_selections__course_id=course)
-
-    if grade:
-        qs = qs.filter(user_info__next_year_class_digit=grade)
-
-    if curator_paid == "1":
-        qs = qs.filter(course_selections__need_tutor=True)
-    elif curator_paid == "0":
-        qs = qs.filter(course_selections__need_tutor=False)
-
-    if step:
-        qs = qs.filter(user_info__selection_step=step)
-
-    return qs.distinct()
+    return build_staff_users_queryset(request)
 
 
 @login_required
