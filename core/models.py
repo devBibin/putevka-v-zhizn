@@ -559,16 +559,48 @@ class MotivationLetterRubricReview(models.Model):
 
 
 class MotivationLetterInstruction(models.Model):
-    title = models.CharField(max_length=200, default="Требования к мотивационному письму")
-    file = models.FileField(upload_to="motivation/instructions/")
-    is_active = models.BooleanField(default=True)
+    title = models.CharField(
+        max_length=200,
+        default="Инструкция к мотивационному письму",
+        verbose_name="Заголовок",
+    )
+    text = models.TextField(
+        blank=True,
+        default="Перед написанием мотивационного письма ознакомьтесь с инструкциями.",
+        verbose_name="Текст",
+    )
+    url = models.URLField(
+        blank=True,
+        default="",
+        verbose_name="Ссылка на инструкцию",
+    )
+    button_text = models.CharField(
+        max_length=80,
+        default="Открыть инструкцию",
+        verbose_name="Текст кнопки",
+    )
+    file = models.FileField(
+        upload_to="motivation/instructions/",
+        blank=True,
+        null=True,
+        verbose_name="Общий файл инструкции",
+        help_text="Устаревшее поле. Используется как запасной вариант, если ссылка на инструкцию не задана.",
+    )
+    is_active = models.BooleanField(default=True, verbose_name="Показывать плашку")
     uploaded_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ["-uploaded_at"]
+        ordering = ["-updated_at", "-uploaded_at"]
+        verbose_name = "Инструкция к мотивационному письму"
+        verbose_name_plural = "Инструкция к мотивационному письму"
 
     def __str__(self):
         return self.title
+
+    @classmethod
+    def get_current(cls):
+        return cls.objects.filter(is_active=True).order_by("-updated_at", "-uploaded_at").first()
 
 
 class Notification(models.Model):
