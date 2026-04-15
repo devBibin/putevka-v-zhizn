@@ -63,11 +63,27 @@
 {% endif %}
 
                 {% if instruction %}
-                    <div class="alert alert-info">
-                        <strong>{{ instruction.title }}</strong><br>
-                        <a href="{{ instruction.file.url }}" target="_blank">
-                            Скачать требования
-                        </a>
+                    <div class="alert alert-info d-flex align-items-start justify-content-between flex-wrap gap-3 mb-4">
+                        <div>
+                            <strong>{{ instruction.title }}</strong><br>
+                            {{ instruction.text|linebreaksbr }}
+                        </div>
+
+                        {% if instruction.url %}
+                            <a href="{{ instruction.url }}"
+                               target="_blank"
+                               rel="noopener"
+                               class="btn btn-primary">
+                                {{ instruction.button_text }}
+                            </a>
+                        {% elif instruction.file %}
+                            <a href="{{ instruction.file.url }}"
+                               target="_blank"
+                               rel="noopener"
+                               class="btn btn-primary">
+                                {{ instruction.button_text }}
+                            </a>
+                        {% endif %}
                     </div>
                 {% endif %}
 

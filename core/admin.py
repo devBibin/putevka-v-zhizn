@@ -163,7 +163,24 @@ class MotivationLetterAdmin(admin.ModelAdmin):
 
 @admin.register(MotivationLetterInstruction)
 class MotivationLetterInstructionAdmin(admin.ModelAdmin):
-    list_display = ('title', )
+    list_display = ("title", "is_active", "updated_at")
+    list_filter = ("is_active",)
+    search_fields = ("title", "text", "url")
+    ordering = ("-updated_at",)
+    readonly_fields = ("uploaded_at", "updated_at")
+    fieldsets = (
+        ("Основное", {
+            "fields": ("title", "text", "url", "button_text", "is_active"),
+        }),
+        ("Наследие", {
+            "fields": ("file",),
+            "description": "Поле используется только как запасной вариант для старых записей без URL.",
+            "classes": ("collapse",),
+        }),
+        ("Даты", {
+            "fields": ("uploaded_at", "updated_at"),
+        }),
+    )
 
 @admin.register(Notification)
 class NotificationAdmin(admin.ModelAdmin):
