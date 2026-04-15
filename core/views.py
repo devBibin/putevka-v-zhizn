@@ -384,11 +384,7 @@ def finish_registration(request):
 @login_required
 def motivation_letter(request):
     user = request.user
-    instruction = (
-        MotivationLetterInstruction.objects
-        .filter(is_active=True)
-        .first()
-    )
+    instruction = MotivationLetterInstruction.get_current()
     letter = None
     is_new_letter = True
 
