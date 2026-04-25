@@ -226,6 +226,10 @@
                         Отправить оповещение выбранным
                     </button>
 
+                    <button type="button" class="btn btn-outline-primary" id="downloadLettersBtn">
+                        Скачать письма (.zip)
+                    </button>
+
                     <button type="button" class="btn btn-outline-success" id="selectAllFilteredBtn">
                         Выбрать всех (по фильтру)
                     </button>
@@ -587,6 +591,7 @@
                     const checkAll = document.getElementById('checkAllOnPage');
                     const selectedCount = document.getElementById('selectedCount');
                     const openModalBtn = document.getElementById('openModalBtn');
+                    const downloadLettersBtn = document.getElementById('downloadLettersBtn');
                     const submitBtn = document.getElementById('submitNotifBtn');
                     const messageText = document.getElementById('messageText');
                     const form = document.getElementById('notifyForm');
@@ -720,6 +725,18 @@
                         });
                     }
 
+                    function submitSelectedLettersDownload() {
+                        injectAllSelectedHiddenInputs();
+
+                        const previousAction = form.action;
+                        const previousTarget = form.target;
+                        form.action = "{% url 'staff_letters_download_zip' %}";
+                        form.target = "_self";
+                        form.submit();
+                        form.action = previousAction;
+                        form.target = previousTarget || "";
+                    }
+
                     if (submitBtn) {
                         submitBtn.addEventListener('click', function (e) {
                             if (!requireSelection(e)) return;
@@ -731,6 +748,13 @@
                                 return;
                             }
                             injectAllSelectedHiddenInputs();
+                        });
+                    }
+
+                    if (downloadLettersBtn) {
+                        downloadLettersBtn.addEventListener('click', function (e) {
+                            if (!requireSelection(e)) return;
+                            submitSelectedLettersDownload();
                         });
                     }
 

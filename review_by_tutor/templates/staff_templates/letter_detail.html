@@ -5,7 +5,14 @@
 
 {% block content %}
     <div class="container py-4">
-        <h1 class="mb-3">Письмо: {{ user_obj.get_full_name|default:user_obj.username }}</h1>
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+            <h1 class="mb-0 me-auto">Письмо: {{ user_obj.get_full_name|default:user_obj.username }}</h1>
+            {% if letter and letter.letter_text %}
+                <a href="{% url 'staff_letter_download' user_obj.id %}" class="btn btn-outline-primary">
+                    Скачать .docx
+                </a>
+            {% endif %}
+        </div>
 
         {% if messages %}
             {% for message in messages %}
