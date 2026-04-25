@@ -26,7 +26,7 @@ client = OpenAI(api_key=OPENAI_API_KEY)
 POLLING_INTERVAL = int(os.getenv("SHADOW_POLLING_INTERVAL", 60))
 BATCH_LIMIT = int(os.getenv("SHADOW_BATCH_LIMIT", 10))
 
-RUBRIC_VERSION = "v2.0-2026-03-11"
+RUBRIC_VERSION = "v3.0-2026-04-25"
 
 SYSTEM_PROMPT = (
     "Ты — эксперт-проверяющий мотивационные письма фонда. "
@@ -40,12 +40,12 @@ USER_INSTRUCTIONS = """
 1. Важен объём в символах. Верни char_count и word_count.
 2. Если в письме менее 1000 символов, итоговый балл = 0.
 3. Если письмо выглядит как непосредственно написанное нейросетью, выставь suspected_ai_generated=true, итоговый балл = 0.
-4. Если письмо объёмом от 1000 до 1500 символов и расчёт даёт 85 баллов, снизь итог до 84.
+4. Если письмо объёмом от 1000 до 1500 символов и расчёт даёт 70 баллов, снизь итог до 69.
 5. Оцени содержательные критерии так:
-   - specialty_choice_score: только одно из "15", "8", "3", "0"
-   - university_choice_score: только одно из "15", "8", "3", "0"
+   - specialty_choice_score: только одно из "10", "5", "2", "0"
+   - university_choice_score: только одно из "10", "5", "2", "0"
    - current_preparation_score: только одно из "10", "5", "0"
-   - admission_trajectory_score: только одно из "15", "10", "5", "0"
+   - admission_trajectory_score: только одно из "10", "5", "2", "0"
    - next_year_preparation_score: только одно из "10", "5", "0"
    - higher_education_value_score: только одно из "10", "5", "0"
    - support_criticality_score: только одно из "10", "5", "0"
@@ -74,10 +74,10 @@ RUBRIC_SCHEMA = {
             "type": "object",
             "additionalProperties": False,
             "properties": {
-                "specialty_choice_score": {"type": "string", "enum": ["15", "8", "3", "0"]},
-                "university_choice_score": {"type": "string", "enum": ["15", "8", "3", "0"]},
+                "specialty_choice_score": {"type": "string", "enum": ["10", "5", "2", "0"]},
+                "university_choice_score": {"type": "string", "enum": ["10", "5", "2", "0"]},
                 "current_preparation_score": {"type": "string", "enum": ["10", "5", "0"]},
-                "admission_trajectory_score": {"type": "string", "enum": ["15", "10", "5", "0"]},
+                "admission_trajectory_score": {"type": "string", "enum": ["10", "5", "2", "0"]},
                 "next_year_preparation_score": {"type": "string", "enum": ["10", "5", "0"]},
                 "higher_education_value_score": {"type": "string", "enum": ["10", "5", "0"]},
                 "support_criticality_score": {"type": "string", "enum": ["10", "5", "0"]},
@@ -177,6 +177,26 @@ def _safe_int(value, default=0) -> int:
         return default
 
 
+def _raw_total_from_json(j: dict) -> int:
+    c = j["content"]
+    r = j["rhetoric"]
+    l = j["literacy"]
+
+    return (
+        _safe_int(c["specialty_choice_score"])
+        + _safe_int(c["university_choice_score"])
+        + _safe_int(c["current_preparation_score"])
+        + _safe_int(c["admission_trajectory_score"])
+        + _safe_int(c["next_year_preparation_score"])
+        + _safe_int(c["higher_education_value_score"])
+        + _safe_int(c["support_criticality_score"])
+        + _safe_int(r["composition_penalty"])
+        + _safe_int(r["style_penalty"])
+        + _safe_int(l["orthography_penalty"])
+        + _safe_int(l["syntax_penalty"])
+    )
+
+
 def _score_from_json(j: dict) -> tuple[int, str]:
     c = j["content"]
     r = j["rhetoric"]
@@ -191,22 +211,10 @@ def _score_from_json(j: dict) -> tuple[int, str]:
     if char_count < 1000:
         return 0, "Менее 1000 символов — работа не засчитывается."
 
-    total = (
-            _safe_int(c["specialty_choice_score"])
-            + _safe_int(c["university_choice_score"])
-            + _safe_int(c["current_preparation_score"])
-            + _safe_int(c["admission_trajectory_score"])
-            + _safe_int(c["next_year_preparation_score"])
-            + _safe_int(c["higher_education_value_score"])
-            + _safe_int(c["support_criticality_score"])
-            + _safe_int(r["composition_penalty"])
-            + _safe_int(r["style_penalty"])
-            + _safe_int(l["orthography_penalty"])
-            + _safe_int(l["syntax_penalty"])
-    )
+    total = _raw_total_from_json(j)
 
-    if 1000 <= char_count < 1500 and total >= 85:
-        total = 84
+    if 1000 <= char_count < 1500 and total >= 70:
+        total = 69
 
     if total < 0:
         total = 0
@@ -235,7 +243,7 @@ def evaluate_with_openai(letter_text: str) -> dict:
             response_format={
                 "type": "json_schema",
                 "json_schema": {
-                    "name": "motivation_letter_scoring_v2",
+                    "name": "motivation_letter_scoring_v3",
                     "schema": RUBRIC_SCHEMA,
                     "strict": True,
                 },
@@ -334,7 +342,7 @@ def _to_review_kwargs(j: dict, *, score: int, model_name: str, rubric_version: s
         "syntax_penalty": l["syntax_penalty"],
 
         "is_too_short": char_count < 1000,
-        "score_capped_for_short_length": 1000 <= char_count < 1500 and int(score) >= 84,
+        "score_capped_for_short_length": 1000 <= char_count < 1500 and _raw_total_from_json(j) >= 70,
         "suspected_ai_generated": bool(f.get("suspected_ai_generated")),
         "returned_for_revision": bool(f.get("returned_for_revision")),
 

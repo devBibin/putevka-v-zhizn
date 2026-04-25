@@ -19,17 +19,17 @@ except Exception:
         return s
 
 
-Content15 = Literal["15", "8", "3", "0"]
-Content15Trajectory = Literal["15", "10", "5", "0"]
+Content10WithMaterials = Literal["10", "5", "2", "0"]
+Content10Trajectory = Literal["10", "5", "2", "0"]
 Content10 = Literal["10", "5", "0"]
 Penalty = Literal["0", "-2", "-5"]
 
 
 class Content(BaseModel):
-    specialty_choice_score: Content15
-    university_choice_score: Content15
+    specialty_choice_score: Content10WithMaterials
+    university_choice_score: Content10WithMaterials
     current_preparation_score: Content10
-    admission_trajectory_score: Content15Trajectory
+    admission_trajectory_score: Content10Trajectory
     next_year_preparation_score: Content10
     higher_education_value_score: Content10
     support_criticality_score: Content10
@@ -105,13 +105,7 @@ def _safe_int(value: Any, default: int = 0) -> int:
         return default
 
 
-def compute_score(p: RubricPayload) -> Tuple[int, str]:
-    if p.flags.suspected_ai_generated:
-        return 0, "Есть признаки непосредственного написания письма нейросетью."
-
-    if p.char_count < 1000:
-        return 0, "Менее 1000 символов — работа не засчитывается."
-
+def _raw_total_score(p: RubricPayload) -> int:
     total = 0
 
     total += _safe_int(p.content.specialty_choice_score)
@@ -128,8 +122,20 @@ def compute_score(p: RubricPayload) -> Tuple[int, str]:
     total += _safe_int(p.literacy.orthography_penalty)
     total += _safe_int(p.literacy.syntax_penalty)
 
-    if 1000 <= p.char_count < 1500 and total >= 85:
-        total = 84
+    return total
+
+
+def compute_score(p: RubricPayload) -> Tuple[int, str]:
+    if p.flags.suspected_ai_generated:
+        return 0, "Есть признаки непосредственного написания письма нейросетью."
+
+    if p.char_count < 1000:
+        return 0, "Менее 1000 символов — работа не засчитывается."
+
+    total = _raw_total_score(p)
+
+    if 1000 <= p.char_count < 1500 and total >= 70:
+        total = 69
 
     if total < 0:
         total = 0
