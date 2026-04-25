@@ -128,6 +128,15 @@ def staff_letter_detail(request, user_id: int):
             messages.error(request, "У пользователя ещё нет мотивационного письма — сохранять нечего.")
             return redirect("staff_letter_detail", user_id=user_id)
 
+        if "action_toggle_favorite" in request.POST:
+            letter.is_favorite = not letter.is_favorite
+            letter.save(update_fields=["is_favorite", "updated_at"])
+            messages.success(
+                request,
+                "Письмо добавлено в избранное." if letter.is_favorite else "Письмо убрано из избранного."
+            )
+            return redirect("staff_letter_detail", user_id=user_id)
+
         if "action_rubric_save" in request.POST:
             if rubric_review is None:
                 messages.error(request, "Нет авторазбора по рубрике — редактировать нечего.")
