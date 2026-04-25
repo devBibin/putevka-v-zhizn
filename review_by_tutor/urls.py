@@ -5,6 +5,7 @@ from . import views, service_views
 
 urlpatterns = [
     path("letters/<int:user_id>/", views.staff_letter_detail, name="staff_letter_detail"),
+    path("letters/<int:user_id>/download/", views.staff_letter_download, name="staff_letter_download"),
     path("profiles/<int:user_id>/", views.staff_profile_detail, name="staff_profile_detail"),
     path("video/<int:user_id>/", views.staff_video_detail, name="staff_video_detail"),
     path("documents/<int:user_id>/", views.staff_documents_detail, name="staff_documents_detail"),
@@ -34,6 +35,7 @@ urlpatterns = [
     path("staff/notes/<int:user_id>/delete/<int:note_id>/", views.staff_note_delete, name="staff_note_delete"),
 
     path("staff/users/ids/", views.staff_users_ids, name="staff_users_ids"),
+    path("users/letters/download/", views.staff_letters_download_zip, name="staff_letters_download_zip"),
 
     path("testing/template-payload/", views.testing_template_payload, name="staff_testing_template_payload"),
 
