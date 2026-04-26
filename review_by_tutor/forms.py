@@ -132,7 +132,28 @@ class UserInfoStaffForm(forms.ModelForm):
 class ScholarVideoStaffForm(forms.ModelForm):
     class Meta:
         model = ScholarVideo
-        fields = ["review", "score"]
+        fields = [
+            "review",
+            "score",
+            "transcript_text",
+            "online_school_prior_experience",
+            "online_school_observations",
+            "online_school_selected_courses",
+            "online_school_choice_reason",
+            "online_school_extra_help",
+            "online_school_used_materials",
+            "online_school_interview_questions",
+            "schedule_school_day",
+            "schedule_homework_time",
+            "schedule_activities_time",
+            "schedule_exam_prep_time",
+            "schedule_rest_time",
+            "schedule_weekend_day",
+            "schedule_realistic_assessment",
+            "schedule_extra_help",
+            "schedule_used_materials",
+            "schedule_interview_questions",
+        ]
         widgets = {
             "review": forms.Textarea(attrs={
                 "rows": 8,
@@ -145,10 +166,46 @@ class ScholarVideoStaffForm(forms.ModelForm):
                 "step": 1,
                 "placeholder": "Баллы (целое число)"
             }),
+            "transcript_text": forms.Textarea(attrs={"rows": 8, "class": "form-control"}),
+            "online_school_prior_experience": forms.Textarea(attrs={"rows": 3, "class": "form-control"}),
+            "online_school_observations": forms.Textarea(attrs={"rows": 4, "class": "form-control"}),
+            "online_school_selected_courses": forms.Textarea(attrs={"rows": 5, "class": "form-control"}),
+            "online_school_choice_reason": forms.Textarea(attrs={"rows": 3, "class": "form-control"}),
+            "online_school_extra_help": forms.Textarea(attrs={"rows": 2, "class": "form-control"}),
+            "online_school_used_materials": forms.Textarea(attrs={"rows": 2, "class": "form-control"}),
+            "online_school_interview_questions": forms.Textarea(attrs={"rows": 3, "class": "form-control"}),
+            "schedule_school_day": forms.Textarea(attrs={"rows": 3, "class": "form-control"}),
+            "schedule_homework_time": forms.Textarea(attrs={"rows": 2, "class": "form-control"}),
+            "schedule_activities_time": forms.Textarea(attrs={"rows": 2, "class": "form-control"}),
+            "schedule_exam_prep_time": forms.Textarea(attrs={"rows": 2, "class": "form-control"}),
+            "schedule_rest_time": forms.Textarea(attrs={"rows": 2, "class": "form-control"}),
+            "schedule_weekend_day": forms.Textarea(attrs={"rows": 3, "class": "form-control"}),
+            "schedule_realistic_assessment": forms.Textarea(attrs={"rows": 3, "class": "form-control"}),
+            "schedule_extra_help": forms.Textarea(attrs={"rows": 2, "class": "form-control"}),
+            "schedule_used_materials": forms.Textarea(attrs={"rows": 2, "class": "form-control"}),
+            "schedule_interview_questions": forms.Textarea(attrs={"rows": 3, "class": "form-control"}),
         }
         labels = {
             "review": "Отзыв",
             "score": "Оценка в баллах",
+            "transcript_text": "Транскрипция видеовизитки",
+            "online_school_prior_experience": "Выбор онлайн-школ: занимался ли раньше и где",
+            "online_school_observations": "Выбор онлайн-школ: что получилось, что было удобно, что не получилось",
+            "online_school_selected_courses": "Выбор онлайн-школ: какие курсы выбраны на следующий год",
+            "online_school_choice_reason": "Выбор онлайн-школ: обоснование выбора",
+            "online_school_extra_help": "Выбор онлайн-школ: нужна ли дополнительная помощь",
+            "online_school_used_materials": "Выбор онлайн-школ: опирался ли на предоставленные материалы",
+            "online_school_interview_questions": "Выбор онлайн-школ: вопросы для обсуждения на собеседовании",
+            "schedule_school_day": "Планирование: как выглядит обычный школьный день",
+            "schedule_homework_time": "Планирование: сколько времени уходит на домашнюю работу",
+            "schedule_activities_time": "Планирование: сколько времени уходит на кружки, спорт и допактивности",
+            "schedule_exam_prep_time": "Планирование: сколько времени уходит на ЕГЭ и олимпиады",
+            "schedule_rest_time": "Планирование: сколько времени уходит на отдых",
+            "schedule_weekend_day": "Планирование: как выглядит обычный выходной",
+            "schedule_realistic_assessment": "Планирование: реалистичность графика",
+            "schedule_extra_help": "Планирование: нужна ли дополнительная помощь",
+            "schedule_used_materials": "Планирование: опирался ли на предоставленные материалы",
+            "schedule_interview_questions": "Планирование: вопросы для обсуждения на собеседовании",
         }
 
 

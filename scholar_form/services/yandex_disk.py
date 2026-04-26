@@ -617,3 +617,21 @@ def build_schedule_disk_path(user_or_id, file_name: str, unique_suffix: str = ""
         _candidate_folder_name(user_or_id),
         _dated_candidate_filename("График занятий", user_or_id, ext, unique_suffix=unique_suffix),
     )
+
+
+def download_file_from_yandex_disk(disk_path: str, local_path: str, *, log_context=None):
+    url = get_download_url(disk_path, log_context=log_context)
+    context = _log_context(log_context, disk_path=disk_path, local_path=local_path)
+    logger.info("Downloading from Yandex Disk started%s", _log_context_suffix(context))
+
+    started_at = time.monotonic()
+    response = requests.get(url, stream=True, timeout=_setting("YANDEX_DISK_TIMEOUT_SECONDS", DEFAULT_TIMEOUT_SECONDS))
+    if response.status_code != 200:
+        _raise_api_error(response, "Не удалось скачать файл с Яндекс Диска.")
+
+    with open(local_path, "wb") as f:
+        for chunk in response.iter_content(chunk_size=8192):
+            f.write(chunk)
+
+    elapsed = time.monotonic() - started_at
+    logger.info("Downloading from Yandex Disk finished elapsed=%.2fs%s", elapsed, _log_context_suffix(context))

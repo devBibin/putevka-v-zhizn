@@ -20,7 +20,6 @@
       <div class="card shadow-sm mb-4">
         <div class="card-header">Видео</div>
         <div class="card-body">
-
           {% if video %}
             {% if video.has_video_file and video_download_url %}
               <video controls preload="metadata" style="width: 100%; max-height: 480px;">
@@ -49,7 +48,6 @@
               У пользователя пока нет видеовизитки.
             </div>
           {% endif %}
-
         </div>
       </div>
 
@@ -109,6 +107,27 @@
         </div>
       </div>
 
+      <div class="card shadow-sm mb-4">
+        <div class="card-header">Транскрипция и разбор</div>
+        <div class="card-body">
+          {% if video %}
+            {% if video.transcript_text %}
+              <div class="border rounded p-3 bg-body-tertiary" style="white-space: pre-line;">
+                {{ video.transcript_text }}
+              </div>
+            {% else %}
+              <div class="text-muted">
+                Транскрипция ещё не заполнена.
+              </div>
+            {% endif %}
+          {% else %}
+            <div class="text-muted">
+              Блок появится после загрузки видеовизитки.
+            </div>
+          {% endif %}
+        </div>
+      </div>
+
       <div class="card shadow-sm">
         <div class="card-header">Метаданные</div>
         <div class="card-body small">
@@ -140,11 +159,9 @@
     </div>
 
     <div class="col-lg-5">
-
       <div class="card shadow-sm mb-4">
         <div class="card-header">Дедлайн</div>
         <div class="card-body">
-
           {% if video and video.deadline_at %}
             <div class="small mb-2">
               <strong>Текущий дедлайн:</strong> {{ video.deadline_at|date:"d.m.Y H:i" }}
@@ -179,14 +196,12 @@
               </div>
             </form>
           {% endif %}
-
         </div>
       </div>
 
       <div class="card shadow-sm">
         <div class="card-header">Модерация</div>
         <div class="card-body">
-
           {% if form %}
             <form method="post" novalidate>
               {% csrf_token %}
@@ -210,6 +225,92 @@
                 {% endif %}
               </div>
 
+              <div class="mb-4">
+                <label class="form-label">{{ form.transcript_text.label }}</label>
+                {{ form.transcript_text|add_class:"form-control" }}
+                {% if form.transcript_text.errors %}
+                  <div class="text-danger small mt-1">{{ form.transcript_text.errors }}</div>
+                {% endif %}
+              </div>
+
+              <div class="border rounded p-3 mb-4 bg-body-tertiary">
+                <h6 class="mb-3">Выбор онлайн-школ</h6>
+
+                <div class="mb-3">
+                  <label class="form-label">{{ form.online_school_prior_experience.label }}</label>
+                  {{ form.online_school_prior_experience|add_class:"form-control" }}
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">{{ form.online_school_observations.label }}</label>
+                  {{ form.online_school_observations|add_class:"form-control" }}
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">{{ form.online_school_selected_courses.label }}</label>
+                  {{ form.online_school_selected_courses|add_class:"form-control" }}
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">{{ form.online_school_choice_reason.label }}</label>
+                  {{ form.online_school_choice_reason|add_class:"form-control" }}
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">{{ form.online_school_extra_help.label }}</label>
+                  {{ form.online_school_extra_help|add_class:"form-control" }}
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">{{ form.online_school_used_materials.label }}</label>
+                  {{ form.online_school_used_materials|add_class:"form-control" }}
+                </div>
+                <div>
+                  <label class="form-label">{{ form.online_school_interview_questions.label }}</label>
+                  {{ form.online_school_interview_questions|add_class:"form-control" }}
+                </div>
+              </div>
+
+              <div class="border rounded p-3 mb-4 bg-body-tertiary">
+                <h6 class="mb-3">Планирование и график</h6>
+
+                <div class="mb-3">
+                  <label class="form-label">{{ form.schedule_school_day.label }}</label>
+                  {{ form.schedule_school_day|add_class:"form-control" }}
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">{{ form.schedule_homework_time.label }}</label>
+                  {{ form.schedule_homework_time|add_class:"form-control" }}
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">{{ form.schedule_activities_time.label }}</label>
+                  {{ form.schedule_activities_time|add_class:"form-control" }}
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">{{ form.schedule_exam_prep_time.label }}</label>
+                  {{ form.schedule_exam_prep_time|add_class:"form-control" }}
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">{{ form.schedule_rest_time.label }}</label>
+                  {{ form.schedule_rest_time|add_class:"form-control" }}
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">{{ form.schedule_weekend_day.label }}</label>
+                  {{ form.schedule_weekend_day|add_class:"form-control" }}
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">{{ form.schedule_realistic_assessment.label }}</label>
+                  {{ form.schedule_realistic_assessment|add_class:"form-control" }}
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">{{ form.schedule_extra_help.label }}</label>
+                  {{ form.schedule_extra_help|add_class:"form-control" }}
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">{{ form.schedule_used_materials.label }}</label>
+                  {{ form.schedule_used_materials|add_class:"form-control" }}
+                </div>
+                <div>
+                  <label class="form-label">{{ form.schedule_interview_questions.label }}</label>
+                  {{ form.schedule_interview_questions|add_class:"form-control" }}
+                </div>
+              </div>
+
               <div class="d-flex gap-2 justify-content-end">
                 <a href="{% url 'staff_users_list' %}" class="btn btn-outline-secondary">Назад к списку</a>
                 <button type="submit" class="btn btn-primary">Сохранить</button>
@@ -220,7 +321,6 @@
               Оценивать пока нечего: у пользователя ещё нет видеовизитки.
             </div>
           {% endif %}
-
         </div>
       </div>
     </div>
