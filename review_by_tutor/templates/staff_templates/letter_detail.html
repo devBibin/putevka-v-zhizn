@@ -7,6 +7,17 @@
     <div class="container py-4">
         <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
             <h1 class="mb-0 me-auto">Письмо: {{ user_obj.get_full_name|default:user_obj.username }}</h1>
+            {% if letter %}
+                <form method="post" class="m-0">
+                    {% csrf_token %}
+                    <button type="submit"
+                            name="action_toggle_favorite"
+                            value="1"
+                            class="btn {% if letter.is_favorite %}btn-warning{% else %}btn-outline-warning{% endif %}">
+                        {% if letter.is_favorite %}★ В избранном{% else %}☆ В избранное{% endif %}
+                    </button>
+                </form>
+            {% endif %}
             {% if letter and letter.letter_text %}
                 <a href="{% url 'staff_letter_download' user_obj.id %}" class="btn btn-outline-primary">
                     Скачать .docx

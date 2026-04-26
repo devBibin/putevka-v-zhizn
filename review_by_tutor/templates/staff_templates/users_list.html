@@ -167,6 +167,21 @@
                     </option>
                 </select>
             </div>
+            <div class="col-lg-2">
+                <label class="form-label d-block">Письма</label>
+                <div class="form-check mt-2">
+                    <input class="form-check-input"
+                           type="checkbox"
+                           name="favorite_letter"
+                           value="1"
+                           id="favoriteLetterCheckbox"
+                           {% if favorite_letter == "1" %}checked{% endif %}>
+                    <label class="form-check-label" for="favoriteLetterCheckbox">
+                        Только избранные
+                    </label>
+                </div>
+            </div>
+
 
             <!-- Доп. фильтры (схлопнули) -->
             <div class="col-12">
@@ -409,15 +424,23 @@
                                 <td>
                                     <a href="{% url 'staff_letter_detail' u.id %}#ml"
                                        class="text-decoration-none">
-                                        {% if u.letter_status == "submitted" %}
-                                            <span class="badge text-bg-success">отправлено</span>
-                                        {% elif u.letter_status == "draft" %}
-                                            <span class="badge text-bg-secondary">черновик</span>
-                                        {% elif u.letter_status %}
-                                            <span class="badge text-bg-light text-dark">{{ u.letter_status }}</span>
-                                        {% else %}
-                                            <span class="badge text-bg-secondary">нет</span>
-                                        {% endif %}
+                                        <div class="d-flex flex-wrap gap-1">
+                                            {% if u.letter_status == "submitted" %}
+                                                <span class="badge text-bg-success">отправлено</span>
+                                            {% elif u.letter_status == "draft" %}
+                                                <span class="badge text-bg-secondary">черновик</span>
+                                            {% elif u.letter_status == "revision" %}
+                                                <span class="badge text-bg-warning text-dark">дописать</span>
+                                            {% elif u.letter_status %}
+                                                <span class="badge text-bg-light text-dark">{{ u.letter_status }}</span>
+                                            {% else %}
+                                                <span class="badge text-bg-secondary">нет</span>
+                                            {% endif %}
+
+                                            {% if u.letter_is_favorite %}
+                                                <span class="badge text-bg-warning">★ избранное</span>
+                                            {% endif %}
+                                        </div>
                                     </a>
                                 </td>
 

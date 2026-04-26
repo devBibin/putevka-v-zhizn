@@ -189,6 +189,12 @@ class MotivationLetter(models.Model):
         verbose_name='Текст мотивационного письма'
     )
 
+    is_favorite = models.BooleanField(
+        default=False,
+        verbose_name="Избранное письмо",
+        db_index=True,
+    )
+
     admin_score = models.PositiveSmallIntegerField(
         verbose_name='Итоговый балл',
         validators=[MinValueValidator(0), MaxValueValidator(70)],

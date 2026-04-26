@@ -32,6 +32,7 @@ def build_staff_users_queryset(request):
     curator_need = (request.GET.get("curator_need") or "").strip()
     step = (request.GET.get("step") or "").strip()
     test_deadline = (request.GET.get("test_deadline") or "").strip()
+    favorite_letter = (request.GET.get("favorite_letter") or "").strip()
 
     sort = (request.GET.get("sort") or "-date_joined").strip()
     sort_fields = [s.strip() for s in sort.split(",") if s.strip()]
@@ -93,6 +94,9 @@ def build_staff_users_queryset(request):
     if step:
         qs = qs.filter(user_info__selection_step=step)
 
+    if favorite_letter == "1":
+        qs = qs.filter(motivation_letter__is_favorite=True)
+
     if grades_selected:
         grade_q = Q()
 
@@ -114,6 +118,12 @@ def build_staff_users_queryset(request):
         MotivationLetter.objects
         .filter(user_id=OuterRef("pk"))
         .values("status")[:1]
+    )
+
+    letter_favorite_sq = Subquery(
+        MotivationLetter.objects
+        .filter(user_id=OuterRef("pk"))
+        .values("is_favorite")[:1]
     )
 
     video_qs = ScholarVideo.objects.filter(user_id=OuterRef("pk"))
@@ -213,6 +223,7 @@ def build_staff_users_queryset(request):
         ),
 
         letter_status=letter_status_sq,
+        letter_is_favorite=letter_favorite_sq,
 
         video_has_file=video_has_file,
         video_deadline_at=video_deadline_sq,
@@ -293,6 +304,7 @@ def get_staff_users_filters(request):
     curator_need = (request.GET.get("curator_need") or "").strip()
     step = (request.GET.get("step") or "").strip()
     test_deadline = (request.GET.get("test_deadline") or "").strip()
+    favorite_letter = (request.GET.get("favorite_letter") or "").strip()
     sort = (request.GET.get("sort") or "-date_joined").strip()
 
     return {
@@ -305,6 +317,7 @@ def get_staff_users_filters(request):
         "curator_need": curator_need,
         "step": step,
         "test_deadline": test_deadline,
+        "favorite_letter": favorite_letter,
         "sort": sort,
         "show_staff": show_staff
     }
