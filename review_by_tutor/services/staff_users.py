@@ -32,6 +32,7 @@ def build_staff_users_queryset(request):
     curator_need = (request.GET.get("curator_need") or "").strip()
     step = (request.GET.get("step") or "").strip()
     test_deadline = (request.GET.get("test_deadline") or "").strip()
+    letter_status = (request.GET.get("letter_status") or "").strip()
     favorite_letter = (request.GET.get("favorite_letter") or "").strip()
 
     sort = (request.GET.get("sort") or "-date_joined").strip()
@@ -93,6 +94,12 @@ def build_staff_users_queryset(request):
 
     if step:
         qs = qs.filter(user_info__selection_step=step)
+
+    if letter_status:
+        if letter_status == "no_letter":
+            qs = qs.filter(motivation_letter__isnull=True)
+        else:
+            qs = qs.filter(motivation_letter__status=letter_status)
 
     if favorite_letter == "1":
         qs = qs.filter(motivation_letter__is_favorite=True)
@@ -175,7 +182,9 @@ def build_staff_users_queryset(request):
         When(user_info__form_status="draft", then=Value(1)),
         When(user_info__form_status="submitted", then=Value(2)),
         When(user_info__form_status="revision", then=Value(3)),
-        When(user_info__form_status="approved", then=Value(4)),
+        When(user_info__form_status="clarification", then=Value(4)),
+        When(user_info__form_status="approved", then=Value(5)),
+        When(user_info__form_status="rejected", then=Value(6)),
         default=Value(99),
         output_field=IntegerField(),
     )
@@ -190,9 +199,11 @@ def build_staff_users_queryset(request):
     )
 
     letter_status_order = Case(
+        When(letter_status__isnull=True, then=Value(0)),
         When(letter_status="draft", then=Value(1)),
         When(letter_status="submitted", then=Value(2)),
-        default=Value(3),
+        When(letter_status="revision", then=Value(3)),
+        default=Value(4),
         output_field=IntegerField(),
     )
 
@@ -304,6 +315,7 @@ def get_staff_users_filters(request):
     curator_need = (request.GET.get("curator_need") or "").strip()
     step = (request.GET.get("step") or "").strip()
     test_deadline = (request.GET.get("test_deadline") or "").strip()
+    letter_status = (request.GET.get("letter_status") or "").strip()
     favorite_letter = (request.GET.get("favorite_letter") or "").strip()
     sort = (request.GET.get("sort") or "-date_joined").strip()
 
@@ -317,6 +329,7 @@ def get_staff_users_filters(request):
         "curator_need": curator_need,
         "step": step,
         "test_deadline": test_deadline,
+        "letter_status": letter_status,
         "favorite_letter": favorite_letter,
         "sort": sort,
         "show_staff": show_staff

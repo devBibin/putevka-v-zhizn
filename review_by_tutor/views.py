@@ -390,6 +390,52 @@ def staff_profile_detail(request, user_id: int):
                 messages.success(request, "Анкета принята. Пользователь будет уведомлён.")
                 return redirect("staff_profile_detail", user_id=user_id)
 
+            if "action_reject" in request.POST:
+                obj = form.save(commit=False)
+                comment = (obj.revision_comment or "").strip()
+
+                obj.form_status = "rejected"
+                obj.save()
+                form.save_m2m()
+
+                def _notify():
+                    message_text = "Анкета отклонена."
+                    if comment:
+                        message_text += f"\n\nКомментарий:\n{comment}"
+
+                    try:
+                        send_tg_notification_to_user(
+                            obj.user,
+                            message_text,
+                            url=f"{BASE_URL}form/apply/",
+                            button_text="Открыть анкету"
+                        )
+                    except Exception as e:
+                        logger.exception("Ошибка отправки Telegram уведомления (reject): %s", e)
+
+                    user_email = obj.user.email or obj.email
+
+                    if user_email:
+                        try:
+                            email_message = "Здравствуйте!\n\nВаша анкета отклонена."
+                            if comment:
+                                email_message += f"\n\nКомментарий:\n{comment}"
+                            email_message += "\n\nС уважением,\nКоманда программы"
+                            send_mail(
+                                subject="Ваша анкета отклонена",
+                                message=email_message,
+                                from_email=settings.DEFAULT_FROM_EMAIL,
+                                recipient_list=[user_email],
+                                fail_silently=False,
+                            )
+                        except Exception as e:
+                            logger.exception("Ошибка отправки Email уведомления (reject): %s", e)
+
+                transaction.on_commit(_notify)
+
+                messages.success(request, "Анкета отклонена. Пользователь будет уведомлён.")
+                return redirect("staff_profile_detail", user_id=user_id)
+
             form.save()
             messages.success(request, "Сохранено.")
             return redirect("staff_profile_detail", user_id=user_id)

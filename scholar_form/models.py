@@ -78,7 +78,9 @@ class UserInfo(models.Model):
         DRAFT = "draft", "Не отправлена"
         SUBMITTED = "submitted", "Отправлена"
         REVISION = "revision", "На дописывание"
+        CLARIFICATION = "clarification", "На уточнении"
         APPROVED = "approved", "Принята"
+        REJECTED = "rejected", "Отклонена"
 
     form_status = models.CharField(
         max_length=20,
@@ -297,7 +299,12 @@ class UserInfo(models.Model):
 
     @property
     def is_locked(self) -> bool:
-        return self.form_status in {self.FormStatus.SUBMITTED, self.FormStatus.APPROVED}
+        return self.form_status in {
+            self.FormStatus.SUBMITTED,
+            self.FormStatus.CLARIFICATION,
+            self.FormStatus.APPROVED,
+            self.FormStatus.REJECTED,
+        }
 
     class Meta:
         verbose_name = "Анкета участника"
