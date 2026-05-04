@@ -16,6 +16,7 @@ from django.db import transaction, models
 from django.utils import timezone
 
 from openai import OpenAI
+import httpx
 
 import config
 from scholar_form.models import ScholarVideo
@@ -32,8 +33,18 @@ LANGUAGE = os.getenv("VIDEO_TRANSCRIBE_LANGUAGE", "ru").strip() or None
 MAX_MODEL_AUDIO_SECONDS = int(os.getenv("OPENAI_TRANSCRIBE_MAX_SECONDS", 1400))
 CHUNK_SECONDS = int(os.getenv("OPENAI_TRANSCRIBE_CHUNK_SECONDS", 1100))
 CHUNK_OVERLAP_SECONDS = int(os.getenv("OPENAI_TRANSCRIBE_CHUNK_OVERLAP_SECONDS", 2))
+PROXY = os.getenv("OPENAI_PROXY")
 
-client = OpenAI(api_key=OPENAI_API_KEY)
+http_client = httpx.Client(
+    proxy=PROXY if PROXY else None,
+    timeout=httpx.Timeout(60.0, connect=30.0),
+    verify=True,
+)
+
+client = OpenAI(
+    api_key=OPENAI_API_KEY,
+    http_client=http_client,
+)
 
 
 def _probe_duration_seconds(media_path: str) -> float:
