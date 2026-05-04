@@ -142,7 +142,9 @@
                     <option value="submitted" {% if form_status == "submitted" %}selected{% endif %}>Отправлена</option>
                     <option value="revision" {% if form_status == "revision" %}selected{% endif %}>На дописывание
                     </option>
+                    <option value="clarification" {% if form_status == "clarification" %}selected{% endif %}>На уточнении</option>
                     <option value="approved" {% if form_status == "approved" %}selected{% endif %}>Принята</option>
+                    <option value="rejected" {% if form_status == "rejected" %}selected{% endif %}>Отклонена</option>
 
                     <option value="no_profile" {% if form_status == "no_profile" %}selected{% endif %}>Нет анкеты
                     </option>
@@ -165,6 +167,16 @@
                     <option value="has_due" {% if test_deadline == "has_due" %}selected{% endif %}>Активные с
                         дедлайном
                     </option>
+                </select>
+            </div>
+            <div class="col-lg-2">
+                <label class="form-label">Статус письма</label>
+                <select name="letter_status" class="form-select">
+                    <option value="" {% if not letter_status %}selected{% endif %}>Все</option>
+                    <option value="draft" {% if letter_status == "draft" %}selected{% endif %}>Черновик</option>
+                    <option value="submitted" {% if letter_status == "submitted" %}selected{% endif %}>Отправлено</option>
+                    <option value="revision" {% if letter_status == "revision" %}selected{% endif %}>На дописывании</option>
+                    <option value="no_letter" {% if letter_status == "no_letter" %}selected{% endif %}>Нет письма</option>
                 </select>
             </div>
             <div class="col-lg-2">
@@ -379,8 +391,12 @@
                                                 <span class="badge text-bg-warning">отправлена</span>
                                             {% elif u.user_info.form_status == "revision" %}
                                                 <span class="badge text-bg-danger">дописать</span>
+                                            {% elif u.user_info.form_status == "clarification" %}
+                                                <span class="badge text-bg-info">уточнение</span>
                                             {% elif u.user_info.form_status == "approved" %}
                                                 <span class="badge text-bg-success">принята</span>
+                                            {% elif u.user_info.form_status == "rejected" %}
+                                                <span class="badge text-bg-dark">отклонена</span>
                                             {% else %}
                                                 <span class="badge text-bg-light text-dark">
                     {{ u.user_info.get_form_status_display }}
