@@ -1,6 +1,7 @@
 import logging
 import mimetypes
 import time
+from pathlib import Path
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -9,7 +10,7 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
-from django.views.decorators.http import require_GET
+from django.views.decorators.http import require_GET, require_POST
 
 from core.decorators import ensure_registration_gate
 from review_by_tutor.models import TestAssignment
@@ -22,16 +23,32 @@ from scholar_form.services.yandex_disk import (
     build_video_disk_path,
     delete_resource,
     get_download_url,
+    get_upload_url,
+    resource_exists,
     upload_file_to_yandex_disk,
 )
 
 logger = logging.getLogger(__name__)
 
 UPLOAD_STATUS_TTL_SECONDS = 60 * 60
+VIDEO_MAX_SIZE = 200 * 1024 * 1024
+SCHEDULE_MAX_SIZE = 20 * 1024 * 1024
+VIDEO_ALLOWED_TYPES = {"video/mp4", "video/webm", "video/quicktime", "video/x-quicktime"}
+VIDEO_ALLOWED_EXT = {".mp4", ".webm", ".mov"}
+SCHEDULE_ALLOWED_TYPES = {
+    "application/pdf",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+}
+SCHEDULE_ALLOWED_EXT = {".pdf", ".doc", ".docx"}
 
 
 def _upload_status_key(user_id, upload_id):
     return f"scholar-video-upload:{user_id}:{upload_id}"
+
+
+def _pending_upload_key(user_id, upload_id):
+    return f"scholar-video-pending:{user_id}:{upload_id}"
 
 
 def _set_upload_status(user_id, upload_id, *, state, message, percent=None, asset=None):
@@ -52,6 +69,22 @@ def _get_upload_status_payload(user_id, upload_id):
     if not upload_id:
         return None
     return cache.get(_upload_status_key(user_id, upload_id))
+
+
+def _store_pending_upload(user_id, upload_id, payload):
+    if upload_id:
+        cache.set(_pending_upload_key(user_id, upload_id), payload, UPLOAD_STATUS_TTL_SECONDS)
+
+
+def _get_pending_upload(user_id, upload_id):
+    if not upload_id:
+        return None
+    return cache.get(_pending_upload_key(user_id, upload_id))
+
+
+def _clear_pending_upload(user_id, upload_id):
+    if upload_id:
+        cache.delete(_pending_upload_key(user_id, upload_id))
 
 
 def _resolve_file_url(remote_path, local_field):
@@ -124,6 +157,36 @@ def _form_error_payload(form):
             payload[field_name] = list(errors)
 
     return payload
+
+
+def _normalize_upload_content_type(content_type):
+    return (content_type or "").split(";", 1)[0].strip().lower()
+
+
+def _validate_direct_upload_meta(*, file_name, content_type, size, allowed_types, allowed_ext, max_size, type_message, size_message):
+    normalized_name = (file_name or "").strip()
+    normalized_type = _normalize_upload_content_type(content_type)
+    ext = Path(normalized_name).suffix.lower()
+
+    if not normalized_name:
+        raise ValueError("Не передано имя файла.")
+    if normalized_type not in allowed_types and ext not in allowed_ext:
+        raise ValueError(type_message)
+    if int(size or 0) <= 0:
+        raise ValueError("Файл пустой или размер не определен.")
+    if int(size) > max_size:
+        raise ValueError(size_message)
+
+    return {
+        "name": normalized_name,
+        "content_type": normalized_type or "application/octet-stream",
+        "size": int(size),
+    }
+
+
+def _upload_suffix(upload_id):
+    cleaned = "".join(ch for ch in (upload_id or "") if ch.isalnum())
+    return cleaned[:8] or str(int(time.time()))
 
 
 def _make_upload_retry_callback(*, user_id, upload_id, asset):
@@ -387,6 +450,252 @@ def personal_info(request):
             "planned_exams_labels": planned_exams_labels,
         },
     )
+
+
+@login_required
+@ensure_registration_gate("protected")
+@require_selection_step(UserInfo.SelectionStep.VIDEO)
+@require_POST
+def my_video_upload_init(request):
+    instance, _ = ScholarVideo.objects.get_or_create(user=request.user)
+    upload_id = (request.POST.get("upload_id", "") or "").strip()[:128]
+    if not upload_id:
+        return JsonResponse({"ok": False, "error": "upload_id is required"}, status=400)
+
+    try:
+        video_meta = None
+        schedule_meta = None
+
+        if request.POST.get("video_file_name"):
+            video_meta = _validate_direct_upload_meta(
+                file_name=request.POST.get("video_file_name"),
+                content_type=request.POST.get("video_content_type"),
+                size=request.POST.get("video_size"),
+                allowed_types=VIDEO_ALLOWED_TYPES,
+                allowed_ext=VIDEO_ALLOWED_EXT,
+                max_size=VIDEO_MAX_SIZE,
+                type_message="Видео должно быть в формате MP4, WebM или MOV.",
+                size_message="Видео не должно превышать 200 МБ.",
+            )
+
+        if request.POST.get("schedule_file_name"):
+            schedule_meta = _validate_direct_upload_meta(
+                file_name=request.POST.get("schedule_file_name"),
+                content_type=request.POST.get("schedule_content_type"),
+                size=request.POST.get("schedule_size"),
+                allowed_types=SCHEDULE_ALLOWED_TYPES,
+                allowed_ext=SCHEDULE_ALLOWED_EXT,
+                max_size=SCHEDULE_MAX_SIZE,
+                type_message="График должен быть в формате PDF, DOC или DOCX.",
+                size_message="Файл графика не должен превышать 20 МБ.",
+            )
+    except ValueError as exc:
+        _set_upload_status(request.user.pk, upload_id, state="error", message=str(exc))
+        return JsonResponse({"ok": False, "error": str(exc)}, status=400)
+
+    upload_targets = {}
+    pending_payload = {
+        "created_at": timezone.now().isoformat(),
+        "video_path": "",
+        "schedule_path": "",
+        "previous_video_path": instance.yandex_disk_path,
+        "previous_schedule_path": instance.schedule_yandex_disk_path,
+    }
+    suffix = _upload_suffix(upload_id)
+
+    try:
+        _set_upload_status(
+            request.user.pk,
+            upload_id,
+            state="preparing",
+            message="Подготавливаем прямую загрузку в Яндекс Диск",
+            percent=0,
+        )
+
+        if video_meta:
+            disk_path = build_video_disk_path(request.user, video_meta["name"], unique_suffix=suffix)
+            upload_targets["video"] = {
+                "url": get_upload_url(
+                    disk_path,
+                    log_context={"user_id": request.user.pk, "upload_id": upload_id, "asset": "video"},
+                ),
+                "content_type": video_meta["content_type"],
+                "path": disk_path,
+            }
+            pending_payload["video_path"] = disk_path
+
+        if schedule_meta:
+            disk_path = build_schedule_disk_path(request.user, schedule_meta["name"], unique_suffix=suffix)
+            upload_targets["schedule"] = {
+                "url": get_upload_url(
+                    disk_path,
+                    log_context={"user_id": request.user.pk, "upload_id": upload_id, "asset": "schedule"},
+                ),
+                "content_type": schedule_meta["content_type"],
+                "path": disk_path,
+            }
+            pending_payload["schedule_path"] = disk_path
+
+        _store_pending_upload(request.user.pk, upload_id, pending_payload)
+        logger.info(
+            "Scholar direct upload initialized for user_id=%s upload_id=%s video=%s schedule=%s",
+            request.user.pk,
+            upload_id,
+            bool(video_meta),
+            bool(schedule_meta),
+        )
+        _set_upload_status(
+            request.user.pk,
+            upload_id,
+            state="ready",
+            message="Временная ссылка получена, начинаем прямую загрузку",
+            percent=0,
+        )
+        return JsonResponse({"ok": True, "upload_targets": upload_targets})
+    except YandexDiskError as exc:
+        logger.exception(
+            "Scholar direct upload init failed for user_id=%s upload_id=%s",
+            request.user.pk,
+            upload_id,
+        )
+        _set_upload_status(request.user.pk, upload_id, state="error", message=str(exc))
+        return JsonResponse({"ok": False, "error": str(exc)}, status=502)
+
+
+@login_required
+@ensure_registration_gate("protected")
+@require_selection_step(UserInfo.SelectionStep.VIDEO)
+@require_POST
+def my_video_upload_finalize(request):
+    instance, _ = ScholarVideo.objects.get_or_create(user=request.user)
+    upload_id = (request.POST.get("upload_id", "") or "").strip()[:128]
+    if not upload_id:
+        return JsonResponse({"ok": False, "error": "upload_id is required"}, status=400)
+
+    pending = _get_pending_upload(request.user.pk, upload_id)
+    if not pending:
+        return JsonResponse({"ok": False, "error": "Сессия загрузки не найдена. Начните загрузку заново."}, status=400)
+
+    form = ScholarVideoForm(request.POST, instance=instance)
+    if not form.is_valid():
+        _set_upload_status(
+            request.user.pk,
+            upload_id,
+            state="error",
+            message="Проверьте форму. Видео должно быть MP4/WebM/MOV, а график — PDF/DOC/DOCX.",
+        )
+        return JsonResponse({"ok": False, "errors": _form_error_payload(form)}, status=400)
+
+    video_path = pending.get("video_path", "")
+    schedule_path = pending.get("schedule_path", "")
+    uploaded_assets = []
+    started_at = time.monotonic()
+
+    try:
+        _set_upload_status(
+            request.user.pk,
+            upload_id,
+            state="verifying",
+            message="Проверяем файлы на Яндекс Диске",
+            percent=100,
+        )
+
+        if video_path and not resource_exists(video_path, log_context={"user_id": request.user.pk, "upload_id": upload_id, "asset": "video"}):
+            raise YandexDiskError("Видео не найдено на Яндекс Диске после загрузки.")
+        if schedule_path and not resource_exists(schedule_path, log_context={"user_id": request.user.pk, "upload_id": upload_id, "asset": "schedule"}):
+            raise YandexDiskError("Файл графика не найден на Яндекс Диске после загрузки.")
+
+        obj = form.save(commit=False)
+        obj.user = request.user
+
+        if video_path:
+            obj.file = None
+            obj.yandex_disk_path = video_path
+            obj.yandex_disk_uploaded_at = timezone.now()
+            obj.yandex_disk_error = ""
+            uploaded_assets.append(
+                {
+                    "asset": "video",
+                    "new_path": video_path,
+                    "previous_path": pending.get("previous_video_path", ""),
+                }
+            )
+
+        if schedule_path:
+            obj.schedule_file = None
+            obj.schedule_yandex_disk_path = schedule_path
+            obj.schedule_yandex_disk_uploaded_at = timezone.now()
+            obj.schedule_yandex_disk_error = ""
+            uploaded_assets.append(
+                {
+                    "asset": "schedule",
+                    "new_path": schedule_path,
+                    "previous_path": pending.get("previous_schedule_path", ""),
+                }
+            )
+
+        _set_upload_status(
+            request.user.pk,
+            upload_id,
+            state="saving",
+            message="Сохраняем запись о видеовизитке",
+            percent=100,
+        )
+        obj.save()
+    except YandexDiskError as exc:
+        logger.exception(
+            "Scholar direct upload finalize failed for user_id=%s upload_id=%s elapsed=%.2fs",
+            request.user.pk,
+            upload_id,
+            time.monotonic() - started_at,
+        )
+        if uploaded_assets:
+            _rollback_uploaded_assets(uploaded_assets, user_id=request.user.pk, upload_id=upload_id)
+        _set_upload_status(
+            request.user.pk,
+            upload_id,
+            state="error",
+            message=str(exc),
+        )
+        return JsonResponse({"ok": False, "error": str(exc)}, status=502)
+    except Exception:
+        logger.exception(
+            "Scholar direct upload finalize failed for user_id=%s upload_id=%s elapsed=%.2fs",
+            request.user.pk,
+            upload_id,
+            time.monotonic() - started_at,
+        )
+        if uploaded_assets:
+            _rollback_uploaded_assets(uploaded_assets, user_id=request.user.pk, upload_id=upload_id)
+        _set_upload_status(
+            request.user.pk,
+            upload_id,
+            state="error",
+            message="Не удалось завершить загрузку. Попробуйте еще раз.",
+        )
+        return JsonResponse(
+            {"ok": False, "error": "Не удалось завершить загрузку. Попробуйте еще раз."},
+            status=500,
+        )
+    else:
+        _delete_replaced_assets(uploaded_assets, user_id=request.user.pk, upload_id=upload_id)
+        _clear_pending_upload(request.user.pk, upload_id)
+        _set_upload_status(
+            request.user.pk,
+            upload_id,
+            state="done",
+            message="Загрузка завершена",
+            percent=100,
+        )
+        logger.info(
+            "Scholar direct upload finalized for user_id=%s upload_id=%s video_path=%s schedule_path=%s elapsed=%.2fs",
+            request.user.pk,
+            upload_id,
+            obj.yandex_disk_path,
+            obj.schedule_yandex_disk_path,
+            time.monotonic() - started_at,
+        )
+        return JsonResponse({"ok": True})
 
 
 @login_required

@@ -78,7 +78,9 @@ class UserInfo(models.Model):
         DRAFT = "draft", "Не отправлена"
         SUBMITTED = "submitted", "Отправлена"
         REVISION = "revision", "На дописывание"
+        CLARIFICATION = "clarification", "На уточнении"
         APPROVED = "approved", "Принята"
+        REJECTED = "rejected", "Отклонена"
 
     form_status = models.CharField(
         max_length=20,
@@ -297,7 +299,12 @@ class UserInfo(models.Model):
 
     @property
     def is_locked(self) -> bool:
-        return self.form_status in {self.FormStatus.SUBMITTED, self.FormStatus.APPROVED}
+        return self.form_status in {
+            self.FormStatus.SUBMITTED,
+            self.FormStatus.CLARIFICATION,
+            self.FormStatus.APPROVED,
+            self.FormStatus.REJECTED,
+        }
 
     class Meta:
         verbose_name = "Анкета участника"
@@ -329,6 +336,24 @@ class ScholarVideo(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="scholar_video")
     review = models.TextField(verbose_name="Отзыв", blank=True, null=True)
     score = models.PositiveIntegerField(verbose_name="Оценка в баллах", blank=True, null=True)
+    transcript_text = models.TextField(
+        blank=True,
+        default="",
+        verbose_name="Транскрипция видеовизитки",
+    )
+    transcript_status = models.CharField(
+        "Статус транскрибации",
+        max_length=20,
+        choices=[
+            ("PENDING", "Ожидает"),
+            ("PROCESSING", "В работе"),
+            ("DONE", "Готово"),
+            ("FAILED", "Ошибка"),
+        ],
+        default="PENDING",
+    )
+    transcript_error = models.TextField("Ошибка транскрибации", blank=True)
+    transcript_updated_at = models.DateTimeField(null=True, blank=True)
 
     schedule_file = models.FileField(
         upload_to="scholar_video_schedules/",
@@ -345,6 +370,91 @@ class ScholarVideo(models.Model):
         default="",
         verbose_name="Онлайн-школа и курс",
         help_text="Укажи онлайн-школу и курс в свободной форме",
+    )
+    online_school_prior_experience = models.TextField(
+        blank=True,
+        default="",
+        verbose_name="Онлайн-школы: предыдущий опыт",
+    )
+    online_school_observations = models.TextField(
+        blank=True,
+        default="",
+        verbose_name="Онлайн-школы: наблюдения и выводы",
+    )
+    online_school_selected_courses = models.TextField(
+        blank=True,
+        default="",
+        verbose_name="Онлайн-школы: выбранные курсы",
+    )
+    online_school_choice_reason = models.TextField(
+        blank=True,
+        default="",
+        verbose_name="Онлайн-школы: обоснование выбора",
+    )
+    online_school_extra_help = models.TextField(
+        blank=True,
+        default="",
+        verbose_name="Онлайн-школы: нужна ли дополнительная помощь",
+    )
+    online_school_used_materials = models.TextField(
+        blank=True,
+        default="",
+        verbose_name="Онлайн-школы: опирался ли на предоставленные материалы",
+    )
+    online_school_interview_questions = models.TextField(
+        blank=True,
+        default="",
+        verbose_name="Онлайн-школы: вопросы для обсуждения на собеседовании",
+    )
+    schedule_school_day = models.TextField(
+        blank=True,
+        default="",
+        verbose_name="График: обычный школьный день",
+    )
+    schedule_homework_time = models.TextField(
+        blank=True,
+        default="",
+        verbose_name="График: время на домашнюю работу",
+    )
+    schedule_activities_time = models.TextField(
+        blank=True,
+        default="",
+        verbose_name="График: время на допактивности, кружки и спорт",
+    )
+    schedule_exam_prep_time = models.TextField(
+        blank=True,
+        default="",
+        verbose_name="График: время на подготовку к ЕГЭ и олимпиадам",
+    )
+    schedule_rest_time = models.TextField(
+        blank=True,
+        default="",
+        verbose_name="График: время на отдых",
+    )
+    schedule_weekend_day = models.TextField(
+        blank=True,
+        default="",
+        verbose_name="График: обычный выходной",
+    )
+    schedule_realistic_assessment = models.TextField(
+        blank=True,
+        default="",
+        verbose_name="График: реалистичность плана",
+    )
+    schedule_extra_help = models.TextField(
+        blank=True,
+        default="",
+        verbose_name="График: нужна ли дополнительная помощь",
+    )
+    schedule_used_materials = models.TextField(
+        blank=True,
+        default="",
+        verbose_name="График: опирался ли на предоставленные материалы",
+    )
+    schedule_interview_questions = models.TextField(
+        blank=True,
+        default="",
+        verbose_name="График: вопросы для обсуждения на собеседовании",
     )
 
     deadline_at = models.DateTimeField(

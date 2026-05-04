@@ -292,7 +292,7 @@ class ApplicationWizard(SessionWizardView):
 
         instance = self.get_form_instance(step or self.steps.current)
 
-        locked = getattr(instance, "form_status", "draft") in {"submitted", "approved"}
+        locked = getattr(instance, "form_status", "draft") in {"submitted", "clarification", "approved", "rejected"}
 
         if locked:
             for name, field in form.fields.items():
@@ -414,7 +414,7 @@ class ApplicationWizard(SessionWizardView):
         response = super().get(request, *args, **kwargs)
 
         instance = self.get_form_instance(self.steps.current)
-        locked = instance.form_status in {"submitted", "approved"}
+        locked = instance.form_status in {"submitted", "clarification", "approved", "rejected"}
 
         step = request.GET.get("step")
         if locked and step:
@@ -432,13 +432,13 @@ class ApplicationWizard(SessionWizardView):
 
     def is_locked(self) -> bool:
         instance = self.get_form_instance(self.steps.current)
-        return getattr(instance, "form_status", "draft") in {"submitted", "approved"}
+        return getattr(instance, "form_status", "draft") in {"submitted", "clarification", "approved", "rejected"}
 
     def dispatch(self, request, *args, **kwargs):
         if request.method in ("POST", "PUT", "PATCH", "DELETE"):
             instance = self.get_form_instance(getattr(self, "steps", None).current if hasattr(self, "steps") else None)
 
-            locked = getattr(instance, "form_status", "draft") in {"submitted", "approved"}
+            locked = getattr(instance, "form_status", "draft") in {"submitted", "clarification", "approved", "rejected"}
 
             if locked:
                 if request.POST.get("_autosave") == "1":
@@ -453,7 +453,7 @@ class ApplicationWizard(SessionWizardView):
         context = super().get_context_data(form=form, **kwargs)
         instance = self.get_form_instance(self.steps.current)
         context["active"] = "apply"
-        context["is_locked"] = getattr(instance, "form_status", "draft") in {"submitted", "approved"}
+        context["is_locked"] = getattr(instance, "form_status", "draft") in {"submitted", "clarification", "approved", "rejected"}
         return context
 
 

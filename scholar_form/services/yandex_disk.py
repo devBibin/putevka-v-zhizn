@@ -297,6 +297,13 @@ def _get_upload_link(path: str, *, log_context=None, retry_callback=None) -> str
     return href
 
 
+def get_upload_url(path: str, *, log_context=None, retry_callback=None) -> str:
+    normalized_path = _normalize_disk_path(path)
+    parent = str(PurePosixPath(normalized_path.replace("disk:/", "", 1)).parent)
+    ensure_folder(parent, log_context=log_context, retry_callback=retry_callback)
+    return _get_upload_link(normalized_path, log_context=log_context, retry_callback=retry_callback)
+
+
 def get_download_url(path: str, *, log_context=None) -> str:
     response = _request(
         "GET",
@@ -313,6 +320,24 @@ def get_download_url(path: str, *, log_context=None) -> str:
     if not href:
         raise YandexDiskError("Яндекс Диск не вернул ссылку для скачивания файла.")
     return href
+
+
+def resource_exists(path: str, *, log_context=None) -> bool:
+    normalized_path = _normalize_disk_path(path)
+    response = _request(
+        "GET",
+        "/resources",
+        params={"path": normalized_path},
+        operation="check resource exists",
+        request_error_message="Не удалось проверить наличие файла на Яндекс Диске.",
+        max_attempts=1,
+        log_context=_log_context(log_context, disk_path=normalized_path),
+    )
+    if response.status_code == 200:
+        return True
+    if response.status_code == 404:
+        return False
+    _raise_api_error(response, "Не удалось проверить наличие файла на Яндекс Диске.")
 
 
 def _content_type(uploaded_file) -> str:
@@ -565,27 +590,48 @@ def _candidate_short_name(user_or_id) -> str:
     return parts["fallback_slug"]
 
 
-def _dated_candidate_filename(label: str, user_or_id, ext: str) -> str:
+def _dated_candidate_filename(label: str, user_or_id, ext: str, unique_suffix: str = "") -> str:
     date_prefix = timezone.localdate().strftime("%y%m%d")
     candidate_name = _candidate_short_name(user_or_id)
-    return _clean_name_part(f"{date_prefix} {label} {candidate_name}", f"{date_prefix} {label}") + ext
+    file_stem = _clean_name_part(f"{date_prefix} {label} {candidate_name}", f"{date_prefix} {label}")
+    if unique_suffix:
+        file_stem = _clean_name_part(f"{file_stem} {unique_suffix}", file_stem)
+    return file_stem + ext
 
 
-def build_video_disk_path(user_or_id, file_name: str) -> str:
+def build_video_disk_path(user_or_id, file_name: str, unique_suffix: str = "") -> str:
     ext = _clean_extension(file_name, ".mp4")
     return _join_disk_path(
         _setting("YANDEX_DISK_VIDEO_FOLDER", DEFAULT_VIDEO_FOLDER) or DEFAULT_VIDEO_FOLDER,
         str(timezone.localdate().year),
         _candidate_folder_name(user_or_id),
-        _dated_candidate_filename("Видеовизитка", user_or_id, ext),
+        _dated_candidate_filename("Видеовизитка", user_or_id, ext, unique_suffix=unique_suffix),
     )
 
 
-def build_schedule_disk_path(user_or_id, file_name: str) -> str:
+def build_schedule_disk_path(user_or_id, file_name: str, unique_suffix: str = "") -> str:
     ext = _clean_extension(file_name, ".pdf")
     return _join_disk_path(
         _setting("YANDEX_DISK_VIDEO_FOLDER", DEFAULT_VIDEO_FOLDER) or DEFAULT_VIDEO_FOLDER,
         str(timezone.localdate().year),
         _candidate_folder_name(user_or_id),
-        _dated_candidate_filename("График занятий", user_or_id, ext),
+        _dated_candidate_filename("График занятий", user_or_id, ext, unique_suffix=unique_suffix),
     )
+
+
+def download_file_from_yandex_disk(disk_path: str, local_path: str, *, log_context=None):
+    url = get_download_url(disk_path, log_context=log_context)
+    context = _log_context(log_context, disk_path=disk_path, local_path=local_path)
+    logger.info("Downloading from Yandex Disk started%s", _log_context_suffix(context))
+
+    started_at = time.monotonic()
+    response = requests.get(url, stream=True, timeout=_setting("YANDEX_DISK_TIMEOUT_SECONDS", DEFAULT_TIMEOUT_SECONDS))
+    if response.status_code != 200:
+        _raise_api_error(response, "Не удалось скачать файл с Яндекс Диска.")
+
+    with open(local_path, "wb") as f:
+        for chunk in response.iter_content(chunk_size=8192):
+            f.write(chunk)
+
+    elapsed = time.monotonic() - started_at
+    logger.info("Downloading from Yandex Disk finished elapsed=%.2fs%s", elapsed, _log_context_suffix(context))

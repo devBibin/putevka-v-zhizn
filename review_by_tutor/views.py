@@ -1,4 +1,6 @@
 import logging
+from io import BytesIO
+from zipfile import ZIP_DEFLATED, ZipFile
 from datetime import timedelta
 
 from django.contrib import messages
@@ -14,7 +16,9 @@ from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.encoding import smart_str
+from django.utils.text import slugify
 from django.views.decorators.http import require_POST, require_GET
+from docx import Document as WordDocument
 
 from Putevka import settings
 from config import BASE_URL
@@ -44,6 +48,49 @@ User = get_user_model()
 
 def _staff_check(user):
     return user.is_staff
+
+
+def _letter_display_name(user) -> str:
+    full_name = (user.get_full_name() or "").strip()
+    return full_name or user.username or f"user_{user.pk}"
+
+
+def _safe_letter_basename(user) -> str:
+    base = slugify(_letter_display_name(user), allow_unicode=True).strip("-_")
+    return base or f"user_{user.pk}"
+
+
+def _build_letter_docx(letter: MotivationLetter) -> bytes:
+    document = WordDocument()
+
+    document.add_heading("Мотивационное письмо", level=1)
+    document.add_paragraph(f"Участник: {_letter_display_name(letter.user)}")
+    document.add_paragraph(f"ID пользователя: {letter.user_id}")
+
+    if letter.submitted_at:
+        submitted_at = timezone.localtime(letter.submitted_at).strftime("%d.%m.%Y %H:%M")
+        document.add_paragraph(f"Отправлено: {submitted_at}")
+
+    text = (letter.letter_text or "").strip()
+    if text:
+        for block in text.splitlines():
+            document.add_paragraph(block)
+    else:
+        document.add_paragraph("Текст письма отсутствует.")
+
+    payload = BytesIO()
+    document.save(payload)
+    return payload.getvalue()
+
+
+def _get_downloadable_letter_or_404(user_id: int) -> MotivationLetter:
+    letter = get_object_or_404(
+        MotivationLetter.objects.select_related("user"),
+        user_id=user_id,
+    )
+    if not (letter.letter_text or "").strip():
+        raise Http404("Текст мотивационного письма не найден")
+    return letter
 
 
 @login_required
@@ -79,6 +126,15 @@ def staff_letter_detail(request, user_id: int):
     if request.method == "POST":
         if letter is None:
             messages.error(request, "У пользователя ещё нет мотивационного письма — сохранять нечего.")
+            return redirect("staff_letter_detail", user_id=user_id)
+
+        if "action_toggle_favorite" in request.POST:
+            letter.is_favorite = not letter.is_favorite
+            letter.save(update_fields=["is_favorite", "updated_at"])
+            messages.success(
+                request,
+                "Письмо добавлено в избранное." if letter.is_favorite else "Письмо убрано из избранного."
+            )
             return redirect("staff_letter_detail", user_id=user_id)
 
         if "action_rubric_save" in request.POST:
@@ -192,6 +248,19 @@ def staff_letter_detail(request, user_id: int):
         "send_notification_form": send_notification_form,
     }
     return render(request, "staff_templates/letter_detail.html", ctx)
+
+
+@login_required
+@user_passes_test(_staff_check)
+@require_GET
+def staff_letter_download(request, user_id: int):
+    letter = _get_downloadable_letter_or_404(user_id)
+    filename = f"motivation-letter_{_safe_letter_basename(letter.user)}_id{letter.user_id}.docx"
+    return FileResponse(
+        BytesIO(_build_letter_docx(letter)),
+        as_attachment=True,
+        filename=smart_str(filename),
+    )
 
 
 @login_required
@@ -319,6 +388,52 @@ def staff_profile_detail(request, user_id: int):
                 transaction.on_commit(_notify)
 
                 messages.success(request, "Анкета принята. Пользователь будет уведомлён.")
+                return redirect("staff_profile_detail", user_id=user_id)
+
+            if "action_reject" in request.POST:
+                obj = form.save(commit=False)
+                comment = (obj.revision_comment or "").strip()
+
+                obj.form_status = "rejected"
+                obj.save()
+                form.save_m2m()
+
+                def _notify():
+                    message_text = "Анкета отклонена."
+                    if comment:
+                        message_text += f"\n\nКомментарий:\n{comment}"
+
+                    try:
+                        send_tg_notification_to_user(
+                            obj.user,
+                            message_text,
+                            url=f"{BASE_URL}form/apply/",
+                            button_text="Открыть анкету"
+                        )
+                    except Exception as e:
+                        logger.exception("Ошибка отправки Telegram уведомления (reject): %s", e)
+
+                    user_email = obj.user.email or obj.email
+
+                    if user_email:
+                        try:
+                            email_message = "Здравствуйте!\n\nВаша анкета отклонена."
+                            if comment:
+                                email_message += f"\n\nКомментарий:\n{comment}"
+                            email_message += "\n\nС уважением,\nКоманда программы"
+                            send_mail(
+                                subject="Ваша анкета отклонена",
+                                message=email_message,
+                                from_email=settings.DEFAULT_FROM_EMAIL,
+                                recipient_list=[user_email],
+                                fail_silently=False,
+                            )
+                        except Exception as e:
+                            logger.exception("Ошибка отправки Email уведомления (reject): %s", e)
+
+                transaction.on_commit(_notify)
+
+                messages.success(request, "Анкета отклонена. Пользователь будет уведомлён.")
                 return redirect("staff_profile_detail", user_id=user_id)
 
             form.save()
@@ -650,6 +765,54 @@ def staff_users_ids(request):
     qs = _staff_users_queryset_from_request(request)
     ids = list(qs.values_list("id", flat=True))
     return JsonResponse({"ids": ids})
+
+
+@login_required
+@user_passes_test(_staff_check)
+@require_POST
+def staff_letters_download_zip(request):
+    raw_ids = request.POST.getlist("ids")
+    ids = [int(x) for x in raw_ids if str(x).isdigit()]
+
+    if not ids:
+        messages.error(request, "Выберите хотя бы одного пользователя.")
+        return redirect("staff_users_list")
+
+    letters = [
+        letter for letter in
+        MotivationLetter.objects.select_related("user")
+        .filter(user_id__in=ids)
+        .exclude(letter_text__isnull=True)
+        .exclude(letter_text__exact="")
+        .order_by("user_id")
+        if (letter.letter_text or "").strip()
+    ]
+
+    if not letters:
+        messages.error(request, "У выбранных пользователей нет текстов мотивационных писем.")
+        return redirect("staff_users_list")
+
+    zip_buffer = BytesIO()
+    used_names: set[str] = set()
+
+    with ZipFile(zip_buffer, "w", compression=ZIP_DEFLATED) as archive:
+        for letter in letters:
+            base_name = f"motivation-letter_{_safe_letter_basename(letter.user)}_id{letter.user_id}"
+            filename = f"{base_name}.docx"
+            suffix = 2
+            while filename in used_names:
+                filename = f"{base_name}_{suffix}.docx"
+                suffix += 1
+            used_names.add(filename)
+            archive.writestr(filename, _build_letter_docx(letter))
+
+    zip_buffer.seek(0)
+    ts = timezone.localtime().strftime("%Y%m%d_%H%M%S")
+    return FileResponse(
+        zip_buffer,
+        as_attachment=True,
+        filename=f"motivation-letters_{ts}.zip",
+    )
 
 
 @staff_member_required

@@ -142,7 +142,9 @@
                     <option value="submitted" {% if form_status == "submitted" %}selected{% endif %}>Отправлена</option>
                     <option value="revision" {% if form_status == "revision" %}selected{% endif %}>На дописывание
                     </option>
+                    <option value="clarification" {% if form_status == "clarification" %}selected{% endif %}>На уточнении</option>
                     <option value="approved" {% if form_status == "approved" %}selected{% endif %}>Принята</option>
+                    <option value="rejected" {% if form_status == "rejected" %}selected{% endif %}>Отклонена</option>
 
                     <option value="no_profile" {% if form_status == "no_profile" %}selected{% endif %}>Нет анкеты
                     </option>
@@ -167,6 +169,31 @@
                     </option>
                 </select>
             </div>
+            <div class="col-lg-2">
+                <label class="form-label">Статус письма</label>
+                <select name="letter_status" class="form-select">
+                    <option value="" {% if not letter_status %}selected{% endif %}>Все</option>
+                    <option value="draft" {% if letter_status == "draft" %}selected{% endif %}>Черновик</option>
+                    <option value="submitted" {% if letter_status == "submitted" %}selected{% endif %}>Отправлено</option>
+                    <option value="revision" {% if letter_status == "revision" %}selected{% endif %}>На дописывании</option>
+                    <option value="no_letter" {% if letter_status == "no_letter" %}selected{% endif %}>Нет письма</option>
+                </select>
+            </div>
+            <div class="col-lg-2">
+                <label class="form-label d-block">Письма</label>
+                <div class="form-check mt-2">
+                    <input class="form-check-input"
+                           type="checkbox"
+                           name="favorite_letter"
+                           value="1"
+                           id="favoriteLetterCheckbox"
+                           {% if favorite_letter == "1" %}checked{% endif %}>
+                    <label class="form-check-label" for="favoriteLetterCheckbox">
+                        Только избранные
+                    </label>
+                </div>
+            </div>
+
 
             <!-- Доп. фильтры (схлопнули) -->
             <div class="col-12">
@@ -224,6 +251,10 @@
                     <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal"
                             data-bs-target="#sendNotifModal" id="openModalBtn">
                         Отправить оповещение выбранным
+                    </button>
+
+                    <button type="button" class="btn btn-outline-primary" id="downloadLettersBtn">
+                        Скачать письма (.zip)
                     </button>
 
                     <button type="button" class="btn btn-outline-success" id="selectAllFilteredBtn">
@@ -360,8 +391,12 @@
                                                 <span class="badge text-bg-warning">отправлена</span>
                                             {% elif u.user_info.form_status == "revision" %}
                                                 <span class="badge text-bg-danger">дописать</span>
+                                            {% elif u.user_info.form_status == "clarification" %}
+                                                <span class="badge text-bg-info">уточнение</span>
                                             {% elif u.user_info.form_status == "approved" %}
                                                 <span class="badge text-bg-success">принята</span>
+                                            {% elif u.user_info.form_status == "rejected" %}
+                                                <span class="badge text-bg-dark">отклонена</span>
                                             {% else %}
                                                 <span class="badge text-bg-light text-dark">
                     {{ u.user_info.get_form_status_display }}
@@ -405,15 +440,23 @@
                                 <td>
                                     <a href="{% url 'staff_letter_detail' u.id %}#ml"
                                        class="text-decoration-none">
-                                        {% if u.letter_status == "submitted" %}
-                                            <span class="badge text-bg-success">отправлено</span>
-                                        {% elif u.letter_status == "draft" %}
-                                            <span class="badge text-bg-secondary">черновик</span>
-                                        {% elif u.letter_status %}
-                                            <span class="badge text-bg-light text-dark">{{ u.letter_status }}</span>
-                                        {% else %}
-                                            <span class="badge text-bg-secondary">нет</span>
-                                        {% endif %}
+                                        <div class="d-flex flex-wrap gap-1">
+                                            {% if u.letter_status == "submitted" %}
+                                                <span class="badge text-bg-success">отправлено</span>
+                                            {% elif u.letter_status == "draft" %}
+                                                <span class="badge text-bg-secondary">черновик</span>
+                                            {% elif u.letter_status == "revision" %}
+                                                <span class="badge text-bg-warning text-dark">дописать</span>
+                                            {% elif u.letter_status %}
+                                                <span class="badge text-bg-light text-dark">{{ u.letter_status }}</span>
+                                            {% else %}
+                                                <span class="badge text-bg-secondary">нет</span>
+                                            {% endif %}
+
+                                            {% if u.letter_is_favorite %}
+                                                <span class="badge text-bg-warning">★ избранное</span>
+                                            {% endif %}
+                                        </div>
                                     </a>
                                 </td>
 
@@ -587,6 +630,7 @@
                     const checkAll = document.getElementById('checkAllOnPage');
                     const selectedCount = document.getElementById('selectedCount');
                     const openModalBtn = document.getElementById('openModalBtn');
+                    const downloadLettersBtn = document.getElementById('downloadLettersBtn');
                     const submitBtn = document.getElementById('submitNotifBtn');
                     const messageText = document.getElementById('messageText');
                     const form = document.getElementById('notifyForm');
@@ -720,6 +764,18 @@
                         });
                     }
 
+                    function submitSelectedLettersDownload() {
+                        injectAllSelectedHiddenInputs();
+
+                        const previousAction = form.action;
+                        const previousTarget = form.target;
+                        form.action = "{% url 'staff_letters_download_zip' %}";
+                        form.target = "_self";
+                        form.submit();
+                        form.action = previousAction;
+                        form.target = previousTarget || "";
+                    }
+
                     if (submitBtn) {
                         submitBtn.addEventListener('click', function (e) {
                             if (!requireSelection(e)) return;
@@ -731,6 +787,13 @@
                                 return;
                             }
                             injectAllSelectedHiddenInputs();
+                        });
+                    }
+
+                    if (downloadLettersBtn) {
+                        downloadLettersBtn.addEventListener('click', function (e) {
+                            if (!requireSelection(e)) return;
+                            submitSelectedLettersDownload();
                         });
                     }
 

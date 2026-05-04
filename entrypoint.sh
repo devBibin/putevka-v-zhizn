@@ -72,6 +72,8 @@ python Shadows/gpt_reviewer.py &
 
 python Shadows/gpt_transcriber.py &
 
+python Shadows/gpt_transcriber_video.py &
+
 python Shadows/gpt_fill_form.py &
 
 # Start Gunicorn server

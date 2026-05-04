@@ -189,10 +189,16 @@ class MotivationLetter(models.Model):
         verbose_name='Текст мотивационного письма'
     )
 
+    is_favorite = models.BooleanField(
+        default=False,
+        verbose_name="Избранное письмо",
+        db_index=True,
+    )
+
     admin_score = models.PositiveSmallIntegerField(
         verbose_name='Итоговый балл',
-        validators=[MinValueValidator(0), MaxValueValidator(85)],
-        help_text="Введите значение от 0 до 85",
+        validators=[MinValueValidator(0), MaxValueValidator(70)],
+        help_text="Введите значение от 0 до 70",
         blank=True,
         null=True
     )
@@ -315,16 +321,16 @@ class MotivationLetter(models.Model):
 
 
 class MotivationLetterRubricReview(models.Model):
-    class Topic15Grade(models.TextChoices):
-        FULL_WITH_MATERIALS = "15", "Да, развёрнуто и материалы учтены — 15"
-        BRIEF_WITH_MATERIALS = "8", "Да, но кратко/гипотетически, материалы учтены — 8"
-        BRIEF_NO_MATERIALS = "3", "Да, но кратко/гипотетически, материалы не учтены — 3"
+    class Topic10WithMaterialsGrade(models.TextChoices):
+        FULL_WITH_MATERIALS = "10", "Да, развёрнуто и материалы учтены — 10"
+        BRIEF_WITH_MATERIALS = "5", "Да, но кратко/гипотетически, материалы учтены — 5"
+        BRIEF_NO_MATERIALS = "2", "Да, но кратко/гипотетически, материалы не учтены — 2"
         NONE = "0", "Нет — 0"
 
-    class Topic15TrajectoryGrade(models.TextChoices):
-        FULL_WITH_REASON_AND_MATERIALS = "15", "Да, развёрнуто; есть обоснование; материалы учтены — 15"
-        BRIEF_WITH_REASON_AND_MATERIALS = "10", "Да, кратко/гипотетически; есть обоснование; материалы учтены — 10"
-        BRIEF_NO_REASON_OR_NO_MATERIALS = "5", "Да, кратко/гипотетически; нет обоснования ИЛИ материалы не учтены — 5"
+    class Topic10TrajectoryGrade(models.TextChoices):
+        FULL_WITH_REASON_AND_MATERIALS = "10", "Да, развёрнуто; есть обоснование; материалы учтены — 10"
+        BRIEF_WITH_REASON_AND_MATERIALS = "5", "Да, кратко/гипотетически; есть обоснование; материалы учтены — 5"
+        BRIEF_NO_REASON_OR_NO_MATERIALS = "2", "Да, кратко/гипотетически; нет обоснования ИЛИ материалы не учтены — 2"
         NONE = "0", "Нет — 0"
 
     class Topic10Grade(models.TextChoices):
@@ -359,7 +365,7 @@ class MotivationLetterRubricReview(models.Model):
     schema_version = models.CharField(
         max_length=32,
         blank=True,
-        default="v2",
+        default="v3.0-2026-04-25",
         verbose_name="Версия рубрики",
     )
 
@@ -381,15 +387,15 @@ class MotivationLetterRubricReview(models.Model):
 
     specialty_choice_score = models.CharField(
         max_length=2,
-        choices=Topic15Grade.choices,
-        default=Topic15Grade.NONE,
+        choices=Topic10WithMaterialsGrade.choices,
+        default=Topic10WithMaterialsGrade.NONE,
         verbose_name="Тема №2: выбор специальности",
     )
 
     university_choice_score = models.CharField(
         max_length=2,
-        choices=Topic15Grade.choices,
-        default=Topic15Grade.NONE,
+        choices=Topic10WithMaterialsGrade.choices,
+        default=Topic10WithMaterialsGrade.NONE,
         verbose_name="Тема №3: выбор вуза",
     )
 
@@ -402,8 +408,8 @@ class MotivationLetterRubricReview(models.Model):
 
     admission_trajectory_score = models.CharField(
         max_length=2,
-        choices=Topic15TrajectoryGrade.choices,
-        default=Topic15TrajectoryGrade.NONE,
+        choices=Topic10TrajectoryGrade.choices,
+        default=Topic10TrajectoryGrade.NONE,
         verbose_name="Тема №5: траектория поступления",
     )
 
@@ -464,7 +470,7 @@ class MotivationLetterRubricReview(models.Model):
     score_capped_for_short_length = models.BooleanField(
         default=False,
         verbose_name="Для текста 1000–1500 символов применён потолок оценки",
-        help_text="По критериям максимум 85 для такого объёма не ставится",
+        help_text="По критериям максимум 70 для такого объёма не ставится",
     )
 
     suspected_ai_generated = models.BooleanField(
@@ -521,13 +527,7 @@ class MotivationLetterRubricReview(models.Model):
         except (TypeError, ValueError):
             return 0
 
-    def calculate_total_score(self) -> int:
-        if self.suspected_ai_generated:
-            return 0
-
-        if self.is_too_short or self.char_count < 1000:
-            return 0
-
+    def _calculate_raw_total(self) -> int:
         total = 0
 
         total += self._to_int(self.specialty_choice_score)
@@ -543,9 +543,22 @@ class MotivationLetterRubricReview(models.Model):
         total += self._to_int(self.orthography_penalty)
         total += self._to_int(self.syntax_penalty)
 
-        if 1000 <= self.char_count < 1500 and total >= 85:
+        return total
+
+    def calculate_total_score(self) -> int:
+        self.score_capped_for_short_length = False
+
+        if self.suspected_ai_generated:
+            return 0
+
+        if self.is_too_short or self.char_count < 1000:
+            return 0
+
+        total = self._calculate_raw_total()
+
+        if 1000 <= self.char_count < 1500 and total >= 70:
             self.score_capped_for_short_length = True
-            total = 84
+            total = 69
 
         return max(total, 0)
 
