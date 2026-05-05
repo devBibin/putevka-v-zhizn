@@ -30,7 +30,7 @@ BASE_URL= # Base app URL, for example https://example.com
 # GPT
 
 GPT_TOKEN= # API token for OpenAI integration
-OPENAI_PROXY= # Optional proxy for OpenAI API, example: http://user:pass@host:port or socks5://user:pass@host:1080
+OPENAI_PROXY= # Deprecated: OpenAI workers reuse TELEGRAM_SOCKS5_PROXY.
 
 
 # ZVONOK

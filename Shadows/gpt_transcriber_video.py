@@ -19,6 +19,7 @@ from openai import OpenAI
 import httpx
 
 import config
+from core.telegram_proxy import normalize_telegram_proxy_url
 from scholar_form.models import ScholarVideo
 from scholar_form.services.yandex_disk import download_file_from_yandex_disk
 
@@ -26,6 +27,7 @@ logger = logging.getLogger(__name__)
 
 OPENAI_API_KEY = config.GPT_TOKEN
 OPENAI_TRANSCRIBE_MODEL = os.getenv("OPENAI_TRANSCRIBE_MODEL", "whisper-1")
+OPENAI_MAX_RETRIES = int(os.getenv("OPENAI_MAX_RETRIES", "5"))
 POLLING_INTERVAL = int(os.getenv("VIDEO_TRANSCRIBE_POLLING_INTERVAL", 60))
 BATCH_LIMIT = int(os.getenv("VIDEO_TRANSCRIBE_BATCH_LIMIT", 2))
 LANGUAGE = os.getenv("VIDEO_TRANSCRIBE_LANGUAGE", "ru").strip() or None
@@ -33,7 +35,7 @@ LANGUAGE = os.getenv("VIDEO_TRANSCRIBE_LANGUAGE", "ru").strip() or None
 MAX_MODEL_AUDIO_SECONDS = int(os.getenv("OPENAI_TRANSCRIBE_MAX_SECONDS", 1400))
 CHUNK_SECONDS = int(os.getenv("OPENAI_TRANSCRIBE_CHUNK_SECONDS", 1100))
 CHUNK_OVERLAP_SECONDS = int(os.getenv("OPENAI_TRANSCRIBE_CHUNK_OVERLAP_SECONDS", 2))
-PROXY = os.getenv("OPENAI_PROXY")
+PROXY = normalize_telegram_proxy_url(os.getenv("TELEGRAM_SOCKS5_PROXY"))
 
 http_client = httpx.Client(
     proxy=PROXY if PROXY else None,
@@ -45,6 +47,7 @@ http_client = httpx.Client(
 client = OpenAI(
     api_key=OPENAI_API_KEY,
     http_client=http_client,
+    max_retries=OPENAI_MAX_RETRIES,
 )
 
 

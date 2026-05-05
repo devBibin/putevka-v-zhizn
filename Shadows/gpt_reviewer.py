@@ -9,10 +9,9 @@ from openai import OpenAI
 
 import config
 from core.llm_safe import parse_llm_json
+from core.telegram_proxy import normalize_telegram_proxy_url
 
 import httpx
-
-PROXY = os.getenv("OPENAI_PROXY")
 
 load_dotenv()
 
@@ -25,6 +24,8 @@ from core.models import MotivationLetter, MotivationLetterRubricReview
 
 OPENAI_API_KEY = config.GPT_TOKEN
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+OPENAI_MAX_RETRIES = int(os.getenv("OPENAI_MAX_RETRIES", "5"))
+PROXY = normalize_telegram_proxy_url(os.getenv("TELEGRAM_SOCKS5_PROXY"))
 http_client = httpx.Client(
     proxy=PROXY if PROXY else None,
     timeout=httpx.Timeout(300.0, connect=60.0, read=300.0, write=300.0),
@@ -35,6 +36,7 @@ http_client = httpx.Client(
 client = OpenAI(
     api_key=OPENAI_API_KEY,
     http_client=http_client,
+    max_retries=OPENAI_MAX_RETRIES,
 )
 
 POLLING_INTERVAL = int(os.getenv("SHADOW_POLLING_INTERVAL", 60))

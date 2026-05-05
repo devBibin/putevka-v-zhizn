@@ -14,6 +14,7 @@ from django.utils.dateparse import parse_date, parse_datetime
 from openai import OpenAI
 
 import httpx
+from core.telegram_proxy import normalize_telegram_proxy_url
 
 load_dotenv()
 
@@ -25,10 +26,11 @@ logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
 
 from review_by_tutor.models import Interview, InterviewResult
 
-PROXY = os.getenv("OPENAI_PROXY")
+PROXY = normalize_telegram_proxy_url(os.getenv("TELEGRAM_SOCKS5_PROXY"))
 
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY") or os.getenv("GPT_TOKEN")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+OPENAI_MAX_RETRIES = int(os.getenv("OPENAI_MAX_RETRIES", "5"))
 
 POLLING_INTERVAL = int(os.getenv("INTERVIEW_RESULT_FILL_POLLING_INTERVAL", "60"))
 BATCH_LIMIT = int(os.getenv("INTERVIEW_RESULT_FILL_BATCH_LIMIT", "2"))
@@ -43,6 +45,7 @@ http_client = httpx.Client(
 client = OpenAI(
     api_key=OPENAI_API_KEY,
     http_client=http_client,
+    max_retries=OPENAI_MAX_RETRIES,
 )
 
 SKIP_FIELDS = {
