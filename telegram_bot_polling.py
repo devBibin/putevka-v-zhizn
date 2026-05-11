@@ -1,15 +1,14 @@
 import json
 import logging
 
-import telebot
 import requests
-import config
 
 from dotenv import load_dotenv
 
-import config
-
 load_dotenv()
+
+import config
+from core.telegram_proxy import create_telegram_bot
 
 
 logger = logging.getLogger(__name__)
@@ -22,11 +21,11 @@ if not token:
 
 endpoint_url = f"{base_url}{token}/"
 
-bot = telebot.TeleBot(token)
+bot = create_telegram_bot(token)
 
 bot.remove_webhook()
 
-@bot.message_handler(func=lambda message: True, content_types=['text', 'contact'])
+@bot.message_handler(func=lambda message: True, content_types=['text', 'contact', 'video', 'document'])
 def handle_message(message):
     try:
         update_object = {

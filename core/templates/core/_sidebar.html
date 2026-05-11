@@ -1,0 +1,136 @@
+<div class="list-group list-group-flush py-3 d-none d-md-block">
+    <a class="list-group-item list-group-item-action d-flex align-items-center {% if active == 'personal_info' %} active{% endif %}"
+       href="{% url 'personal_info' %}">
+        Личная информация
+    </a>
+
+    {% if user.user_info.status == "CANDIDATE" %}
+        <a class="list-group-item list-group-item-action d-flex justify-content-between align-items-center
+                  {% if active == 'apply' or active == 'motivation_letter' or active == 'my_video_page' or active == 'testing' or active == 'interview' %} active{% endif %}"
+           data-bs-toggle="collapse"
+           href="#selectionMenu"
+           role="button"
+           aria-expanded="{% if active == 'apply' or active == 'motivation_letter' or active == 'my_video_page' or active == 'testing' or active == 'interview' %}true{% else %}false{% endif %}"
+           aria-controls="selectionMenu">
+            <span>Отбор</span>
+            <span class="small text-muted">▾</span>
+        </a>
+
+        <div class="collapse {% if active == 'apply' or active == 'motivation_letter' or active == 'my_video_page' or active == 'testing' or active == 'interview' %}show{% endif %}"
+             id="selectionMenu">
+            <a class="list-group-item list-group-item-action ps-4 {% if active == 'apply' %}active{% endif %}"
+               href="{% url 'apply' %}">
+                Анкета
+            </a>
+            <a class="list-group-item list-group-item-action ps-4 {% if active == 'testing' %}active{% endif %}"
+               href="{% url 'candidate_testing_list' %}">
+                Тестирование
+            </a>
+            <a class="list-group-item list-group-item-action ps-4 {% if active == 'motivation_letter' %}active{% endif %}"
+               href="{% url 'motivation_letter' %}">
+                Мотивационное письмо
+            </a>
+            <a class="list-group-item list-group-item-action ps-4 {% if active == 'my_video_page' %}active{% endif %}"
+               href="{% url 'my_video_page' %}">
+                Видеовизитка
+            </a>
+            <a class="list-group-item list-group-item-action ps-4 {% if active == 'interview' %}active{% endif %}"
+               href="{% url 'preparation' %}">
+                Подготовка к собеседованию
+            </a>
+        </div>
+    {% endif %}
+
+    {% if user.user_info.status != "CANDIDATE" %}
+        <a class="list-group-item list-group-item-action d-flex align-items-center {% if active == 'documents_dashboard' %} active{% endif %}"
+           href="{% url 'documents_dashboard' %}">
+            Документы
+        </a>
+    {% endif %}
+
+    {% if user.user_info.status != "CANDIDATE" %}
+        <a class="list-group-item list-group-item-action d-flex align-items-center {% if active == 'study' %} active{% endif %}"
+           href="{% url 'study:schools' %}">
+            Моя учёба
+        </a>
+    {% endif %}
+
+    <a class="list-group-item list-group-item-action d-flex align-items-center {% if active == 'feedback' %} active{% endif %}"
+       href="{% url 'feedback' %}">
+        Связь с фондом
+    </a>
+</div>
+
+
+<nav class="d-md-none mobile-tabs sticky-top bg-white border-top shadow-sm">
+    <div class="d-flex justify-content-around py-2">
+        <a href="{% url 'personal_info' %}"
+           class="text-center {% if active == 'personal_info' %}text-primary{% else %}text-secondary{% endif %}">
+            <div class="small">Профиль</div>
+        </a>
+
+        {% if user.user_info.status == "CANDIDATE" %}
+            <div class="dropdown">
+                <a class="text-center dropdown-toggle {% if active == 'apply' or active == 'motivation_letter' or active == 'my_video_page' or active == 'testing' or active == 'interview' %}text-primary{% else %}text-secondary{% endif %}"
+                   href="#"
+                   id="selectionDropdown"
+                   role="button"
+                   data-bs-toggle="dropdown"
+                   aria-expanded="false">
+                    <div class="small">Отбор</div>
+                </a>
+                <ul class="dropdown-menu" aria-labelledby="selectionDropdown">
+                    <li>
+                        <a class="dropdown-item {% if active == 'apply' %}active{% endif %}"
+                           href="{% url 'apply' %}">
+                            Анкета
+                        </a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item {% if active == 'testing' %}active{% endif %}"
+                           href="{% url 'candidate_testing_list' %}">
+                            Тестирование
+                        </a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item {% if active == 'motivation_letter' %}active{% endif %}"
+                           href="{% url 'motivation_letter' %}">
+                            Мотивационное письмо
+                        </a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item {% if active == 'my_video_page' %}active{% endif %}"
+                           href="{% url 'my_video_page' %}">
+                            Видеовизитка
+                        </a>
+                    </li>
+                    <li>
+                        <a class="dropdown-item {% if active == 'interview' %}active{% endif %}"
+                           href="{% url 'preparation' %}">
+                            Подготовка к собеседованию
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        {% endif %}
+
+        {% if user.user_info.status != "CANDIDATE" %}
+            <a href="{% url 'documents_dashboard' %}"
+               class="text-center {% if active == 'documents_dashboard' %}text-primary{% else %}text-secondary{% endif %}">
+                <div class="small">Документы</div>
+            </a>
+        {% endif %}
+
+        {% if user.user_info.status != "CANDIDATE" %}
+            <a href="{% url 'study:schools' %}"
+               class="text-center {% if active == 'study' %}text-primary{% else %}text-secondary{% endif %}">
+                <div class="small">Учёба</div>
+            </a>
+        {% endif %}
+
+        <a href="{% url 'feedback' %}"
+           class="text-center {% if active == 'feedback' %}text-primary{% else %}text-secondary{% endif %}">
+            <div class="small">Связь с фондом</div>
+        </a>
+    </div>
+</nav>

@@ -10,30 +10,35 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
+import os
 from pathlib import Path
 
+import dj_database_url
 import os
 from dotenv import load_dotenv
 
-import config
-
 load_dotenv()
+
+import config
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-(ct6qihahs$niey_!sj__0l4$o4wd8jz%nf&p%jgtf94upx^v('
+SECRET_KEY = os.getenv("SECRET_KEY", "local-dev-insecure-secret-key")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv("DEBUG", "true").lower() in {"1", "true", "yes", "on"}
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
 
+CSRF_TRUSTED_ORIGINS = os.getenv(
+    "CSRF_TRUSTED_ORIGINS",
+    "http://localhost,http://127.0.0.1,http://localhost:8000,http://127.0.0.1:8000,http://localhost:8001,http://127.0.0.1:8001",
+).split(",")
 
 # Application definition
 
@@ -47,7 +52,10 @@ INSTALLED_APPS = [
     'scholar_form',
     'core',
     'documents',
-    'widget_tweaks'
+    'widget_tweaks',
+    'my_study',
+    'review_by_tutor',
+    'subscriber',
 ]
 
 MIDDLEWARE = [
@@ -68,8 +76,11 @@ TEMPLATES = [
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         'DIRS': [
             BASE_DIR / 'templates',
+            BASE_DIR / 'core' / 'templates',
             BASE_DIR / 'scholar_form' / 'templates',
-            BASE_DIR / 'documents' / 'templates'
+            BASE_DIR / 'documents' / 'templates',
+            BASE_DIR / 'my_study' / 'templates',
+            BASE_DIR / 'review_by_tutor' / 'templates',
         ],
         'APP_DIRS': True,
         'OPTIONS': {
@@ -85,22 +96,25 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'Putevka.wsgi.application'
 
-
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv("POSTGRES_DB"),
-        'USER': os.getenv("POSTGRES_USER"),
-        'PASSWORD': os.getenv("POSTGRES_PASSWORD"),
-        'HOST': 'db',
-        'PORT': 5432,
+DATABASE_URL = os.getenv("DATABASE_URL")
+
+if DATABASE_URL:
+    DATABASES = {
+        "default": dj_database_url.config(
+            default=DATABASE_URL,
+            conn_max_age=60,
+        )
     }
-}
-
-
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": BASE_DIR / "db.sqlite3",
+        }
+    }
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
@@ -120,44 +134,66 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
 LANGUAGE_CODE = 'ru'
 
-TIME_ZONE = 'UTC'
+TIME_ZONE = 'Europe/Moscow'
 
 USE_I18N = True
 
 USE_TZ = True
 
-
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
+STATICFILES_DIRS = [BASE_DIR / 'static']
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-STATIC_URL = '/static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
-DEFAULT_FROM_EMAIL = 'no-reply@yourdomain.com'
+EMAIL_BACKEND = 'core.mail_backends.postbox.PostboxEmailBackend'
+POSTBOX_ENDPOINT = "https://postbox.cloud.yandex.net/v2/email/outbound-emails"
+POSTBOX_REGION = "ru-central1"
+POSTBOX_SERVICE = "ses"
 
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+POSTBOX_ACCESS_KEY_ID = os.getenv("YC_EMAIL_USER")
+POSTBOX_SECRET_ACCESS_KEY = os.getenv("YC_EMAIL_PASSWORD")
+YANDEX_DISK_OAUTH_TOKEN = os.getenv("YANDEX_DISK_OAUTH_TOKEN", "").strip()
+YANDEX_DISK_VIDEO_FOLDER = os.getenv("YANDEX_DISK_VIDEO_FOLDER", "Путевка/Видеовизитки").strip() or "Путевка/Видеовизитки"
+YANDEX_DISK_TIMEOUT_SECONDS = int(os.getenv("YANDEX_DISK_TIMEOUT_SECONDS", "60"))
+YANDEX_DISK_UPLOAD_TIMEOUT_SECONDS = int(os.getenv("YANDEX_DISK_UPLOAD_TIMEOUT_SECONDS", "900"))
+YANDEX_DISK_API_RETRIES = int(os.getenv("YANDEX_DISK_API_RETRIES", "3"))
+YANDEX_DISK_UPLOAD_RETRIES = int(os.getenv("YANDEX_DISK_UPLOAD_RETRIES", "3"))
+YANDEX_DISK_RETRY_BACKOFF_SECONDS = float(os.getenv("YANDEX_DISK_RETRY_BACKOFF_SECONDS", "2"))
+YANDEX_DISK_VERIFY_RETRIES = int(os.getenv("YANDEX_DISK_VERIFY_RETRIES", "5"))
+YANDEX_DISK_VERIFY_DELAY_SECONDS = float(os.getenv("YANDEX_DISK_VERIFY_DELAY_SECONDS", "1"))
 
-EMAIL_HOST = 'smtp.gmail.com'
-EMAIL_PORT = 587
+# Keep candidate uploads in memory so Django does not write temp files to disk.
+FILE_UPLOAD_HANDLERS = [
+    "django.core.files.uploadhandler.MemoryFileUploadHandler",
+]
+FILE_UPLOAD_MAX_MEMORY_SIZE = 250 * 1024 * 1024
+DATA_UPLOAD_MAX_MEMORY_SIZE = 275 * 1024 * 1024
+
+EMAIL_HOST = 'postbox.cloud.yandex.net'
+EMAIL_PORT = 465
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'your_email@gmail.com'
-EMAIL_HOST_PASSWORD = 'your_email_password_or_app_password'
+
+EMAIL_HOST_USER = os.getenv("YC_EMAIL_USER")
+EMAIL_HOST_PASSWORD = os.getenv("YC_EMAIL_PASSWORD")
+
+EMAIL_TIMEOUT = 10
+
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL")
 
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/'
@@ -204,7 +240,7 @@ LOGGING = {
             'level': 'INFO',
             'class': 'logging.handlers.RotatingFileHandler',
             'filename': os.path.join(BASE_DIR, 'logs', 'output_to_file_level_info.log'),
-            'maxBytes': 1024*1024*5,
+            'maxBytes': 1024 * 1024 * 5,
             'backupCount': 5,
             'formatter': 'standard',
             'filters': ['user_info_filter'],
@@ -213,7 +249,7 @@ LOGGING = {
             'level': 'ERROR',
             'class': 'logging.handlers.RotatingFileHandler',
             'filename': os.path.join(BASE_DIR, 'logs', 'output_to_file_level_error.log'),
-            'maxBytes': 1024*1024*10,
+            'maxBytes': 1024 * 1024 * 10,
             'backupCount': 10,
             'formatter': 'standard',
             'filters': ['user_info_filter'],
@@ -225,32 +261,40 @@ LOGGING = {
             'chat_id': config.TELEGRAM_LOG_CHAT_ID,
             'formatter': 'standard',
             'filters': ['user_info_filter'],
+        } if config.TG_TOKEN_ADMIN and config.TELEGRAM_STAFF_CHAT_IDS else {
+            "class": "logging.NullHandler",
+            "level": "ERROR",
         },
     },
 
     'loggers': {
         'django': {
-            'handlers': ['console', 'file_info',],
+            'handlers': ['console', 'file_info', ],
             'level': 'INFO',
             'propagate': False,
         },
         'django.request': {
             'handlers': ['telegram_errors', 'file_error'],
-            'level': 'ERROR',
+            'level': 'INFO',
             'propagate': False,
         },
         'core': {
             'handlers': ['console', 'file_info', 'file_error', 'telegram_errors'],
-            'level': 'DEBUG', # В разработке может быть DEBUG, на продакшене INFO
+            'level': 'INFO',  # В разработке может быть DEBUG, на продакшене INFO
             'propagate': False,
         },
         'documents': {
             'handlers': ['console', 'file_info', 'file_error', 'telegram_errors'],
-            'level': 'DEBUG', # В разработке может быть DEBUG, на продакшене INFO
+            'level': 'INFO',  # В разработке может быть DEBUG, на продакшене INFO
+            'propagate': False,
+        },
+        'scholar_form': {
+            'handlers': ['console', 'file_info', 'file_error', 'telegram_errors'],
+            'level': 'INFO',  # В разработке может быть DEBUG, на продакшене INFO
             'propagate': False,
         },
         '': {
-            'handlers': ['console'],
+            'handlers': ['console', 'file_info', 'file_error'],
             'level': 'INFO',
             'propagate': True,
         }
@@ -260,3 +304,7 @@ LOGGING = {
 LOG_DIR = os.path.join(BASE_DIR, 'logs')
 if not os.path.exists(LOG_DIR):
     os.makedirs(LOG_DIR)
+
+ALLOWED_VIDEO_MIME = {
+    "video/mp4", "video/quicktime", "video/x-matroska", "video/webm", "application/octet-stream"
+}

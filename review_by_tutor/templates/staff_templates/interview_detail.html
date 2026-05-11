@@ -1,0 +1,317 @@
+{% extends "staff_templates/base.html" %}
+{% load widget_tweaks %}
+{% load form_extras %}
+
+{% block title %}Собеседование — {{ user_obj.get_full_name|default:user_obj.username }}{% endblock %}
+
+{% block content %}
+    <div class="container py-4">
+        <div class="d-flex align-items-center gap-2 mb-3">
+            <h4 class="mb-0">Собеседование: {{ user_obj.get_full_name|default:user_obj.username }}</h4>
+            <span class="badge text-bg-secondary">ID {{ user_obj.id }}</span>
+        </div>
+
+        {% if messages %}
+            {% for m in messages %}
+                <div class="alert alert-{{ m.tags }}">{{ m }}</div>
+            {% endfor %}
+        {% endif %}
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-white d-flex align-items-center justify-content-between">
+                <strong>Видео собеседования</strong>
+                {% if interview.video %}
+                    <a href="{{ interview.video.url }}" class="btn btn-sm btn-outline-primary" download>
+                        Скачать видео
+                    </a>
+                {% endif %}
+            </div>
+
+            <div class="card-body">
+                {% if interview.video %}
+                    <video controls style="width: 100%; max-height: 420px;">
+                        <source src="{{ interview.video.url }}">
+                        Ваш браузер не поддерживает видео.
+                    </video>
+
+                    <div class="text-muted small mt-2">
+                        {% if interview.video_uploaded_at %}
+                            {{ interview.video_uploaded_at|date:"d.m.Y H:i" }}{% endif %}
+                        {% if interview.video_uploaded_by %} ·
+                            {{ interview.video_uploaded_by.get_full_name|default:interview.video_uploaded_by.username }}{% endif %}
+                    </div>
+                {% else %}
+                    <div class="text-muted">Видео ещё не загружено.</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <strong>Транскрипция видео</strong>
+
+                {% if interview.transcript_status == "PROCESSING" %}
+                    <span class="badge text-bg-warning">В обработке</span>
+                {% elif interview.transcript_status == "DONE" %}
+                    <span class="badge text-bg-success">Готово</span>
+                {% elif interview.transcript_status == "FAILED" %}
+                    <span class="badge text-bg-danger">Ошибка</span>
+                {% else %}
+                    <span class="badge text-bg-secondary">Ожидает</span>
+                {% endif %}
+            </div>
+
+            <div class="card-body">
+                {% if interview.transcript %}
+                    <div class="border rounded p-3 bg-light transcript-box"
+                         style="white-space: pre-wrap;
+                                max-height: 420px;
+                                overflow-y: auto;
+                                overflow-x: hidden;
+                                font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+                                font-size: 0.9rem;
+                                line-height: 1.5;
+                            ">{{ interview.transcript }}
+                    </div>
+
+                    {% if interview.transcript_uploaded_at %}
+                        <div class="text-muted small mt-2">
+                            Обновлено: {{ interview.transcript_uploaded_at|date:"d.m.Y H:i" }}
+                        </div>
+                    {% endif %}
+
+                {% elif interview.transcript_status == "FAILED" %}
+                    <div class="alert alert-danger small mb-0">
+                        Не удалось получить транскрипцию.
+                        {% if interview.transcript_error %}
+                            <br>
+                            <code>{{ interview.transcript_error }}</code>
+                        {% endif %}
+                    </div>
+
+                {% else %}
+                    <div class="text-muted">
+                        Транскрипт ещё не готов. Обработка выполняется в фоне.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+
+        <div class="card shadow-sm">
+            <div class="card-header bg-white">
+                <strong>Заметки интервьюера + загрузка заполненного шаблона</strong>
+            </div>
+            <div class="card-body">
+                <form id="interview-form" method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <input type="hidden" name="op" value="save_interview_files">
+
+                    <div class="mb-3">
+                        <label class="form-label">Заметки</label>
+                        {% render_field form.notes class+="form-control" %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Видео</label>
+                        {% render_field form.video class+="form-control" id="video-input" %}
+                        {% if form.video.errors %}
+                            <div class="text-danger small mt-1">{{ form.video.errors }}</div>
+                        {% endif %}
+                        <div class="form-text">
+                            Загрузите видеофайл (может быть большим — загрузка займёт время).
+                        </div>
+
+                        <!-- Progress UI -->
+                        <div id="upload-progress-wrap" class="mt-2 d-none">
+                            <div class="progress" role="progressbar" aria-label="Прогресс загрузки" aria-valuemin="0"
+                                 aria-valuemax="100">
+                                <div id="upload-progress-bar"
+                                     class="progress-bar progress-bar-striped progress-bar-animated"
+                                     style="width: 0%">0%
+                                </div>
+                            </div>
+                            <div class="small text-muted mt-1" id="upload-progress-text">Подготовка…</div>
+                        </div>
+
+                        <div id="upload-error" class="alert alert-danger small mt-2 d-none"></div>
+                    </div>
+
+                    <div class="mt-3 text-end">
+                        <button id="submit-btn" type="submit" class="btn btn-primary">Сохранить</button>
+                    </div>
+                </form>
+
+            </div>
+            <div class="card-footer small text-muted">
+                Создано: {{ interview.created_at|date:"d.m.Y H:i" }},
+                обновлено: {{ interview.updated_at|date:"d.m.Y H:i" }}
+            </div>
+        </div>
+
+        <div class="card shadow-sm mt-4">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <strong>Результаты интервью</strong>
+            </div>
+
+            <div class="card-body">
+                <form method="post" id="interview-result-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="op" value="save_interview_result">
+
+                    {% if result_form.non_field_errors %}
+                        <div class="alert alert-danger">{{ result_form.non_field_errors }}</div>
+                    {% endif %}
+
+                    <div class="accordion" id="interviewAccordion">
+                        {% for sec_id, sec_title, fields in interview_sections %}
+                            <div class="accordion-item">
+                                <h2 class="accordion-header" id="h-{{ sec_id }}">
+                                    <button class="accordion-button {% if not forloop.first %}collapsed{% endif %}"
+                                            type="button"
+                                            data-bs-toggle="collapse" data-bs-target="#c-{{ sec_id }}"
+                                            aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}"
+                                            aria-controls="c-{{ sec_id }}">
+                                        {{ sec_title }}
+                                    </button>
+                                </h2>
+
+                                <div id="c-{{ sec_id }}"
+                                     class="accordion-collapse collapse {% if forloop.first %}show{% endif %}"
+                                     aria-labelledby="h-{{ sec_id }}" data-bs-parent="#interviewAccordion">
+                                    <div class="accordion-body">
+                                        <div class="row g-3">
+
+                                            {% for fname in fields %}
+                                                {% with f=result_form|get_field:fname %}
+                                                    <div class="{% if f.field.widget.input_type == 'checkbox' %}col-12{% elif f.field.widget.attrs.rows %}col-12{% else %}col-md-6{% endif %}">
+                                                        <label class="form-label">{{ f.label }}</label>
+                                                        {{ f }}
+                                                        {% if f.help_text %}
+                                                            <div class="form-text">{{ f.help_text }}</div>
+                                                        {% endif %}
+                                                        {% if f.errors %}
+                                                            <div class="text-danger small mt-1">{{ f.errors }}</div>
+                                                        {% endif %}
+                                                    </div>
+                                                {% endwith %}
+                                            {% endfor %}
+
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="mt-3 text-end">
+                        <button type="submit" class="btn btn-success">Сохранить результаты интервью</button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="card-footer small text-muted">
+                Обновлено: {{ result_form.instance.updated_at|date:"d.m.Y H:i" }}
+            </div>
+        </div>
+
+    </div>
+{% endblock %}
+
+{% block extra_js %}
+    <script>
+        (function () {
+            const form = document.getElementById("interview-form");
+            if (!form) return;
+
+            const videoInput = document.getElementById("video-input");
+            const wrap = document.getElementById("upload-progress-wrap");
+            const bar = document.getElementById("upload-progress-bar");
+            const text = document.getElementById("upload-progress-text");
+            const errBox = document.getElementById("upload-error");
+            const btn = document.getElementById("submit-btn");
+
+            function humanBytes(bytes) {
+                if (!Number.isFinite(bytes) || bytes <= 0) return "0 B";
+                const units = ["B", "KB", "MB", "GB", "TB"];
+                let i = 0;
+                while (bytes >= 1024 && i < units.length - 1) {
+                    bytes /= 1024;
+                    i++;
+                }
+                return `${bytes.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
+            }
+
+            function setProgress(pct, loaded, total) {
+                const p = Math.max(0, Math.min(100, pct));
+                bar.style.width = p + "%";
+                bar.textContent = p + "%";
+                const totalText = total ? humanBytes(total) : "—";
+                const loadedText = loaded ? humanBytes(loaded) : "—";
+                text.textContent = `Загружено: ${loadedText} / ${totalText}`;
+            }
+
+            function showError(msg) {
+                errBox.classList.remove("d-none");
+                errBox.textContent = msg;
+            }
+
+            function resetError() {
+                errBox.classList.add("d-none");
+                errBox.textContent = "";
+            }
+
+            form.addEventListener("submit", function (e) {
+                const hasVideo = videoInput && videoInput.files && videoInput.files.length > 0;
+
+                if (!hasVideo) return;
+
+                e.preventDefault();
+                resetError();
+
+                wrap.classList.remove("d-none");
+                btn.disabled = true;
+
+                const formData = new FormData(form);
+
+                const xhr = new XMLHttpRequest();
+                xhr.open(form.method || "POST", form.action || window.location.href, true);
+
+                xhr.setRequestHeader("X-Requested-With", "XMLHttpRequest");
+
+                xhr.upload.addEventListener("progress", function (evt) {
+                    if (!evt.lengthComputable) {
+                        text.textContent = "Загрузка…";
+                        return;
+                    }
+                    const pct = Math.round((evt.loaded / evt.total) * 100);
+                    setProgress(pct, evt.loaded, evt.total);
+                });
+
+                xhr.addEventListener("load", function () {
+                    if (xhr.status >= 200 && xhr.status < 400) {
+                        setProgress(100, 1, 1);
+                        text.textContent = "Готово. Обновляем страницу…";
+                        window.location.reload();
+                        return;
+                    }
+
+                    btn.disabled = false;
+                    showError("Не удалось сохранить. Сервер вернул статус: " + xhr.status);
+                });
+
+                xhr.addEventListener("error", function () {
+                    btn.disabled = false;
+                    showError("Сетевая ошибка при загрузке. Проверь соединение и попробуй ещё раз.");
+                });
+
+                xhr.addEventListener("abort", function () {
+                    btn.disabled = false;
+                    showError("Загрузка отменена.");
+                });
+
+                xhr.send(formData);
+            });
+        })();
+    </script>
+{% endblock %}

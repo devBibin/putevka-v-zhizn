@@ -1,0 +1,47 @@
+{% extends "staff_templates/base.html" %}
+{% load static %}
+{% block title %}Шаблоны документов{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h4 class="mb-1">Шаблоны документов</h4>
+      <div class="text-muted small">
+        Пользователь: {{ user_obj.get_full_name|default:user_obj.username }}
+      </div>
+    </div>
+  </div>
+
+  <div class="alert alert-warning small" role="alert">
+    <i class="bi bi-exclamation-triangle-fill me-2"></i>
+    Вы будете подставлять <strong>персональные и важные данные</strong> пользователя.
+    Проверьте корректность заполнения профиля (паспорт/адрес/реквизиты) перед генерацией.
+  </div>
+
+  {% if templates %}
+    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3">
+      {% for t in templates %}
+        <div class="col">
+          <div class="card h-100 shadow-sm border-0">
+            <div class="card-body d-flex flex-column">
+              <h6 class="mb-2">{{ t.name }}</h6>
+              <p class="text-muted small flex-grow-1">{{ t.description|default:"Без описания" }}</p>
+              <div class="d-flex justify-content-between align-items-center mt-2">
+                <a class="btn btn-sm btn-primary"
+                   href="{% url 'staff_docs_generate' t.id user_obj.id %}">
+                  <i class="bi bi-file-earmark-word"></i> Сформировать
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="alert alert-info">
+      Пока нет активных шаблонов.
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

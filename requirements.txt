@@ -4,9 +4,21 @@ python-dotenv
 gunicorn
 pyTelegramBotAPI
 requests
+PySocks
 django-formtools
 django-widget-tweaks
-psycopg2-binary
-openai
-python-magic
-
+openai>=1.52.0
+python-magic-bin; platform_system == "Windows"
+python-magic; platform_system != "Windows"
+dj-database-url
+psycopg
+Pillow
+pydantic
+requests
+jinja2
+num2words
+docxtpl
+openpyxl
+httpx
+socksio
+botocore

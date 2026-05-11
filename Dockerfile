@@ -5,18 +5,25 @@ ENV PYTHONUNBUFFERED 1
 
 WORKDIR /app
 
-RUN apt-get update && apt-get install -y netcat-openbsd postgresql-client libmagic1 gettext && apt-get clean
+RUN apt-get update && apt-get install -y netcat-openbsd postgresql-client libmagic1 gettext ffmpeg && apt-get clean
+
+RUN pip install --upgrade pip
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir \
     --timeout 30 \
     --retries 10 \
     --default-timeout=30 \
-    -r requirements.txt
+    -r requirements.txt \
+    -vv
 
-COPY .env .
+#COPY .env .
 COPY telegram_bot_polling.py .
 COPY Shadows/gpt_reviewer.py .
+COPY Shadows/gpt_transcriber.py .
+COPY Shadows/gpt_fill_form.py .
+COPY Shadows/notification_worker.py .
+COPY Shadows/gpt_transcriber_video.py .
 
 COPY . .
 

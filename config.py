@@ -2,7 +2,11 @@ import json
 import logging
 import os
 
+from dotenv import load_dotenv
+
 logger = logging.getLogger(__name__)
+
+load_dotenv()
 
 
 def get_variable(name: str):
@@ -15,19 +19,21 @@ def get_variable(name: str):
         return None
 
 
-CHAT_ID = get_variable('CHAT_ID')
-
 try:
     raw_dict = get_variable('TELEGRAM_STAFF_CHAT_IDS')
     TELEGRAM_STAFF_CHAT_IDS = json.loads(raw_dict)
 except Exception as e:
-    TELEGRAM_STAFF_CHAT_IDS = None
+    TELEGRAM_STAFF_CHAT_IDS = ""
     logger.error(f'TELEGRAM_STAFF_CHAT_IDS не используется {e}')
 
 TELEGRAM_LOG_CHAT_ID = get_variable('TELEGRAM_LOG_CHAT_ID')
 TG_TOKEN_ADMIN = get_variable('TG_TOKEN_ADMIN')
 TG_TOKEN_USERS = get_variable('TG_TOKEN_USERS')
 TG_BOT_USERS_USERNAME = get_variable('TG_BOT_USERS_USERNAME')
+TELEGRAM_SOCKS5_PROXY = get_variable('TELEGRAM_SOCKS5_PROXY')
+
+TG_TOKEN_MAIL = get_variable('TG_TOKEN_MAIL')
+TG_CHAT_ID_MAIL = get_variable('TG_CHAT_ID_MAIL')
 
 GPT_TOKEN = get_variable('GPT_TOKEN')
 
@@ -37,3 +43,5 @@ ZVONOK_API_INITIATE_URL = get_variable('ZVONOK_API_INITIATE_URL')
 ZVONOK_API_POLLING_URL = get_variable('ZVONOK_API_POLLING_URL')
 
 BASE_URL = get_variable('BASE_URL')
+
+MAX_VIDEO_MB = 2000

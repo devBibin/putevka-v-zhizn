@@ -1,11 +1,12 @@
 import logging
-from telebot import TeleBot
-from django.conf import settings
+
+from core.telegram_proxy import create_telegram_bot
+
 
 class TelegramHandler(logging.Handler):
     def __init__(self, token, chat_id, level=logging.NOTSET):
         super().__init__(level)
-        self.bot = TeleBot(token)
+        self.bot = create_telegram_bot(token)
         self.chat_id = chat_id
 
     def emit(self, record):

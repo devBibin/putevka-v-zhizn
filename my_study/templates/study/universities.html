@@ -1,0 +1,232 @@
+{% extends "study/base_study.html" %}
+{% load widget_tweaks %}
+{% block extra_head %}
+    <link href="https://cdn.jsdelivr.net/npm/tom-select/dist/css/tom-select.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/tom-select/dist/js/tom-select.complete.min.js"></script>
+{% endblock %}
+{% block study_content %}
+    <div class="row g-4">
+        <!-- ЛЕВАЯ КОЛОНКА: форма -->
+        <div class="col-lg-5">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title mb-2">Добавить направление в вуз</h5>
+                    <p class="text-muted small mb-3">
+                        Одна запись — это одно <strong>направление</strong> в конкретном ВУЗе.
+                        В один и тот же ВУЗ можно добавить несколько разных направлений.
+                    </p>
+
+                    {% if form.non_field_errors %}
+                        <div class="alert alert-danger mb-3">{{ form.non_field_errors|striptags }}</div>
+                    {% elif form.errors %}
+                        <div class="alert alert-danger mb-3">Проверьте поля ниже — есть ошибки.</div>
+                    {% endif %}
+
+                    <form method="post" novalidate>
+                        {% csrf_token %}
+
+                        <!-- ВУЗ -->
+                        <div class="mb-3">
+                            <label class="form-label" for="{{ form.university.id_for_label }}">ВУЗ</label>
+                            {% with field=form.university %}
+                                {% if field.errors %}
+                                    {{ field|add_class:"form-control is-invalid" }}
+                                    <div class="invalid-feedback">{{ field.errors|striptags }}</div>
+                                {% else %}
+                                    {{ field|add_class:"form-control" }}
+                                {% endif %}
+                            {% endwith %}
+                        </div>
+
+                        <!-- Город -->
+                        <div class="mb-3">
+                            <label class="form-label" for="{{ form.city.id_for_label }}">Город</label>
+                            {% with field=form.city %}
+                                {% if field.errors %}
+                                    {{ field|add_class:"form-control is-invalid" }}
+                                    <div class="invalid-feedback">{{ field.errors|striptags }}</div>
+                                {% else %}
+                                    {{ field|add_class:"form-control" }}
+                                {% endif %}
+                            {% endwith %}
+                        </div>
+
+                        <!-- Специальность -->
+                        <div class="mb-3">
+                            <label class="form-label"
+                                   for="{{ form.specialty.id_for_label }}">Специальность/направление</label>
+                            {% with field=form.specialty %}
+                                {% if field.errors %}
+                                    {{ field|add_class:"form-control is-invalid" }}
+                                    <div class="invalid-feedback">{{ field.errors|striptags }}</div>
+                                {% else %}
+                                    {{ field|add_class:"form-control" }}
+                                {% endif %}
+                            {% endwith %}
+                            <div class="form-text">
+                                В один и тот же ВУЗ можно добавить несколько разных направлений.
+                            </div>
+                        </div>
+
+                        <!-- Целевое обучение -->
+                        <div class="mb-3 form-check">
+                            {% with field=form.is_targeted %}
+                                {{ field|add_class:"form-check-input" }}
+                                <label class="form-check-label ms-1" for="{{ field.id_for_label }}">
+                                    Целевое обучение
+                                </label>
+                                {% if field.errors %}
+                                    <div class="invalid-feedback d-block">{{ field.errors|striptags }}</div>
+                                {% endif %}
+                            {% endwith %}
+                        </div>
+
+                        <!-- Предметы -->
+                        <div class="mb-3">
+                            <label class="form-label" for="{{ form.subjects.id_for_label }}">Предметы</label>
+                            {% with field=form.subjects %}
+                                {% if field.errors %}
+                                    {{ field|add_class:"form-select is-invalid" }}
+                                    <div class="invalid-feedback">{{ field.errors|striptags }}</div>
+                                {% else %}
+                                    {{ field|add_class:"form-select" }}
+                                {% endif %}
+                            {% endwith %}
+                            <div class="form-text">Печатайте, чтобы искать, Enter — добавить.</div>
+                        </div>
+
+                        <!-- Приоритет -->
+                        <div class="mb-3">
+                            <label class="form-label" for="{{ form.priority.id_for_label }}">Приоритет</label>
+                            {% with field=form.priority %}
+                                {% if field.errors %}
+                                    {{ field|add_class:"form-select is-invalid" }}
+                                    <div class="invalid-feedback">{{ field.errors|striptags }}</div>
+                                {% else %}
+                                    {{ field|add_class:"form-select" }}
+                                {% endif %}
+                            {% endwith %}
+                            <div class="form-text">
+                                1 — самый высокий приоритет. Один номер не может принадлежать разным записям.
+                            </div>
+                        </div>
+
+                        <!-- Заметка -->
+                        <div class="mb-3">
+                            <label class="form-label" for="{{ form.notes.id_for_label }}">Заметка</label>
+                            {% with field=form.notes %}
+                                {% if field.errors %}
+                                    {{ field|add_class:"form-control is-invalid" }}
+                                    <div class="invalid-feedback">{{ field.errors|striptags }}</div>
+                                {% else %}
+                                    {{ field|add_class:"form-control" }}
+                                {% endif %}
+                            {% endwith %}
+                        </div>
+
+                        <button type="submit" class="btn btn-primary">Сохранить</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- ПРАВАЯ КОЛОНКА: сгруппированный список -->
+        <div class="col-lg-7">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title mb-3">Текущий список приоритетов</h5>
+                    <p class="text-muted small mb-3">
+                        Записи сгруппированы по ВУЗам. Внутри каждого ВУЗа — выбранные направления с приоритетами.
+                    </p>
+
+                    {% if priorities %}
+                        {% regroup priorities by university as universities_grouped %}
+
+                        <div class="vstack gap-3">
+                            {% for uni in universities_grouped %}
+                                <div class="border rounded-3 p-3">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <div>
+                                            <div class="fw-semibold">
+                                                {{ uni.grouper }}
+                                            </div>
+                                            {% with first=uni.list.0 %}
+                                                {% if first.city %}
+                                                    <div class="small text-body-secondary">
+                                                        Город: {{ first.city }}
+                                                    </div>
+                                                {% endif %}
+                                            {% endwith %}
+                                        </div>
+                                        <span class="badge bg-secondary">
+                                            Направлений: {{ uni.list|length }}
+                                        </span>
+                                    </div>
+
+                                    <ol class="list-group list-group-numbered list-group-flush">
+                                        {% for p in uni.list %}
+                                            <li class="list-group-item d-flex justify-content-between align-items-start">
+                                                <div class="ms-2 me-auto">
+                                                    <div class="fw-semibold">
+                                                        {% if p.specialty %}
+                                                            {{ p.specialty }}
+                                                        {% else %}
+                                                            (направление не указано)
+                                                        {% endif %}
+                                                    </div>
+
+                                                    <div class="small mt-1 text-body-secondary">
+                                                        <span>Приоритет: #{{ p.priority }}</span><br>
+                                                        {% if p.is_targeted %}
+                                                            <span class="badge text-bg-success mt-1">Целевое обучение</span><br>
+                                                        {% endif %}
+                                                        {% if p.subjects.count %}
+                                                            Предметы:
+                                                            {{ p.subjects.all|join:", " }}<br>
+                                                        {% endif %}
+                                                    </div>
+
+                                                    {% if p.notes %}
+                                                        <div class="small mt-2 text-body-secondary notes">
+                                                            {{ p.notes|linebreaks }}
+                                                        </div>
+                                                    {% endif %}
+                                                </div>
+
+                                                <div class="d-flex align-items-center gap-2 text-nowrap">
+                                                    <a class="btn btn-sm btn-outline-danger"
+                                                       href="{% url 'study:delete_university_priority' p.id %}"
+                                                       onclick="return confirm('Удалить это направление?');">
+                                                        Удалить
+                                                    </a>
+                                                </div>
+                                            </li>
+                                        {% endfor %}
+                                    </ol>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-muted">Пока нет записей.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    new TomSelect('#{{ form.subjects.id_for_label }}', {
+      plugins: ['remove_button'],
+      create: false,
+      maxOptions: 1000,
+      closeAfterSelect: false,
+      render: {
+        option: function(data, escape){ return `<div>${escape(data.text)}</div>`; }
+      }
+    });
+  });
+</script>
+{% endblock %}

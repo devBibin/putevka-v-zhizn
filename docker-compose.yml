@@ -1,17 +1,22 @@
-version: '3.9'
-
 services:
   web:
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     build: .
     volumes:
       - .:/app
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     depends_on:
       db:
         condition: service_healthy
     env_file:
       - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?sslmode=disable}
+      SECRET_KEY: ${SECRET_KEY:-local-dev-insecure-secret-key}
+      RUN_BACKGROUND_WORKERS: ${RUN_BACKGROUND_WORKERS:-false}
 
 
   db:
@@ -23,7 +28,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "5432:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5433}:5432"
     healthcheck:
       test: [ "CMD-SHELL", "sh -c 'pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\"'" ]
       interval: 5s

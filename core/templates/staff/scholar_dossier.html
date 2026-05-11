@@ -1,0 +1,382 @@
+{% extends "staff_templates/base.html" %}
+{% load widget_tweaks %}
+
+{% block title %}Сводка по участнику{% endblock %}
+
+{% block content %}
+    <div class="container py-4">
+        <div class="d-flex align-items-center gap-2 mb-3">
+            <h4 class="mb-0">{{ user_obj.get_full_name|default:user_obj.username }}</h4>
+            <span class="badge text-bg-secondary">ID {{ user_obj.id }}</span>
+            <div class="ms-auto">
+                <a class="btn btn-sm btn-outline-secondary"
+                   href="{% url 'admin:auth_user_change' user_obj.id %}" target="_blank" rel="noopener">Открыть в
+                    админке</a>
+            </div>
+        </div>
+
+        {% if messages %}
+            <div class="mb-3">
+                {% for m in messages %}
+                    <div class="alert alert-{{ m.tags }} mb-2">{{ m }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <div class="row g-3">
+            <div class="col-12 col-xl-4">
+                <div class="card mb-3 sticky-xl">
+                    <div class="card-body">
+                        <h6 class="text-uppercase text-muted mb-3">Контакты</h6>
+                        <div class="fw-semibold">{{ user_obj.first_name }} {{ user_obj.last_name }}</div>
+                        <div class="text-muted small break-anywhere">{{ user_obj.email|default:"—" }}</div>
+                        {% with uinfo=user_obj.user_info %}
+                            {% if uinfo and uinfo.phone %}
+                                <div class="text-muted small break-anywhere">{{ uinfo.phone }}</div>
+                            {% endif %}
+                            {% if user_obj.telegram_account and user_obj.telegram_account.username %}
+                                <div class="text-muted small break-anywhere">
+                                    Telegram:
+                                    <a href="https://t.me/{{ user_obj.telegram_account.username }}"
+                                       target="_blank"
+                                       class="link-secondary text-decoration-none">
+                                        @{{ user_obj.telegram_account.username }}
+                                    </a>
+                                    {% if user_obj.telegram_account.telegram_verified %}
+                                        <span class="badge text-bg-success ms-1">активирован</span>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                        {% endwith %}
+                    </div>
+                </div>
+
+                {% if favorite_notes %}
+                    <div class="card mb-3 border-warning">
+                        <div class="card-body">
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                <h6 class="text-uppercase text-muted mb-0">Избранные заметки</h6>
+                            </div>
+
+                            <div class="vstack gap-2">
+                                {% for n in favorite_notes %}
+                                    <div class="p-2 border rounded">
+                                        <div class="d-flex justify-content-between align-items-start small text-muted mb-1">
+                                            <div>
+                                                {% if n.author %}
+                                                    {{ n.author.get_full_name|default:n.author.username }}
+                                                {% else %}
+                                                    —
+                                                {% endif %}
+                                                • {{ n.created_at|date:"d.m.Y H:i" }}
+                                            </div>
+                                            <span title="Избранное">⭐</span>
+                                        </div>
+                                        <div class="small" style="white-space: pre-wrap; word-break: break-word;">
+                                            {{ n.text|truncatechars:400 }}
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                            </div>
+
+                        </div>
+                    </div>
+                {% endif %}
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <h6 class="text-uppercase text-muted mb-3">Статус участника</h6>
+                        <form method="post" action="{% url 'staff_scholar_action' user_obj.id %}" class="row g-2">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="change_status">
+                            <div class="col-12 col-sm-8">
+                                {% render_field status_form.status class+="form-select" %}
+                            </div>
+                            <div class="col-12 col-sm-4 d-grid">
+                                <button class="btn btn-primary">Сохранить</button>
+                            </div>
+                        </form>
+                        <div class="form-text mt-2">
+                            Текущий: <strong>{{ user_obj.user_info.get_status_display }}</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <h6 class="text-uppercase text-muted mb-3">Учебный профиль</h6>
+                        <form method="post" action="{% url 'staff_scholar_action' user_obj.id %}" class="row g-2">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="change_profile">
+                            <div class="col-12 col-sm-8">
+                                {% render_field profile_form.internal_study_profile class+="form-select" %}
+                            </div>
+                            <div class="col-12 col-sm-4 d-grid">
+                                <button class="btn btn-primary">Сохранить</button>
+                            </div>
+                        </form>
+                        <div class="form-text mt-2">
+                            Текущий:
+                            <strong>{{ user_obj.user_info.get_internal_study_profile_display|default:"Не установлен" }}</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <h6 class="text-uppercase text-muted mb-3">
+                            Этап отбора (внутренний)
+                        </h6>
+
+                        <form method="post"
+                              action="{% url 'staff_scholar_action' user_obj.id %}"
+                              class="row g-2">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="change_selection_step">
+
+                            <div class="col-12 col-sm-8">
+                                {{ selection_step_form.selection_step }}
+                            </div>
+
+                            <div class="col-12 col-sm-4 d-grid">
+                                <button class="btn btn-primary">Сохранить</button>
+                            </div>
+                        </form>
+
+                        <div class="form-text mt-2">
+                            Текущий:
+                            <strong>
+                                {{ user_obj.user_info.get_selection_step_display }}
+                            </strong>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <h6 class="text-uppercase text-muted mb-3">Жизненная ситуация (внутреннее)</h6>
+
+                        {% with uinfo=user_obj.user_info %}
+                            {% if uinfo %}
+
+                                <div class="mb-3">
+                                    <div class="small text-muted">Тип населённого пункта</div>
+                                    <div class="fw-semibold">
+                                        {{ uinfo.get_settlement_type_display|default:"Не указан" }}
+                                    </div>
+                                </div>
+
+                                <div class="mb-2 small text-muted">Социальные статусы</div>
+                                <div class="d-flex flex-wrap gap-2">
+
+                                    {% if uinfo.is_large_family %}
+                                        <span class="badge text-bg-secondary">Многодетность</span>{% endif %}
+                                    {% if uinfo.is_single_parent_family %}
+                                        <span class="badge text-bg-secondary">Неполная семья</span>{% endif %}
+                                    {% if uinfo.has_candidate_disability %}
+                                        <span class="badge text-bg-secondary">Инвалидность кандидата</span>{% endif %}
+                                    {% if uinfo.is_orphan_or_under_guardianship %}
+                                        <span class="badge text-bg-secondary">Сирота / под опекой</span>{% endif %}
+                                    {% if uinfo.has_breadwinner_loss %}
+                                        <span class="badge text-bg-secondary">Потеря кормильца</span>{% endif %}
+                                    {% if uinfo.has_relative_disability %}
+                                        <span class="badge text-bg-secondary">Инвалидность близкого</span>{% endif %}
+                                    {% if uinfo.is_parent_pensioner %}
+                                        <span class="badge text-bg-secondary">Родитель пенсионер</span>{% endif %}
+                                    {% if uinfo.is_parent_in_svo %}
+                                        <span class="badge text-bg-secondary">Родитель на СВО</span>{% endif %}
+                                    {% if uinfo.has_alumni_sibling %}
+                                        <span class="badge text-bg-secondary">Сиблинг выпускника</span>{% endif %}
+
+                                </div>
+
+                                {% if uinfo.life_situation_notes %}
+                                    <hr>
+                                    <div class="small text-muted mb-1">Комментарий</div>
+                                    <div class="small" style="white-space: pre-wrap;">
+                                        {{ uinfo.life_situation_notes }}
+                                    </div>
+                                {% endif %}
+
+                            {% else %}
+                                <div class="text-muted">Нет данных</div>
+                            {% endif %}
+                        {% endwith %}
+
+                    </div>
+                </div>
+
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <div class="text-uppercase text-muted mb-3">Документы</div>
+                        {% if documents %}
+                            <div class="fw-semibold">Последние загрузки:</div>
+                            <ul class="small text-muted mb-0">
+                                {% for d in documents %}
+                                    <li>{{ d.uploaded_at|date:"d.m.Y H:i" }}
+                                        — {{ d.caption|default:"без названия" }}</li>
+                                {% endfor %}
+                            </ul>
+                        {% else %}
+                            <div class="fw-semibold text-muted">Нет документов</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-xl-8">
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <h6 class="text-uppercase text-muted mb-3">Статусы для отбора</h6>
+
+                        <div class="row g-2">
+                            <div class="col-12 col-md-6">
+                                <div class="p-3 border rounded">
+                                    <div class="small text-muted">Анкета</div>
+                                    {% if summary.questionnaire_done %}
+                                        <div class="fw-semibold text-success">Отправлена</div>
+                                    {% else %}
+                                        <div class="fw-semibold text-warning">Не отправлена</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <div class="col-12 col-md-6">
+                                <div class="p-3 border rounded">
+                                    <div class="small text-muted">Видеовизитка</div>
+                                    {% if summary.video_exists %}
+                                        {% if summary.video_needs_review %}
+                                            <div class="fw-semibold text-warning">Ждёт оценки</div>
+                                        {% else %}
+                                            <div class="fw-semibold text-success">Есть (оценена/просмотрена)</div>
+                                        {% endif %}
+
+                                        <div class="small text-muted mt-1">
+                                            Баллы:
+                                            {% if summary.video_score is not None %}
+                                                <span class="fw-semibold">{{ summary.video_score }}</span>
+                                            {% else %}
+                                                —
+                                            {% endif %}
+                                        </div>
+                                    {% else %}
+                                        <div class="fw-semibold text-muted">Нет</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <div class="col-12 col-md-6">
+                                <div class="p-3 border rounded">
+                                    <div class="small text-muted">Мотивационное письмо</div>
+                                    {% if summary.ml_exists %}
+                                        {% if summary.ml_needs_review %}
+                                            Ждёт оценки
+                                        {% elif user_obj.motivation_letter.status == "revision" %}
+                                            На дописывании
+                                        {% elif user_obj.motivation_letter.status == "draft" %}
+                                            Черновик
+                                        {% else %}
+                                            Есть (оценено/принято)
+                                        {% endif %}
+                                    {% else %}
+                                        Нет
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <div class="col-12 col-md-6">
+                                <div class="p-3 border rounded">
+                                    <div class="small text-muted">Оповещения</div>
+                                    {% if summary.unseen_notifs_count %}
+                                        <div class="fw-semibold">Непрочитанных: {{ summary.unseen_notifs_count }}</div>
+                                    {% else %}
+                                        <div class="fw-semibold text-success">Нет непрочитанных</div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+
+                        </div>
+
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-body">
+                        <h6 class="text-uppercase text-muted mb-3">Быстрое сообщение</h6>
+                        <form method="post" action="{% url 'staff_scholar_action' user_obj.id %}" class="row g-2">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="send_notification">
+                            <div class="col-12">
+                                {{ notif_form.message }}
+                            </div>
+                            <div class="col-12 col-sm-5 col-md-4 col-lg-3 d-grid">
+                                <button class="btn btn-success">Отправить</button>
+                            </div>
+                        </form>
+
+                        {% if notifs_page %}
+                            <hr>
+                            <div class="small text-muted mb-2">
+                                Последние оповещения:
+                                {% if notifs_page.paginator.count %}
+                                    <span class="ms-1">({{ notifs_page.paginator.count }})</span>
+                                {% endif %}
+                            </div>
+
+                            <ul class="list-group list-group-flush">
+                                {% for un in notifs_page %}
+                                    <li class="list-group-item">
+                                        <div class="small text-muted">
+                                            {{ un.notification.created_at|date:"d.m.Y H:i" }}
+                                            • {{ un.is_seen|yesno:"просмотрено,не просмотрено" }}
+                                        </div>
+                                        <div class="break-anywhere">{{ un.notification.message|linebreaksbr }}</div>
+                                    </li>
+                                {% endfor %}
+                            </ul>
+
+                            {% if notifs_page.paginator.num_pages > 1 %}
+                                <nav class="mt-3" aria-label="Пагинация оповещений">
+                                    <ul class="pagination pagination-sm mb-0">
+
+                                        <li class="page-item {% if not notifs_page.has_previous %}disabled{% endif %}">
+                                            {% if notifs_page.has_previous %}
+                                                <a class="page-link"
+                                                   href="?page={{ notifs_page.previous_page_number }}">←</a>
+                                            {% else %}
+                                                <span class="page-link">←</span>
+                                            {% endif %}
+                                        </li>
+
+                                        {# компактно: показываем окна вокруг текущей #}
+                                        {% for p in notifs_page.paginator.page_range %}
+                                            {% if p == 1 or p == notifs_page.paginator.num_pages or p >= notifs_page.number|add:-2 and p <= notifs_page.number|add:2 %}
+                                                <li class="page-item {% if p == notifs_page.number %}active{% endif %}">
+                                                    <a class="page-link" href="?page={{ p }}">{{ p }}</a>
+                                                </li>
+                                            {% elif p == notifs_page.number|add:-3 or p == notifs_page.number|add:3 %}
+                                                <li class="page-item disabled"><span class="page-link">…</span></li>
+                                            {% endif %}
+                                        {% endfor %}
+
+                                        <li class="page-item {% if not notifs_page.has_next %}disabled{% endif %}">
+                                            {% if notifs_page.has_next %}
+                                                <a class="page-link"
+                                                   href="?page={{ notifs_page.next_page_number }}">→</a>
+                                            {% else %}
+                                                <span class="page-link">→</span>
+                                            {% endif %}
+                                        </li>
+
+                                    </ul>
+                                </nav>
+                            {% endif %}
+                        {% endif %}
+
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+{% endblock %}

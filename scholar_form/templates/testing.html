@@ -1,0 +1,150 @@
+{% extends "core/base.html" %}
+{% block title %}Тестирование способностей{% endblock %}
+
+{% block content %}
+    <div class="container py-4">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+            <h1 class="mb-0">Тестирование способностей</h1>
+        </div>
+
+        {# Инструкция #}
+        {% if testing_instruction and testing_instruction.is_active %}
+            <div class="alert alert-info d-flex align-items-center justify-content-between mb-4">
+                <div>
+                    <strong>{{ testing_instruction.title }}</strong><br>
+                    {{ testing_instruction.text|linebreaksbr }}
+                </div>
+
+                <a href="{{ testing_instruction.url }}"
+                   target="_blank"
+                   rel="noopener"
+                   class="btn btn-primary">
+                    {{ testing_instruction.button_text }}
+                </a>
+            </div>
+        {% endif %}
+
+        {% if items %}
+            <div class="vstack gap-3">
+                {% for t in items %}
+                    <div class="card shadow-sm">
+                        <div class="card-body">
+                            <div class="d-flex align-items-start justify-content-between gap-3 flex-wrap">
+                                <div class="me-auto" style="min-width: 280px;">
+                                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                                        <h5 class="mb-0">{{ t.title }}</h5>
+
+                                        {% if t.status == 'completed' %}
+                                            <span class="badge text-bg-success">Завершено</span>
+                                        {% elif t.status == 'needs_revision' %}
+                                            <span class="badge text-bg-warning">На дописывание</span>
+                                        {% elif t.status == 'in_progress' %}
+                                            <span class="badge text-bg-primary">В процессе</span>
+                                        {% elif t.status == 'cancelled' %}
+                                            <span class="badge text-bg-danger">Отменено</span>
+                                        {% else %}
+                                            <span class="badge text-bg-secondary">{{ t.get_status_display }}</span>
+                                        {% endif %}
+                                    </div>
+
+                                    <div class="small text-muted mt-1">
+                                        Назначено: {{ t.assigned_at|date:"d.m.Y H:i" }}
+                                        {% if t.due_at %}
+                                            • Дедлайн: {{ t.due_at|date:"d.m.Y H:i" }}
+                                        {% endif %}
+                                    </div>
+
+                                    {% if t.instructions %}
+                                        <div class="mt-2">
+                                            <div class="small fw-semibold text-muted">Комментарий</div>
+                                            <div>{{ t.instructions|linebreaksbr }}</div>
+                                        </div>
+                                    {% endif %}
+
+                                    {% if t.status != 'completed' %}
+                                        <form method="post" action="{% url 'test_assignment_complete' t.id %}"
+                                              class="mt-3">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-sm btn-outline-success">
+                                                Отметить выполненным
+                                            </button>
+                                        </form>
+                                    {% endif %}
+                                </div>
+
+                                {# Результат справа #}
+                                <div style="min-width: 260px;">
+                                    {% if t.status == 'completed' %}
+                                        <div class="bg-light rounded-3 p-3">
+                                            <div class="small fw-semibold text-muted mb-2">Результат</div>
+
+                                            {% if t.passed is not None %}
+                                                <div class="mb-1">
+                                                <span class="badge {% if t.passed %}text-bg-success{% else %}text-bg-danger{% endif %}">
+                                                    {{ t.passed|yesno:"Пройдено,Не пройдено" }}
+                                                </span>
+                                                </div>
+                                            {% endif %}
+
+                                            {% if t.result_score is not None %}
+                                                <div class="small">Баллы (общие): <span
+                                                        class="fw-semibold">{{ t.result_score }}</span></div>
+                                            {% endif %}
+                                            {% if t.percentile is not None %}
+                                                <div class="small">Перцентиль (общий): <span
+                                                        class="fw-semibold">{{ t.percentile }}%</span></div>
+                                            {% endif %}
+
+                                            {% if t.score_a is not None or t.percentile_a is not None or t.score_b is not None or t.percentile_b is not None or t.score_c is not None or t.percentile_c is not None %}
+                                                <hr class="my-2">
+                                                <div class="small fw-semibold text-muted mb-1">Подробные результаты ты можешь узнать на сайте, где проходил тесты.</div>
+
+
+                                            {% endif %}
+                                        </div>
+                                    {% else %}
+                                        <div class="text-end">
+                                            <span class="badge text-bg-secondary">{{ t.get_status_display }}</span>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            {% if t.status == 'completed' %}
+                            {% if t.numeric_grade or t.numeric_percentile is not None or t.verbal_grade or t.verbal_percentile is not None or t.logical_grade or t.logical_percentile is not None %}
+                                <div class="mt-3">
+                                    <div class="small fw-semibold text-muted">Результаты по тестам</div>
+                                    <div class="border rounded-3 p-3 bg-white small">
+                                        {% if t.numeric_grade or t.numeric_percentile is not None %}
+                                            <div>Числовой: {% if t.numeric_grade %}<span class="fw-semibold">грейд {{ t.numeric_grade }}</span>{% endif %}{% if t.numeric_percentile is not None %}{% if t.numeric_grade %} • {% endif %}<span class="fw-semibold">перцентиль {{ t.numeric_percentile }}</span>{% endif %}</div>
+                                        {% endif %}
+                                        {% if t.verbal_grade or t.verbal_percentile is not None %}
+                                            <div>Вербальный: {% if t.verbal_grade %}<span class="fw-semibold">грейд {{ t.verbal_grade }}</span>{% endif %}{% if t.verbal_percentile is not None %}{% if t.verbal_grade %} • {% endif %}<span class="fw-semibold">перцентиль {{ t.verbal_percentile }}</span>{% endif %}</div>
+                                        {% endif %}
+                                        {% if t.logical_grade or t.logical_percentile is not None %}
+                                            <div>Логический: {% if t.logical_grade %}<span class="fw-semibold">грейд {{ t.logical_grade }}</span>{% endif %}{% if t.logical_percentile is not None %}{% if t.logical_grade %} • {% endif %}<span class="fw-semibold">перцентиль {{ t.logical_percentile }}</span>{% endif %}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            {% endif %}
+                            {% endif %}
+
+                            {% if t.result_text and t.status == 'completed' %}
+                                <div class="mt-3">
+                                    <div class="small fw-semibold text-muted">Комментарий куратора</div>
+                                    <div class="border rounded-3 p-3 bg-white">
+                                        {{ t.result_text|linebreaksbr }}
+                                    </div>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="alert alert-info">
+                Администратор выдаст вам инструкции.
+            </div>
+        {% endif %}
+    </div>
+{% endblock %}

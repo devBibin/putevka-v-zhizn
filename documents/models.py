@@ -2,8 +2,12 @@ import os
 import uuid
 
 from django.contrib.auth.models import User
+from django.contrib.contenttypes.fields import GenericRelation
 from django.core.exceptions import ValidationError
+from django.core.validators import FileExtensionValidator
 from django.db import models
+
+from scholar_form.models import StaffNote
 
 
 def upload_to_path(instance, filename):
@@ -36,15 +40,12 @@ class Document(models.Model):
 
     related_documents = models.ManyToManyField('self', blank=True, symmetrical=False, related_name='document_relations')
 
-    is_locked = models.BooleanField(default=False, verbose_name="Заблокирован")
+    notes = GenericRelation(StaffNote, related_query_name="letters")
 
     def clean(self):
         super().clean()
         if not self.caption:
             raise ValidationError({'caption': 'Это поле не может быть пустым.'})
-
-        if self.pk and self.is_locked and not hasattr(self, '_ignore_lock_validation'):
-            raise ValidationError("Этот документ заблокирован и не может быть изменен.")
 
     def save(self, *args, **kwargs):
         if self.pk is None and self.file:
@@ -54,3 +55,23 @@ class Document(models.Model):
 
     def __str__(self):
         return self.file.name
+
+
+class DocTemplate(models.Model):
+    name = models.CharField("Название", max_length=200)
+    description = models.TextField("Описание", blank=True)
+    file = models.FileField(
+        "Файл шаблона (.docx)",
+        upload_to="doc_templates/",
+        validators=[FileExtensionValidator(["docx"])],
+    )
+    required_params = models.JSONField("Требуемые параметры", default=dict, blank=True)
+    is_active = models.BooleanField("Активен", default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Шаблон документа"
+        verbose_name_plural = "Шаблоны документов"
+
+    def __str__(self):
+        return self.name

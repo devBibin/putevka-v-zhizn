@@ -1,0 +1,860 @@
+{% extends "staff_templates/base_without_sidebar.html" %}
+{% load form_extras %}
+
+{% block title %}Пользователи — модерация{% endblock %}
+
+{% block content %}
+    <div class="container py-4">
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+            <h1 class="mb-0 me-auto">Пользователи</h1>
+
+            <a href="{% url 'staff_users_export_xlsx' %}?{{ request.GET.urlencode }}"
+               class="btn btn-success">
+                Выгрузить Excel
+            </a>
+
+            <span class="text-muted small">Всего на странице: {{ page_obj.object_list|length }} · Стр. {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+        </div>
+
+        <!-- Фильтры -->
+        <form class="row g-3 mb-3" method="get">
+            <!-- Поиск -->
+            <div class="col-lg-4">
+                <label class="form-label">Поиск</label>
+                <input type="search" name="q" value="{{ q }}" class="form-control"
+                       placeholder="Имя, логин, email, телефон, регион">
+            </div>
+
+            <div class="col-lg-2">
+                <label class="form-label d-block">Персонал</label>
+                <div class="form-check mt-2">
+                    <input class="form-check-input"
+                           type="checkbox"
+                           name="show_staff"
+                           value="1"
+                           id="showStaffCheckbox"
+                           {% if show_staff == "1" %}checked{% endif %}>
+                    <label class="form-check-label" for="showStaffCheckbox">
+                        Показывать персонал
+                    </label>
+                </div>
+            </div>
+
+            <div class="col-lg-2">
+                <label class="form-label">Класс</label>
+
+                <div class="dropdown w-100">
+                    <button class="btn btn-outline-secondary dropdown-toggle w-100 text-start"
+                            type="button"
+                            data-bs-toggle="dropdown"
+                            id="gradeDropdownBtn">
+                        Классы
+                    </button>
+
+                    <div class="dropdown-menu p-3" style="max-height:200px;overflow:auto;">
+
+                        <div class="form-check">
+                            <input class="form-check-input grade-check"
+                                   type="checkbox"
+                                   name="grade_group"
+                                   value="9"
+                                   {% if "9" in grades_selected %}checked{% endif %}>
+                            <label class="form-check-label">9 класс</label>
+                        </div>
+
+                        <div class="form-check">
+                            <input class="form-check-input grade-check"
+                                   type="checkbox"
+                                   name="grade_group"
+                                   value="10"
+                                   {% if "10" in grades_selected %}checked{% endif %}>
+                            <label class="form-check-label">10 класс</label>
+                        </div>
+
+                        <div class="form-check">
+                            <input class="form-check-input grade-check"
+                                   type="checkbox"
+                                   name="grade_group"
+                                   value="11"
+                                   {% if "11" in grades_selected %}checked{% endif %}>
+                            <label class="form-check-label">11 класс</label>
+                        </div>
+
+                        <div class="form-check">
+                            <input class="form-check-input grade-check"
+                                   type="checkbox"
+                                   name="grade_group"
+                                   value="other"
+                                   {% if "other" in grades_selected %}checked{% endif %}>
+                            <label class="form-check-label">Иное</label>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-2">
+                <label class="form-label">Профиль</label>
+
+                <div class="dropdown w-100">
+                    <button class="btn btn-outline-secondary dropdown-toggle w-100 text-start"
+                            type="button"
+                            data-bs-toggle="dropdown"
+                            id="profileDropdownBtn">
+                        Профили
+                    </button>
+
+                    <div class="dropdown-menu p-3" style="max-height:250px;overflow:auto;">
+                        {% for value, label in profiles %}
+                            <div class="form-check">
+                                <input class="form-check-input profile-check"
+                                       type="checkbox"
+                                       name="profile"
+                                       value="{{ value }}"
+                                       {% if value|stringformat:"s" in profiles_selected %}checked{% endif %}>
+                                <label class="form-check-label">
+                                    {{ label }}
+                                </label>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Этап -->
+            <div class="col-lg-2">
+                <label class="form-label">Этап</label>
+                <select name="step" class="form-select">
+                    <option value="" {% if not step %}selected{% endif %}>Все</option>
+                    {% for value, label in steps %}
+                        <option value="{{ value }}"
+                                {% if step == value|stringformat:"s" %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-lg-2">
+                <label class="form-label">Анкета</label>
+                <select name="form_status" class="form-select">
+                    <option value="" {% if not form_status %}selected{% endif %}>Все</option>
+
+                    <option value="draft" {% if form_status == "draft" %}selected{% endif %}>Черновик</option>
+                    <option value="submitted" {% if form_status == "submitted" %}selected{% endif %}>Отправлена</option>
+                    <option value="revision" {% if form_status == "revision" %}selected{% endif %}>На дописывание
+                    </option>
+                    <option value="clarification" {% if form_status == "clarification" %}selected{% endif %}>На уточнении</option>
+                    <option value="approved" {% if form_status == "approved" %}selected{% endif %}>Принята</option>
+                    <option value="rejected" {% if form_status == "rejected" %}selected{% endif %}>Отклонена</option>
+
+                    <option value="no_profile" {% if form_status == "no_profile" %}selected{% endif %}>Нет анкеты
+                    </option>
+                </select>
+            </div>
+
+            <!-- Дедлайны тестов -->
+            <div class="col-lg-2">
+                <label class="form-label">Тесты</label>
+                <select name="test_deadline" class="form-select">
+                    <option value="" {% if not test_deadline %}selected{% endif %}>Все</option>
+                    <option value="overdue" {% if test_deadline == "overdue" %}selected{% endif %}>Просрочены</option>
+                    <option value="due_soon" {% if test_deadline == "due_soon" %}selected{% endif %}>Скоро (3 дня)
+                    </option>
+                    <option value="active" {% if test_deadline == "active" %}selected{% endif %}>Активные</option>
+                    <option value="completed" {% if test_deadline == "completed" %}selected{% endif %}>Завершены
+                    </option>
+                    <option value="no_due" {% if test_deadline == "no_due" %}selected{% endif %}>Активные без дедлайна
+                    </option>
+                    <option value="has_due" {% if test_deadline == "has_due" %}selected{% endif %}>Активные с
+                        дедлайном
+                    </option>
+                </select>
+            </div>
+            <div class="col-lg-2">
+                <label class="form-label">Статус письма</label>
+                <select name="letter_status" class="form-select">
+                    <option value="" {% if not letter_status %}selected{% endif %}>Все</option>
+                    <option value="draft" {% if letter_status == "draft" %}selected{% endif %}>Черновик</option>
+                    <option value="submitted" {% if letter_status == "submitted" %}selected{% endif %}>Отправлено</option>
+                    <option value="revision" {% if letter_status == "revision" %}selected{% endif %}>На дописывании</option>
+                    <option value="no_letter" {% if letter_status == "no_letter" %}selected{% endif %}>Нет письма</option>
+                </select>
+            </div>
+            <div class="col-lg-2">
+                <label class="form-label d-block">Письма</label>
+                <div class="form-check mt-2">
+                    <input class="form-check-input"
+                           type="checkbox"
+                           name="favorite_letter"
+                           value="1"
+                           id="favoriteLetterCheckbox"
+                           {% if favorite_letter == "1" %}checked{% endif %}>
+                    <label class="form-check-label" for="favoriteLetterCheckbox">
+                        Только избранные
+                    </label>
+                </div>
+            </div>
+
+
+            <!-- Доп. фильтры (схлопнули) -->
+            <div class="col-12">
+                <details class="mt-1">
+                    <summary class="text-muted small">Доп. фильтры (школа, курс, куратор)</summary>
+                    <div class="row g-3 mt-1">
+                        <div class="col-md-4">
+                            <label class="form-label">Онлайн-школа</label>
+                            <select name="school" class="form-select">
+                                <option value="">Все школы</option>
+                                {% for s in schools %}
+                                    <option value="{{ s.id }}"
+                                            {% if s.id|stringformat:"s" == school %}selected{% endif %}>{{ s.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">Курс</label>
+                            <select name="course" class="form-select">
+                                <option value="">Все курсы</option>
+                                {% for c in courses %}
+                                    <option value="{{ c.id }}"
+                                            {% if c.id|stringformat:"s" == course %}selected{% endif %}>{{ c.title }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label">Куратор нужен</label>
+                            <select name="curator_need" class="form-select">
+                                <option value="" {% if not curator_need %}selected{% endif %}>Все</option>
+                                <option value="1" {% if curator_need == "1" %}selected{% endif %}>Да</option>
+                                <option value="0" {% if curator_need == "0" %}selected{% endif %}>Нет</option>
+                            </select>
+                        </div>
+                    </div>
+                </details>
+            </div>
+
+            <div class="col-12 d-flex gap-2">
+                <button class="btn btn-primary">Применить</button>
+                <a class="btn btn-outline-secondary" href="{% url 'staff_users_list' %}">Сбросить</a>
+            </div>
+
+
+        </form>
+
+        {% if page_obj.object_list %}
+            <!-- Массовые действия (оставил твои кнопки) -->
+            <form method="post" action="{% url 'staff_send_notification' %}" id="notifyForm">
+                {% csrf_token %}
+
+                <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                    <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal"
+                            data-bs-target="#sendNotifModal" id="openModalBtn">
+                        Отправить оповещение выбранным
+                    </button>
+
+                    <button type="button" class="btn btn-outline-primary" id="downloadLettersBtn">
+                        Скачать письма (.zip)
+                    </button>
+
+                    <button type="button" class="btn btn-outline-success" id="selectAllFilteredBtn">
+                        Выбрать всех (по фильтру)
+                    </button>
+
+                    <button type="button" class="btn btn-outline-secondary" id="clearSelectionBtn">
+                        Снять выбор
+                    </button>
+
+                    <span class="text-muted small">Выбрано: <strong id="selectedCount">0</strong></span>
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-sm align-middle">
+                        <thead class="table-light" style="position: sticky; top: 0; z-index: 1;">
+                        <tr>
+                            <th style="width:36px;">
+                                <input class="form-check-input" type="checkbox" id="checkAllOnPage"
+                                       title="Выбрать все на странице">
+                            </th>
+
+                            <th style="min-width:260px;">
+                                <a class="text-decoration-none text-dark d-block" href="{% sort_url 'user' %}">
+                                    Пользователь {% sort_icon 'user' %}
+                                </a>
+                            </th>
+
+                            <th style="min-width:120px;">
+                                <a class="text-decoration-none text-dark d-block" href="{% sort_url 'date_joined' %}">
+                                    Регистрация {% sort_icon 'date_joined' %}
+                                </a>
+                            </th>
+
+                            <th>
+                                <a class="text-decoration-none text-dark d-block" href="{% sort_url 'form' %}">
+                                    Анкета {% sort_icon 'form' %}
+                                </a>
+                            </th>
+
+                            <th>
+                                <a class="text-decoration-none text-dark d-block" href="{% sort_url 'tests' %}">
+                                    Тесты {% sort_icon 'tests' %}
+                                </a>
+                            </th>
+
+                            <th>
+                                <a class="text-decoration-none text-dark d-block" href="{% sort_url 'letter' %}">
+                                    МП {% sort_icon 'letter' %}
+                                </a>
+                            </th>
+
+                            <th>
+                                <a class="text-decoration-none text-dark d-block" href="{% sort_url 'video' %}">
+                                    Видео {% sort_icon 'video' %}
+                                </a>
+                            </th>
+
+                            <th>Собес</th>
+
+                            <th>
+                                <a class="text-decoration-none text-dark d-block" href="{% sort_url 'result' %}">
+                                    Итог {% sort_icon 'result' %}
+                                </a>
+                            </th>
+                        </tr>
+                        </thead>
+
+                        <tbody>
+                        {% for u in page_obj.object_list %}
+                            <tr>
+                                <td>
+                                    <input class="form-check-input row-check" type="checkbox" name="ids"
+                                           value="{{ u.id }}">
+                                </td>
+
+                                <td class="text-break">
+                                    <div class="fw-semibold">
+                                        <a href="{% url 'staff_scholar_dossier' u.id %}"
+                                           class="link-dark text-decoration-none">
+                                            {% if u.last_name or u.first_name %}
+                                                {{ u.last_name }} {{ u.first_name }}
+                                            {% else %}
+                                                {{ u.username }}
+                                            {% endif %}
+                                        </a>
+                                    </div>
+                                    <div class="small text-muted">
+                                        {{ u.email|default:"—" }}{% if u.user_info.phone %}<br>
+                                            {{ u.user_info.phone }}{% endif %}
+                                    </div>
+                                    <div class="mt-1">
+                                        {% if u.is_staff %}
+                                            <span class="badge text-bg-primary">Персонал</span>
+                                        {% endif %}
+
+                                        {% if u.is_active %}
+                                            {% if u.user_info.status == "CANDIDATE" %}
+                                                <span class="badge text-bg-warning">Кандидат</span>
+                                            {% elif u.user_info.status == "ALTERNATIVE" %}
+                                                <span class="badge text-bg-info">Альтернативный</span>
+                                            {% elif u.user_info.status == "SCHOLAR" %}
+                                                <span class="badge text-bg-success">Участник</span>
+                                            {% elif u.user_info.status == "ALUMNUS" %}
+                                                <span class="badge text-bg-secondary">Выпускник</span>
+                                            {% else %}
+                                                <span class="badge text-bg-light text-dark">Статус?</span>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="badge text-bg-dark">Неактивен</span>
+                                        {% endif %}
+
+                                        {% if u.docs_pending %}
+                                            <span class="badge text-bg-warning ms-1"
+                                                  title="Документы на проверке">docs: {{ u.docs_pending }}</span>
+                                        {% endif %}
+                                    </div>
+                                </td>
+
+                                <!-- Регистрация -->
+                                <td class="small">
+                                    <div class="fw-semibold">{{ u.date_joined|date:"d.m.Y" }}</div>
+                                    <div class="text-muted">{{ u.date_joined|date:"H:i" }}</div>
+                                </td>
+
+                                <!-- Анкета -->
+                                <td>
+                                    <a href="{% url 'staff_profile_detail' u.id %}"
+                                       class="text-decoration-none">
+                                        {% if u.user_info %}
+                                            {% if u.user_info.form_status == "draft" %}
+                                                <span class="badge text-bg-secondary">черновик</span>
+                                            {% elif u.user_info.form_status == "submitted" %}
+                                                <span class="badge text-bg-warning">отправлена</span>
+                                            {% elif u.user_info.form_status == "revision" %}
+                                                <span class="badge text-bg-danger">дописать</span>
+                                            {% elif u.user_info.form_status == "clarification" %}
+                                                <span class="badge text-bg-info">уточнение</span>
+                                            {% elif u.user_info.form_status == "approved" %}
+                                                <span class="badge text-bg-success">принята</span>
+                                            {% elif u.user_info.form_status == "rejected" %}
+                                                <span class="badge text-bg-dark">отклонена</span>
+                                            {% else %}
+                                                <span class="badge text-bg-light text-dark">
+                    {{ u.user_info.get_form_status_display }}
+                </span>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="badge text-bg-secondary">нет</span>
+                                        {% endif %}
+                                    </a>
+
+                                    {% if u.user_info and u.user_info.tutor_summary %}
+                                        <div class="small text-muted mt-1">
+                                            {{ u.user_info.tutor_summary|truncatechars:20 }}
+                                        </div>
+                                    {% endif %}
+                                </td>
+
+                                <!-- Тесты -->
+                                <td>
+                                    <a href="{% url 'staff_testing_list_for_user' u.id %}"
+                                       class="text-decoration-none">
+                                        {% if u.test_status == "overdue" %}
+                                            <span class="badge text-bg-danger">просрочены</span>
+                                        {% elif u.test_status == "due_soon" %}
+                                            <span class="badge text-bg-warning text-dark">скоро</span>
+                                        {% elif u.test_status == "active" %}
+                                            <span class="badge text-bg-primary">активные</span>
+                                        {% elif u.test_status == "completed" %}
+                                            <span class="badge text-bg-success">завершены</span>
+                                        {% else %}
+                                            <span class="badge text-bg-secondary">нет</span>
+                                        {% endif %}
+                                    </a>
+
+                                    {% if u.next_test_due_at %}
+                                        <div class="small text-muted mt-1">до {{ u.next_test_due_at|date:"d.m" }}</div>
+                                    {% endif %}
+                                </td>
+
+                                <!-- Мотписьмо -->
+                                <td>
+                                    <a href="{% url 'staff_letter_detail' u.id %}#ml"
+                                       class="text-decoration-none">
+                                        <div class="d-flex flex-wrap gap-1">
+                                            {% if u.letter_status == "submitted" %}
+                                                <span class="badge text-bg-success">отправлено</span>
+                                            {% elif u.letter_status == "draft" %}
+                                                <span class="badge text-bg-secondary">черновик</span>
+                                            {% elif u.letter_status == "revision" %}
+                                                <span class="badge text-bg-warning text-dark">дописать</span>
+                                            {% elif u.letter_status %}
+                                                <span class="badge text-bg-light text-dark">{{ u.letter_status }}</span>
+                                            {% else %}
+                                                <span class="badge text-bg-secondary">нет</span>
+                                            {% endif %}
+
+                                            {% if u.letter_is_favorite %}
+                                                <span class="badge text-bg-warning">★ избранное</span>
+                                            {% endif %}
+                                        </div>
+                                    </a>
+                                </td>
+
+                                <!-- Видео -->
+                                <td>
+                                    <a href="{% url 'staff_video_detail' u.id %}"
+                                       class="text-decoration-none">
+                                        {% if u.video_has_file %}
+                                            <span class="badge text-bg-success">загружено</span>
+                                        {% else %}
+                                            <span class="badge text-bg-secondary">нет</span>
+                                        {% endif %}
+                                    </a>
+
+                                    {% if u.video_deadline_at %}
+                                        <div class="small text-muted mt-1">до {{ u.video_deadline_at|date:"d.m" }}</div>
+                                    {% endif %}
+                                </td>
+
+                                <!-- Собеседование -->
+                                <td>
+                                    <a href="{% url 'interview_detail' u.id %}"
+                                       class="text-decoration-none">
+                                        <span class="badge text-bg-light text-dark">—</span>
+                                    </a>
+                                </td>
+
+                                <!-- Итог -->
+                                <td>
+                                    {% if u.user_info and u.user_info.selection_step %}
+                                        <span class="badge text-bg-light text-dark">{{ u.user_info.get_selection_step_display }}</span>
+                                    {% else %}
+                                        <span class="badge text-bg-secondary">—</span>
+                                    {% endif %}
+                                </td>
+
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- пагинация (добавил новые параметры в querystring) -->
+                <nav class="mt-3">
+                    <ul class="pagination">
+                        {% if page_obj.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="{% page_url page_obj.previous_page_number %}">
+                                    Назад
+                                </a>
+                            </li>
+                        {% endif %}
+
+                        <li class="page-item disabled">
+                            <span class="page-link">Стр. {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span>
+                        </li>
+
+                        {% if page_obj.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="{% page_url page_obj.next_page_number %}">
+                                    Вперёд
+                                </a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+
+                <!-- Модалка отправки оповещения -->
+                <div class="modal fade" id="sendNotifModal" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-lg modal-dialog-centered">
+                        <div class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title">Отправить оповещение выбранным пользователям</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal"
+                                        aria-label="Закрыть"></button>
+                            </div>
+                            <div class="modal-body">
+                                <div class="mb-3">
+                                    <label for="messageText" class="form-label">Текст сообщения</label>
+                                    <textarea id="messageText" name="message" class="form-control" rows="5"
+                                              placeholder="Сообщение для получателей…" required></textarea>
+                                    <div class="form-text">Сообщение увидят все отмеченные пользователи.</div>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Отмена
+                                </button>
+                                <button type="submit" class="btn btn-primary" id="submitNotifBtn">Отправить</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </form>
+
+            <!-- Небольшой JS для удобства -->
+            <script>
+                (function () {
+                    const checkAll = document.getElementById('checkAllOnPage');
+                    const form = document.getElementById('notifyForm');
+                    const selectedCount = document.getElementById('selectedCount');
+                    const openModalBtn = document.getElementById('openModalBtn');
+                    const submitBtn = document.getElementById('submitNotifBtn');
+                    const messageText = document.getElementById('messageText');
+
+                    function updateCount() {
+                        const checked = document.querySelectorAll('.row-check:checked').length;
+                        selectedCount.textContent = String(checked);
+                        return checked;
+                    }
+
+                    function requireSelection(e) {
+                        if (updateCount() === 0) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            alert('Отметьте хотя бы одного пользователя.');
+                        }
+                    }
+
+                    // Выбрать все на странице
+                    if (checkAll) {
+                        checkAll.addEventListener('change', function () {
+                            document.querySelectorAll('.row-check').forEach(cb => {
+                                cb.checked = checkAll.checked;
+                            });
+                            updateCount();
+                        });
+                    }
+
+                    // Счётчик при клике по отдельным чекбоксам
+                    document.addEventListener('change', function (e) {
+                        if (e.target && e.target.classList && e.target.classList.contains('row-check')) {
+                            updateCount();
+                        }
+                    });
+
+                    // Не открываем модалку без выбранных
+                    if (openModalBtn) {
+                        openModalBtn.addEventListener('click', function (e) {
+                            if (updateCount() === 0) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                alert('Отметьте хотя бы одного пользователя.');
+                            }
+                        });
+                    }
+
+                    // Доп. валидация при сабмите (сообщение + выбор)
+                    if (submitBtn) {
+                        submitBtn.addEventListener('click', function (e) {
+                            if (updateCount() === 0) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                alert('Отметьте хотя бы одного пользователя.');
+                                return;
+                            }
+                            if (!messageText.value.trim()) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                alert('Введите текст сообщения.');
+                            }
+                        });
+                    }
+
+                    // Инициализация счётчика при загрузке
+                    updateCount();
+                })();
+
+                (function () {
+                    const STORAGE_KEY = "staff_users_selected_ids";
+
+                    const checkAll = document.getElementById('checkAllOnPage');
+                    const selectedCount = document.getElementById('selectedCount');
+                    const openModalBtn = document.getElementById('openModalBtn');
+                    const downloadLettersBtn = document.getElementById('downloadLettersBtn');
+                    const submitBtn = document.getElementById('submitNotifBtn');
+                    const messageText = document.getElementById('messageText');
+                    const form = document.getElementById('notifyForm');
+
+                    const selectAllFilteredBtn = document.getElementById('selectAllFilteredBtn');
+                    const clearSelectionBtn = document.getElementById('clearSelectionBtn');
+
+                    function loadSelected() {
+                        try {
+                            return new Set(JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]").map(String));
+                        } catch (e) {
+                            return new Set();
+                        }
+                    }
+
+                    function saveSelected(set) {
+                        localStorage.setItem(STORAGE_KEY, JSON.stringify(Array.from(set)));
+                    }
+
+                    let selected = loadSelected();
+
+                    function updateCount() {
+                        selectedCount.textContent = String(selected.size);
+                        return selected.size;
+                    }
+
+                    function restoreChecksOnPage() {
+                        document.querySelectorAll('.row-check').forEach(cb => {
+                            cb.checked = selected.has(String(cb.value));
+                        });
+
+                        const pageChecks = Array.from(document.querySelectorAll('.row-check'));
+                        if (checkAll && pageChecks.length) {
+                            checkAll.checked = pageChecks.every(cb => cb.checked);
+                            checkAll.indeterminate = !checkAll.checked && pageChecks.some(cb => cb.checked);
+                        }
+                        updateCount();
+                    }
+
+                    // checkbox single
+                    document.addEventListener('change', function (e) {
+                        const t = e.target;
+                        if (t && t.classList && t.classList.contains('row-check')) {
+                            const id = String(t.value);
+                            if (t.checked) selected.add(id);
+                            else selected.delete(id);
+                            saveSelected(selected);
+                            restoreChecksOnPage();
+                        }
+                    });
+
+                    // check all on page
+                    if (checkAll) {
+                        checkAll.addEventListener('change', function () {
+                            document.querySelectorAll('.row-check').forEach(cb => {
+                                cb.checked = checkAll.checked;
+                                const id = String(cb.value);
+                                if (checkAll.checked) selected.add(id);
+                                else selected.delete(id);
+                            });
+                            saveSelected(selected);
+                            restoreChecksOnPage();
+                        });
+                    }
+
+                    // ✅ select all by filter (старый принцип: просто заполняем ids)
+                    if (selectAllFilteredBtn) {
+                        selectAllFilteredBtn.addEventListener('click', async function () {
+                            // текущие фильтры = текущий querystring
+                            const url = "{% url 'staff_users_ids' %}" + window.location.search;
+
+                            selectAllFilteredBtn.disabled = true;
+                            const oldText = selectAllFilteredBtn.textContent;
+                            selectAllFilteredBtn.textContent = "Выбираю…";
+
+                            try {
+                                const resp = await fetch(url, {headers: {"X-Requested-With": "XMLHttpRequest"}});
+                                if (!resp.ok) throw new Error("HTTP " + resp.status);
+                                const data = await resp.json();
+
+                                selected = new Set((data.ids || []).map(String));
+                                saveSelected(selected);
+                                restoreChecksOnPage();
+
+                                alert("Выбрано пользователей: " + selected.size);
+                            } catch (err) {
+                                console.error(err);
+                                alert("Не удалось выбрать всех по фильтру.");
+                            } finally {
+                                selectAllFilteredBtn.disabled = false;
+                                selectAllFilteredBtn.textContent = oldText;
+                            }
+                        });
+                    }
+
+                    // ✅ clear
+                    if (clearSelectionBtn) {
+                        clearSelectionBtn.addEventListener('click', function () {
+                            selected = new Set();
+                            saveSelected(selected);
+                            restoreChecksOnPage();
+                        });
+                    }
+
+                    function requireSelection(e) {
+                        if (updateCount() === 0) {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            alert('Отметьте хотя бы одного пользователя.');
+                            return false;
+                        }
+                        return true;
+                    }
+
+                    if (openModalBtn) {
+                        openModalBtn.addEventListener('click', function (e) {
+                            requireSelection(e);
+                        });
+                    }
+
+                    // при отправке — добавляем hidden ids для ВСЕХ выбранных (со всех страниц)
+                    function injectAllSelectedHiddenInputs() {
+                        form.querySelectorAll('input[name="ids"][data-from-storage="1"]').forEach(el => el.remove());
+                        selected.forEach(id => {
+                            const input = document.createElement('input');
+                            input.type = "hidden";
+                            input.name = "ids";
+                            input.value = id;
+                            input.setAttribute("data-from-storage", "1");
+                            form.appendChild(input);
+                        });
+                    }
+
+                    function submitSelectedLettersDownload() {
+                        injectAllSelectedHiddenInputs();
+
+                        const previousAction = form.action;
+                        const previousTarget = form.target;
+                        form.action = "{% url 'staff_letters_download_zip' %}";
+                        form.target = "_self";
+                        form.submit();
+                        form.action = previousAction;
+                        form.target = previousTarget || "";
+                    }
+
+                    if (submitBtn) {
+                        submitBtn.addEventListener('click', function (e) {
+                            if (!requireSelection(e)) return;
+
+                            if (!messageText.value.trim()) {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                alert('Введите текст сообщения.');
+                                return;
+                            }
+                            injectAllSelectedHiddenInputs();
+                        });
+                    }
+
+                    if (downloadLettersBtn) {
+                        downloadLettersBtn.addEventListener('click', function (e) {
+                            if (!requireSelection(e)) return;
+                            submitSelectedLettersDownload();
+                        });
+                    }
+
+                    restoreChecksOnPage();
+                })();
+
+                (function () {
+
+                    const btn = document.getElementById("gradeDropdownBtn");
+                    const checks = document.querySelectorAll(".grade-check");
+
+                    function updateLabel() {
+                        const selected = Array.from(checks)
+                            .filter(c => c.checked)
+                            .map(c => c.nextElementSibling.textContent.trim());
+
+                        if (selected.length === 0) {
+                            btn.textContent = "Классы";
+                        } else {
+                            btn.textContent = selected.join(", ");
+                        }
+                    }
+
+                    checks.forEach(c => {
+                        c.addEventListener("change", updateLabel);
+                    });
+
+                    updateLabel();
+
+                })();
+
+                (function () {
+
+                    const btn = document.getElementById("profileDropdownBtn");
+                    const checks = document.querySelectorAll(".profile-check");
+
+                    function updateLabel() {
+                        const selected = Array.from(checks)
+                            .filter(c => c.checked)
+                            .map(c => c.nextElementSibling.textContent.trim());
+
+                        if (selected.length === 0) {
+                            btn.textContent = "Профили";
+                        } else if (selected.length <= 2) {
+                            btn.textContent = selected.join(", ");
+                        } else {
+                            btn.textContent = "Выбрано: " + selected.length;
+                        }
+                    }
+
+                    checks.forEach(c => {
+                        c.addEventListener("change", updateLabel);
+                    });
+
+                    updateLabel();
+
+                })();
+            </script>
+
+        {% else %}
+            <div class="alert alert-info">Пользователи не найдены.</div>
+        {% endif %}
+    </div>
+{% endblock %}

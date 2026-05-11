@@ -1,33 +1,176 @@
 {% extends "core/base.html" %}
 
 {% block content %}
-<div class="text-center mb-5">
-  <h1 class="fw-bold">Добро пожаловать!</h1>
-</div>
-
-{% if user.is_authenticated %}
-  <div class="alert alert-success text-center">
-    Здравствуйте, <strong>{{ user.username }}</strong>! Вы уже авторизованы.
-  </div>
-{% else %}
-  <div class="row">
-    <div class="col-md-6 mb-4">
-      <div class="card shadow-sm">
-        <div class="card-body">
-          <h3 class="card-title text-center mb-3">Вход</h3>
-          <form method="post" action="{% url 'login' %}">
-            {% csrf_token %}
-            <div class="mb-3">
-              <input type="text" name="username" class="form-control" placeholder="Ваш email" required>
-            </div>
-            <div class="mb-3">
-              <input type="password" name="password" class="form-control" placeholder="Пароль" required>
-            </div>
-            <button type="submit" class="btn btn-yellow w-100">Войти</button>
-          </form>
-        </div>
-      </div>
+    <div class="text-center mb-5">
+        <h1 class="fw-bold">Добро пожаловать!</h1>
     </div>
-  </div>
-{% endif %}
+
+    {% if user.is_authenticated %}
+        <div class="alert alert-success text-center">
+            Здравствуйте, <strong>{{ user.username }}</strong>!
+        </div>
+
+        {% if not user.user_info.is_done and user.user_info.status == "CANDIDATE" %}
+            <div class="alert alert-warning">
+                Ваша <strong>анкета</strong> ещё не отправлена.
+                <a href="{% url 'apply' %}" class="alert-link">Заполнить сейчас</a>.
+            </div>
+        {% endif %}
+
+        {% if user.user_info.status == "CANDIDATE" %}
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <h5 class="fw-bold mb-2">Как проходит отбор</h5>
+                    <p class="text-muted mb-3">
+                        Отбор состоит из нескольких последовательных этапов. Новые шаги будут появляться
+                        по мере продвижения.
+                    </p>
+
+                    <ul class="mb-0">
+                        <li class="mb-2">
+                            <strong>Анкета</strong><br>
+                            Базовая информация о вас. Обязательный первый шаг.
+                        </li>
+                        <li class="mb-2">
+                            <strong>Тестирование способностей</strong><br>
+                            После принятия анкеты сотрудники фонда назначат тестирования.
+                        </li>
+                        <li class="mb-2">
+                            <strong>Мотивационное письмо</strong><br>
+                            Рассказ о целях, мотивации и ожиданиях от программы.
+                        </li>
+                        <li class="mb-2">
+                            <strong>Видеовизитка</strong><br>
+                            Короткий ответ в формате видео о планируемой подготовке
+                        </li>
+                        <li class="mb-2">
+                            <strong>Собеседование</strong><br>
+                            Беседа с сотрудником фонда в онлайн-формате
+                        </li>
+                        <li>
+                            <strong>Подтверждение данных</strong><br>
+                            Предоставление подтверждающих документов о доходе и данных из анкеты.
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        {% endif %}
+
+        {% if user.is_authenticated and user.user_info.status == "SCHOLAR" %}
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <h5 class="fw-bold mb-2">Возможности личного кабинета</h5>
+                    <p class="text-muted mb-3">
+                        В личном кабинете собраны инструменты для отслеживания прогресса и результатов обучения.
+                    </p>
+
+                    <ul class="mb-0">
+                        <li class="mb-2">
+                            <strong>Трекер прогресса</strong><br>
+                            Помогает планировать обучение и отслеживать продвижение по предметам и курсам.
+                        </li>
+                        <li class="mb-2">
+                            <strong>Отслеживание результатов</strong><br>
+                            Добавление курсов, экзаменов, сертификатов и других достижений.
+                        </li>
+                        <li class="mb-2">
+                            <strong>Выбор приоритетных вузов</strong><br>
+                            Фиксация вузов, которые вы рассматриваете для поступления.
+                        </li>
+                        <li>
+                            <strong>История обучения</strong><br>
+                            Вся информация о прогрессе и результатах хранится в одном месте.
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        {% endif %}
+
+        {% if user.is_authenticated and user.user_info.status == "ALTERNATIVE" %}
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <h5 class="fw-bold mb-2">Альтернативный трек</h5>
+                    <p class="text-muted mb-3">
+                        Этот трек предлагает дополнительные возможности для обучения и развития.
+                    </p>
+
+                    <ul class="mb-0">
+                        <li class="mb-2">
+                            <strong>Альтернативные программы обучения</strong><br>
+                            Информация о школах и курсах с льготными условиями.
+                        </li>
+                        <li class="mb-2">
+                            <strong>Развитие навыков</strong><br>
+                            Возможность усилить знания и практический опыт.
+                        </li>
+                        <li class="mb-2">
+                            <strong>Фиксация результатов</strong><br>
+                            Сохранение результатов обучения и достижений.
+                        </li>
+                        <li>
+                            <strong>Рекомендации и следующие шаги</strong><br>
+                            Обновляются по мере появления новых возможностей.
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        {% endif %}
+
+        {% if user.is_authenticated and user.user_info.status == "ALUMNUS" %}
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <h5 class="fw-bold mb-2">Кабинет выпускника</h5>
+                    <p class="text-muted mb-3">
+                        Здесь хранится информация о вашем участии и результатах в программе.
+                    </p>
+
+                    <ul class="mb-0">
+                        <li class="mb-2">
+                            <strong>История обучения</strong><br>
+                            Сохранённые данные о результатах и достижениях.
+                        </li>
+                        <li class="mb-2">
+                            <strong>Документы и материалы</strong><br>
+                            Доступ к связанным с программой файлам (при наличии).
+                        </li>
+                        <li class="mb-2">
+                            <strong>Архив достижений</strong><br>
+                            Удобное хранилище опыта, полученного в ходе участия.
+                        </li>
+                        <li>
+                            <strong>Дополнительные возможности</strong><br>
+                            Информация может дополняться со временем.
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        {% endif %}
+
+
+
+
+
+    {% else %}
+        <div class="row">
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm">
+                    <div class="card-body">
+                        <h3 class="card-title text-center mb-3">Вход</h3>
+                        <form method="post" action="{% url 'login' %}">
+                            {% csrf_token %}
+                            <div class="mb-3">
+                                <input type="text" name="username" class="form-control" placeholder="Ваш email"
+                                       required>
+                            </div>
+                            <div class="mb-3">
+                                <input type="password" name="password" class="form-control" placeholder="Пароль"
+                                       required>
+                            </div>
+                            <button type="submit" class="btn btn-yellow w-100">Войти</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
 {% endblock %}

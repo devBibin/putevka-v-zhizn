@@ -1,0 +1,194 @@
+{% extends "staff_templates/base.html" %}
+
+{% block title %}Учёба участника — просмотр{% endblock %}
+
+{% block content %}
+    <div class="container py-4">
+        <h1 class="mb-4">Учёба: {{ user_obj.get_full_name|default:user_obj.username }}</h1>
+
+        {# --- Выбранные курсы --- #}
+        <div class="card mb-4">
+            <div class="card-header">Выбранные курсы</div>
+            <div class="card-body">
+                {% if selections %}
+                    <div class="table-responsive">
+                        <table class="table align-middle">
+                            <thead>
+                            <tr>
+                                <th style="min-width:280px;">Курс</th>
+                                <th>Школа</th>
+                                <th>Предмет</th>
+                                <th style="min-width:320px;">Мотивация</th>
+                                <th style="min-width:320px;">Нужен куратор</th>
+                                <th class="text-end" style="width:1%;">Добавлено</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {% for s in selections %}
+                                <tr>
+                                    <td class="text-break">
+                                        <div class="fw-semibold">{{ s.course.title }}</div>
+                                        {% if s.course.link %}
+                                            <div class="small">
+                                                <a href="{{ s.course.link }}" target="_blank">ссылка на курс</a>
+                                            </div>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ s.course.school.name }}</td>
+                                    <td>{{ s.course.subject.name }}</td>
+                                    <td class="text-break">{{ s.motivation|default:"—" }}</td>
+                                    <td>{{ s.need_tutor }}</td>
+                                    <td class="text-end">
+                                        <span class="small text-muted">{{ s.created_at|date:"d.m.Y H:i" }}</span>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-muted">Нет выбранных курсов.</div>
+                {% endif %}
+            </div>
+        </div>
+
+        {# --- Приоритетные ВУЗы --- #}
+        <div class="card mb-4">
+            <div class="card-header">Приоритетные ВУЗы</div>
+            <div class="card-body">
+                {% if priorities %}
+                    {% regroup priorities by university as universities_grouped %}
+
+                    <div class="vstack gap-3">
+                        {% for uni in universities_grouped %}
+                            <div class="border rounded-3 p-3">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <div>
+                                        <div class="fw-semibold">
+                                            {{ uni.grouper }}
+                                            {% with first=uni.list.0 %}
+                                                {% if first.city %}
+                                                    <span class="text-body-secondary">, {{ first.city }}</span>
+                                                {% endif %}
+                                            {% endwith %}
+                                        </div>
+
+                                        {% with first=uni.list.0 %}
+                                            {% if first.is_targeted %}
+                                                {# если у хотя бы одного направления целевое — можно показать общий бейдж, но при желании можно перенести вниз #}
+                                                <span class="badge text-bg-success mt-1">Есть целевые направления</span>
+                                            {% endif %}
+                                        {% endwith %}
+                                    </div>
+                                    <span class="badge bg-secondary">
+                                        Направлений: {{ uni.list|length }}
+                                    </span>
+                                </div>
+
+                                <ol class="list-group list-group-numbered list-group-flush">
+                                    {% for p in uni.list %}
+                                        <li class="list-group-item d-flex justify-content-between align-items-start">
+                                            <div class="me-3">
+                                                <div class="fw-semibold">
+                                                    {% if p.specialty %}
+                                                        {{ p.specialty }}
+                                                    {% else %}
+                                                        (направление не указано)
+                                                    {% endif %}
+                                                    {% if p.is_targeted %}
+                                                        <span class="badge text-bg-success ms-2 align-middle">
+                                                            Целевое
+                                                        </span>
+                                                    {% endif %}
+                                                </div>
+
+                                                {% with subj=p.subjects.all %}
+                                                    {% if subj|length %}
+                                                        <div class="mt-2">
+                                                            {% for s in subj %}
+                                                                <span class="badge rounded-pill text-bg-light me-1 mb-1">
+                                                                    {{ s }}
+                                                                </span>
+                                                            {% endfor %}
+                                                        </div>
+                                                    {% endif %}
+                                                {% endwith %}
+
+                                                {% if p.notes %}
+                                                    <div class="small mt-2 text-body-secondary">
+                                                        {{ p.notes|linebreaks }}
+                                                    </div>
+                                                {% endif %}
+                                            </div>
+
+                                            <span class="badge text-bg-primary rounded-pill">#{{ p.priority }}</span>
+                                        </li>
+                                    {% endfor %}
+                                </ol>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-muted">Приоритетов нет.</div>
+                {% endif %}
+            </div>
+        </div>
+
+        {# --- Результаты --- #}
+        <div class="card mb-4">
+            <div class="card-header">Результаты</div>
+            <div class="card-body">
+                {% if assessments %}
+                    <div class="table-responsive">
+                        <table class="table align-middle">
+                            <thead>
+                            <tr>
+                                <th>Дата</th>
+                                <th>Тип</th>
+                                <th>Предмет</th>
+                                <th style="min-width:280px;">Название / место</th>
+                                <th class="text-end">Баллы</th>
+                                <th class="text-end" style="width:1%;">Файл</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            {% for a in assessments %}
+                                <tr>
+                                    <td>{{ a.date|date:"d.m.Y" }}</td>
+                                    <td>{{ a.get_kind_display }}</td>
+                                    <td>{{ a.subject.name }}</td>
+                                    <td class="text-break">
+                                        <div class="fw-semibold">{{ a.title }}</div>
+                                        {% if a.place %}
+                                            <div class="small text-muted">{{ a.place }}</div>
+                                        {% endif %}
+                                        {% if a.notes %}
+                                            <div class="small">{{ a.notes|truncatechars:160 }}</div>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end">
+                                        {% if a.score %}{{ a.score }}{% endif %}
+                                        {% if a.max_score %}/{{ a.max_score }}{% endif %}
+                                        {% if a.percent %}
+                                            <div class="small text-muted">{{ a.percent }}%</div>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end">
+                                        {% if a.attachment %}
+                                            <a class="btn btn-sm btn-outline-secondary"
+                                               href="{{ a.attachment.url }}"
+                                               target="_blank">Файл</a>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="text-muted">Результатов нет.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+{% endblock %}

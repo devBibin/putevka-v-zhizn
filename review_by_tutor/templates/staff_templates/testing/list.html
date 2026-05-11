@@ -1,0 +1,183 @@
+{% extends "staff_templates/base.html" %}
+{% block title %}Тестирование кандидата{% endblock %}
+{% block content %}
+    <div class="container py-4">
+        <div class="d-flex align-items-center mb-3">
+            <h4 class="mb-0">Тестирование (пользователь ID {{ target_user_id }})</h4>
+            <a class="btn btn-sm btn-primary ms-auto" href="{% url 'staff_testing_create' %}?user_id={{ user_obj.id }}">Назначить
+                тест</a>
+        </div>
+
+        {% if items %}
+            <div class="list-group">
+                {% for t in items %}
+                    <div class="list-group-item border-start border-4
+    {% if t.status == 'assigned' %}border-warning
+    {% elif t.status == 'in_progress' %}border-primary
+    {% elif t.status == 'completed' %}border-success
+    {% elif t.status == 'needs_revision' %}border-danger
+    {% else %}border-secondary{% endif %}
+">
+
+                        <div class="d-flex justify-content-between align-items-start gap-3">
+                            <div class="flex-grow-1">
+
+                                <div class="fw-semibold mb-1">{{ t.title }}</div>
+
+                                <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                <span class="badge rounded-pill px-3 py-2
+                    {% if t.status == 'assigned' %}bg-warning text-dark
+                    {% elif t.status == 'in_progress' %}bg-primary
+                    {% elif t.status == 'completed' %}bg-success
+                    {% elif t.status == 'needs_revision' %}bg-danger
+                    {% else %}bg-secondary{% endif %}
+                ">
+                    {{ t.get_status_display }}
+                </span>
+
+                                    <span class="small text-muted">
+                    Пользователь: {{ t.user_id }}
+                    • Назначено: {{ t.assigned_at|date:"d.m.Y H:i" }}
+                                        {% if t.due_at %} • Дедлайн: {{ t.due_at|date:"d.m.Y H:i" }}{% endif %}
+                </span>
+                                </div>
+
+                                {% if t.external_url %}
+                                    <div class="mb-2">
+                                        <a class="link-primary fw-semibold"
+                                           href="{{ t.external_url }}"
+                                           target="_blank"
+                                           rel="noopener">
+                                            Открыть тест
+                                        </a>
+                                    </div>
+                                {% endif %}
+
+                                {% if t.instructions %}
+                                    <div class="small text-muted mb-2">
+                                        {{ t.instructions|linebreaksbr }}
+                                    </div>
+                                {% endif %}
+
+                                {% if t.status == 'completed' %}
+                                    <div class="mt-2 p-3 rounded bg-light small">
+
+                                        <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                                            <strong>Результат:</strong>
+
+                                            {% if t.passed is not None %}
+                                                <span class="badge {% if t.passed %}bg-success{% else %}bg-danger{% endif %}">
+                                {{ t.passed|yesno:"Пройдено,Не пройдено" }}
+                            </span>
+                                            {% endif %}
+                                        </div>
+
+                                        <div class="mb-2">
+                                            {% if t.result_score is not None %}
+                                                <div>Общие баллы: <strong>{{ t.result_score }}</strong></div>
+                                            {% endif %}
+                                            {% if t.percentile is not None %}
+                                                <div>Общий перцентиль: <strong>{{ t.percentile }}%</strong></div>
+                                            {% endif %}
+                                        </div>
+
+                                        {% if t.score_a is not None or t.percentile_a is not None or t.score_b is not None or t.percentile_b is not None or t.score_c is not None or t.percentile_c is not None %}
+                                            <div class="border-top pt-2 mt-2">
+                                                <div class="text-muted fw-semibold mb-1">Шкалы</div>
+
+                                                {% if t.score_a is not None or t.percentile_a is not None %}
+                                                    <div>
+                                                        <strong>A:</strong>
+                                                        {% if t.score_a is not None %} баллы
+                                                            <strong>{{ t.score_a }}</strong>{% endif %}
+                                                        {% if t.percentile_a is not None %}
+                                                            {% if t.score_a is not None %} •{% endif %}
+                                                            перцентиль <strong>{{ t.percentile_a }}%</strong>
+                                                        {% endif %}
+                                                    </div>
+                                                {% endif %}
+
+                                                {% if t.score_b is not None or t.percentile_b is not None %}
+                                                    <div>
+                                                        <strong>B:</strong>
+                                                        {% if t.score_b is not None %} баллы
+                                                            <strong>{{ t.score_b }}</strong>{% endif %}
+                                                        {% if t.percentile_b is not None %}
+                                                            {% if t.score_b is not None %} •{% endif %}
+                                                            перцентиль <strong>{{ t.percentile_b }}%</strong>
+                                                        {% endif %}
+                                                    </div>
+                                                {% endif %}
+
+                                                {% if t.score_c is not None or t.percentile_c is not None %}
+                                                    <div>
+                                                        <strong>C:</strong>
+                                                        {% if t.score_c is not None %} баллы
+                                                            <strong>{{ t.score_c }}</strong>{% endif %}
+                                                        {% if t.percentile_c is not None %}
+                                                            {% if t.score_c is not None %} •{% endif %}
+                                                            перцентиль <strong>{{ t.percentile_c }}%</strong>
+                                                        {% endif %}
+                                                    </div>
+                                                {% endif %}
+                                            </div>
+                                        {% endif %}
+
+                                        {% if t.numeric_grade or t.numeric_percentile is not None or t.verbal_grade or t.verbal_percentile is not None or t.logical_grade or t.logical_percentile is not None %}
+                                            <div class="border-top pt-2 mt-2">
+                                                <div class="text-muted fw-semibold mb-1">Результаты по тестам</div>
+
+                                                {% if t.numeric_grade or t.numeric_percentile is not None %}
+                                                    <div>
+                                                        <strong>Числовой:</strong>
+                                                        {% if t.numeric_grade %} грейд <strong>{{ t.numeric_grade }}</strong>{% endif %}
+                                                        {% if t.numeric_percentile is not None %}{% if t.numeric_grade %} • {% endif %}перцентиль <strong>{{ t.numeric_percentile }}</strong>{% endif %}
+                                                    </div>
+                                                {% endif %}
+
+                                                {% if t.verbal_grade or t.verbal_percentile is not None %}
+                                                    <div>
+                                                        <strong>Вербальный:</strong>
+                                                        {% if t.verbal_grade %} грейд <strong>{{ t.verbal_grade }}</strong>{% endif %}
+                                                        {% if t.verbal_percentile is not None %}{% if t.verbal_grade %} • {% endif %}перцентиль <strong>{{ t.verbal_percentile }}</strong>{% endif %}
+                                                    </div>
+                                                {% endif %}
+
+                                                {% if t.logical_grade or t.logical_percentile is not None %}
+                                                    <div>
+                                                        <strong>Логический:</strong>
+                                                        {% if t.logical_grade %} грейд <strong>{{ t.logical_grade }}</strong>{% endif %}
+                                                        {% if t.logical_percentile is not None %}{% if t.logical_grade %} • {% endif %}перцентиль <strong>{{ t.logical_percentile }}</strong>{% endif %}
+                                                    </div>
+                                                {% endif %}
+                                            </div>
+                                        {% endif %}
+
+                                        {% if t.result_text %}
+                                            <div class="mt-2 text-muted">
+                                                {{ t.result_text|linebreaksbr }}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                {% endif %}
+
+                            </div>
+
+                            <div class="d-flex flex-column gap-2 text-end">
+                                <a class="btn btn-sm btn-outline-secondary" href="{% url 'staff_testing_edit' t.id %}">
+                                    Редактировать
+                                </a>
+                                <a class="btn btn-sm btn-success" href="{% url 'staff_testing_fill_result' t.id %}">
+                                    Внести результат
+                                </a>
+                            </div>
+                        </div>
+
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="alert alert-secondary">Для этого пользователя тестов пока нет.</div>
+        {% endif %}
+    </div>
+{% endblock %}

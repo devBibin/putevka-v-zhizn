@@ -1,0 +1,13 @@
+[
+  {"model":"my_study.school","pk":1,"fields":{"name":"Фоксфорд","description":"Онлайн-школа для подготовки к ОГЭ/ЕГЭ","website":"https://foxford.ru"}},
+  {"model":"my_study.school","pk":2,"fields":{"name":"Сириус.Онлайн","description":"Курсы от Образовательного центра «Сириус»","website":"https://edu.sirius.online/"}},
+  {"model":"my_study.school","pk":3,"fields":{"name":"Яндекс Учебник","description":"Материалы и курсы по школьным предметам","website":"https://education.yandex.ru"}},
+  {"model":"my_study.school","pk":4,"fields":{"name":"Stepik","description":"Платформа открытых онлайн-курсов","website":"https://stepik.org"}},
+
+  {"model":"my_study.course","pk":1,"fields":{"school":1,"title":"ЕГЭ Математика (профиль)","subject":1,"description":"Полная подготовка к профилю: теория+практика","link":"https://foxford.ru"}},
+  {"model":"my_study.course","pk":2,"fields":{"school":1,"title":"Физика: задачи с параметрами","subject":2,"description":"Разбор нестандартных задач","link":"https://foxford.ru"}},
+  {"model":"my_study.course","pk":3,"fields":{"school":2,"title":"Информатика: алгоритмы и структуры данных","subject":3,"description":"Алгоритмы, сложность, практика","link":"https://edu.sirius.online/"}},
+  {"model":"my_study.course","pk":4,"fields":{"school":3,"title":"Русский язык: сочинение и задание 27","subject":4,"description":"Структура сочинения, клише, примеры","link":"https://education.yandex.ru"}},
+  {"model":"my_study.course","pk":5,"fields":{"school":4,"title":"Подготовка к ЕГЭ по химии","subject":5,"description":"Органика, неорганика, расчётные задачи","link":"https://stepik.org"}},
+  {"model":"my_study.course","pk":6,"fields":{"school":4,"title":"ЕГЭ Информатика: практика на Python","subject":3,"description":"Задачи ЕГЭ на Python, разбор","link":"https://stepik.org"}}
+]

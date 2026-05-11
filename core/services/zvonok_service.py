@@ -36,14 +36,14 @@ def initiate_zvonok_verification(phone, pincode=None):
             "message": "Не удалось подключиться к сервису звонков. Пожалуйста, проверьте интернет-соединение или попробуйте позже."
         }
     except Exception as e:
-        logger.error(f"Непредвиденная ошибка в _initiate_zvonok_verification: {e}")
+        logger.error(f"Непредвиденная ошибка в initiate_zvonok_verification: {e}")
         return {
             "status": "error",
             "message": "Произошла непредвиденная ошибка. Пожалуйста, попробуйте позже."
         }
 
 
-def _poll_zvonok_status(phone):
+def poll_zvonok_status(phone):
     url = config.ZVONOK_API_POLLING_URL
     params = {
         'public_key': config.PUBLIC_KEY_CALL,
@@ -55,5 +55,5 @@ def _poll_zvonok_status(phone):
         response.raise_for_status()
         return response.json() if (isinstance(response.json(), dict)) else response.json()[0]
     except requests.exceptions.RequestException as e:
-        print(f"Ошибка при вызове API zvonok.com (polling): {e}")
+        logger.error(f"Ошибка при вызове API zvonok.com (polling): {e}")
         return None

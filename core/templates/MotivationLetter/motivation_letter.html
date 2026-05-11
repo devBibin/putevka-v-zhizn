@@ -11,14 +11,19 @@
         <div class="row justify-content-center">
             <div class="col-lg-8 col-md-10">
                 <h1 class="mb-4 text-center">
-                    {% if is_new_letter %}Создать новое мотивационное письмо{% else %}Редактировать мотивационное
-                        письмо{% endif %}
+                    {% if is_new_letter %}
+                        Создать новое мотивационное письмо
+                    {% else %}
+                        Редактировать мотивационное письмо
+                    {% endif %}
                 </h1>
+
                 {% if messages %}
                     {% for message in messages %}
                         <div class="alert alert-{{ message.tags }}">{{ message }}</div>
                     {% endfor %}
                 {% endif %}
+
                 <p class="lead text-center mb-5">
                     {% if is_new_letter %}
                         Заполните форму ниже, чтобы создать свое мотивационное письмо.
@@ -26,6 +31,83 @@
                         Внесите необходимые изменения в ваше мотивационное письмо.
                     {% endif %}
                 </p>
+
+            {% if letter and letter.deadline_at %}
+    <div class="alert alert-light border shadow-sm mb-4" role="alert">
+        <div class="d-flex align-items-start justify-content-between flex-wrap gap-2">
+            <div>
+                <div class="fw-semibold">
+                    <i class="bi bi-hourglass-split me-2"></i>Дедлайн сдачи
+                </div>
+                <div class="mt-1">
+                    <span class="fw-semibold">{{ letter.deadline_at|date:"d.m.Y H:i" }}</span>
+                    <span class="text-muted">({{ letter.deadline_at|timeuntil }} осталось)</span>
+                </div>
+            </div>
+
+            {% if letter.deadline_at < now and letter.status != 'submitted' %}
+                <span class="badge text-bg-danger align-self-start">Срок истёк</span>
+            {% elif letter.status != 'submitted' %}
+                <span class="badge text-bg-warning align-self-start">Успейте отправить</span>
+            {% else %}
+                <span class="badge text-bg-success align-self-start">Отправлено</span>
+            {% endif %}
+        </div>
+
+        {% if letter.deadline_at < now and letter.status != 'submitted' %}
+            <div class="small text-muted mt-2">
+                После дедлайна отправка недоступна. Черновик можно сохранить (если вы это разрешаете).
+            </div>
+        {% endif %}
+    </div>
+{% endif %}
+
+                {% if instruction %}
+                    <div class="alert alert-info d-flex align-items-start justify-content-between flex-wrap gap-3 mb-4">
+                        <div>
+                            <strong>{{ instruction.title }}</strong><br>
+                            {{ instruction.text|linebreaksbr }}
+                        </div>
+
+                        {% if instruction.url %}
+                            <a href="{{ instruction.url }}"
+                               target="_blank"
+                               rel="noopener"
+                               class="btn btn-primary">
+                                {{ instruction.button_text }}
+                            </a>
+                        {% elif instruction.file %}
+                            <a href="{{ instruction.file.url }}"
+                               target="_blank"
+                               rel="noopener"
+                               class="btn btn-primary">
+                                {{ instruction.button_text }}
+                            </a>
+                        {% endif %}
+                    </div>
+                {% endif %}
+
+
+                {% if letter and letter.status == 'revision' %}
+                    <div class="alert alert-warning shadow-sm mb-4" role="alert">
+                        <div class="fw-semibold mb-1">
+                            <i class="bi bi-exclamation-triangle me-2"></i>
+                            Письмо возвращено на дописывание
+                        </div>
+
+                        {% if letter.revision_comment %}
+                            <div class="mt-1">{{ letter.revision_comment|linebreaksbr }}</div>
+                        {% else %}
+                            <div class="mt-1 text-muted">Администратор не оставил комментарий.</div>
+                        {% endif %}
+
+                        {% if letter.revision_requested_at %}
+                            <div class="small text-muted mt-2">
+                                Отправлено на доработку: {{ letter.revision_requested_at|date:"d.m.Y H:i" }}
+                            </div>
+                        {% endif %}
+                    </div>
+                {% endif %}
 
                 {% if letter and letter.status == 'submitted' %}
                     <div class="alert alert-success shadow-sm mb-4" role="alert">
@@ -44,9 +126,13 @@
                                     <label for="{{ field.id_for_label }}"
                                            class="form-label fs-5">{{ field.label }}</label>
 
-                                    {# поле уже будет disabled из формы при submitted #}
-                                    {% if field.field.widget.input_type == 'textarea' %}
-                                        {{ field|add_class:"form-control form-control-lg" }}
+                                    {% if field.name == 'letter_text' %}
+                                        {{ field|add_class:"form-control" }}
+
+                                        <div id="captionCharCount" class="form-text text-muted">
+                                            0 / {{ field.field.max_length|default:15000 }} символов
+                                        </div>
+                                        <div id="autosaveStatus" class="form-text"></div>
                                     {% else %}
                                         {{ field|add_class:"form-control" }}
                                     {% endif %}
@@ -54,6 +140,7 @@
                                     {% if field.help_text %}
                                         <div class="form-text text-muted mt-2">{{ field.help_text }}</div>
                                     {% endif %}
+
                                     {% if field.errors %}
                                         <div class="alert alert-danger mt-2 small">
                                             {% for error in field.errors %}
@@ -65,7 +152,7 @@
                             {% endfor %}
 
                             <div class="d-grid gap-2 d-md-flex justify-content-md-end mt-4">
-                                {% if not letter or letter.status == 'draft' %}
+                                {% if not letter or letter.status == 'draft' or letter.status == 'revision' %}
                                     <button type="submit" name="save_draft"
                                             class="btn btn-outline-primary btn-lg px-4 me-md-2">
                                         Сохранить черновик
@@ -83,17 +170,13 @@
                     </div>
                 </div>
 
-                {% if letter.status == 'submitted' %}
+                {% if letter and letter.status == 'submitted' %}
                     {% if letter.admin_rating %}
                         <div class="card bg-success-subtle text-success-emphasis border-success-subtle shadow-sm">
                             <div class="card-body">
                                 <h4 class="card-title mb-3">
                                     <i class="bi bi-check-circle-fill me-2"></i>Ваше письмо оценено!
                                 </h4>
-                                <p class="card-text fs-5">
-                                    <strong>Оценка администратора:</strong>
-                                    <span class="badge bg-success fs-5">{{ letter.admin_rating }}</span>
-                                </p>
                             </div>
                         </div>
                     {% else %}
@@ -110,4 +193,77 @@
             </div>
         </div>
     </div>
+
+    {% block extra_js %}
+        <script>
+            document.addEventListener('DOMContentLoaded', function () {
+                const textarea = document.getElementById('{{ form.letter_text.id_for_label }}');
+                const counter = document.getElementById('captionCharCount');
+                if (!textarea || !counter) return;
+
+                let maxLen = parseInt(textarea.getAttribute('maxlength'), 10);
+                if (isNaN(maxLen) || maxLen <= 0) maxLen = 15000;
+
+                function setCounter(len) {
+                    counter.textContent = `${len} / ${maxLen} символов`;
+                }
+
+                setCounter(textarea.value.length);
+
+                function clampAndCount() {
+                    if (textarea.value.length > maxLen) {
+                        textarea.value = textarea.value.slice(0, maxLen);
+                    }
+                    setCounter(textarea.value.length);
+                }
+
+                textarea.addEventListener('keydown', function (e) {
+                    const allowedControl = (
+                        e.ctrlKey || e.metaKey || e.altKey ||
+                        ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'Tab', 'Enter'].includes(e.key)
+                    );
+                    if (allowedControl) return;
+
+                    const hasSelection = textarea.selectionStart !== textarea.selectionEnd;
+                    if (textarea.value.length >= maxLen && !hasSelection) e.preventDefault();
+                });
+
+                textarea.addEventListener('paste', function (e) {
+                    const paste = (e.clipboardData || window.clipboardData).getData('text');
+                    const start = textarea.selectionStart;
+                    const end = textarea.selectionEnd;
+                    const currentLen = textarea.value.length - (end - start);
+                    const room = Math.max(0, maxLen - currentLen);
+
+                    if (room <= 0) {
+                        e.preventDefault();
+                        return;
+                    }
+
+                    if (paste.length > room) {
+                        e.preventDefault();
+                        const toInsert = paste.slice(0, room);
+                        const before = textarea.value.slice(0, start);
+                        const after = textarea.value.slice(end);
+                        textarea.value = before + toInsert + after;
+                        const caretPos = start + toInsert.length;
+                        textarea.setSelectionRange(caretPos, caretPos);
+                        setCounter(textarea.value.length);
+                    }
+                });
+
+                textarea.addEventListener('input', () => setCounter(textarea.value.length));
+                textarea.addEventListener('change', clampAndCount);
+                clampAndCount();
+            });
+
+            document.addEventListener('htmx:configRequest', function (evt) {
+                if (evt.detail.elt && evt.detail.elt.id === 'id_letter_text') {
+                    const el = document.getElementById('autosaveStatus');
+                    if (el) el.textContent = 'Сохраняю...';
+                }
+                evt.detail.headers['X-CSRFToken'] = '{{ csrf_token }}';
+            });
+        </script>
+    {% endblock %}
 {% endblock %}

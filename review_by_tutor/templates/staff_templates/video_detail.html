@@ -1,0 +1,421 @@
+{% extends 'staff_templates/base.html' %}
+{% load widget_tweaks %}
+
+{% block title %}Видеовизитка — модерация{% endblock %}
+
+{% block extra_head %}
+<style>
+  .video-detail-page {
+    background: #f6f8fb;
+    min-height: calc(100vh - 56px);
+  }
+
+  .video-detail-shell {
+    max-width: 1440px;
+  }
+
+  .page-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .page-heading h1 {
+    font-size: 1.5rem;
+    line-height: 1.25;
+  }
+
+  .panel {
+    border: 1px solid #dfe5ee;
+    border-radius: .5rem;
+    background: #fff;
+  }
+
+  .panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+    padding: .9rem 1rem;
+    border-bottom: 1px solid #e7ecf3;
+  }
+
+  .panel-title {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 700;
+  }
+
+  .panel-body {
+    padding: 1rem;
+  }
+
+  .video-player {
+    overflow: hidden;
+    border-radius: .5rem;
+    background: #111827;
+  }
+
+  .video-player video {
+    display: block;
+    width: 100%;
+    max-height: 520px;
+  }
+
+  .info-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: .75rem;
+  }
+
+  .info-cell {
+    min-height: 72px;
+    padding: .8rem;
+    border: 1px solid #e3e9f1;
+    border-radius: .5rem;
+    background: #f8fafc;
+  }
+
+  .info-label {
+    color: #64748b;
+    font-size: .78rem;
+  }
+
+  .info-value {
+    margin-top: .25rem;
+    font-weight: 700;
+  }
+
+  .text-box {
+    max-height: 320px;
+    overflow: auto;
+    white-space: pre-line;
+    word-break: break-word;
+    padding: .85rem;
+    border: 1px solid #e3e9f1;
+    border-radius: .5rem;
+    background: #f8fafc;
+  }
+
+  .empty-state {
+    padding: .9rem;
+    border: 1px dashed #cbd5e1;
+    border-radius: .5rem;
+    background: #f8fafc;
+    color: #64748b;
+  }
+
+  .form-section {
+    height: 100%;
+    padding: 1rem;
+    border: 1px solid #e3e9f1;
+    border-radius: .5rem;
+    background: #f8fafc;
+  }
+
+  @media (max-width: 991.98px) {
+    .info-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .page-heading {
+      flex-direction: column;
+    }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="video-detail-page">
+  <div class="container-fluid video-detail-shell py-4">
+    <div class="page-heading mb-3">
+      <div>
+        <div class="text-muted small mb-1">Видеовизитка</div>
+        <h1 class="mb-0">{{ user_obj.get_full_name|default:user_obj.username }}</h1>
+      </div>
+      <a href="{% url 'staff_users_list' %}" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i>
+        К списку
+      </a>
+    </div>
+
+    {% if messages %}
+      {% for message in messages %}
+        <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+      {% endfor %}
+    {% endif %}
+
+    <div class="row g-3 mb-3">
+      <div class="col-xl-8">
+        <div class="panel h-100">
+          <div class="panel-header">
+            <h2 class="panel-title">Просмотр</h2>
+            {% if video and video.has_video_file and video_download_url %}
+              <a class="btn btn-outline-secondary btn-sm" href="{{ video_download_url }}" download>
+                <i class="bi bi-download"></i>
+                Скачать
+              </a>
+            {% endif %}
+          </div>
+          <div class="panel-body">
+            {% if video %}
+              {% if video.has_video_file and video_download_url %}
+                <div class="video-player">
+                  <video controls preload="metadata">
+                    <source src="{{ video_download_url }}"{% if video_mime %} type="{{ video_mime }}"{% endif %}>
+                    Ваш браузер не поддерживает воспроизведение видео.
+                  </video>
+                </div>
+                {% if video_name %}
+                  <div class="text-muted small mt-2">{{ video_name }}</div>
+                {% endif %}
+              {% elif video.has_video_file %}
+                <div class="empty-state">Видео загружено, но временная ссылка сейчас недоступна.</div>
+              {% else %}
+                <div class="empty-state">Файл видео отсутствует или недоступен.</div>
+              {% endif %}
+            {% else %}
+              <div class="empty-state">У пользователя пока нет видеовизитки.</div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <div class="col-xl-4">
+        <div class="panel h-100">
+          <div class="panel-header">
+            <h2 class="panel-title">Статус</h2>
+          </div>
+          <div class="panel-body">
+            <div class="info-grid mb-3">
+              <div class="info-cell">
+                <div class="info-label">Видео</div>
+                <div class="info-value">{% if video and video.has_video_file %}Загружено{% else %}Нет файла{% endif %}</div>
+              </div>
+              <div class="info-cell">
+                <div class="info-label">Оценка</div>
+                <div class="info-value">{% if video and video.score %}{{ video.score }}{% else %}Не задана{% endif %}</div>
+              </div>
+              <div class="info-cell">
+                <div class="info-label">Обновлено</div>
+                <div class="info-value">{% if video %}{{ video.updated_at|date:"d.m.Y H:i"|default:"—" }}{% else %}—{% endif %}</div>
+              </div>
+            </div>
+
+            {% if deadline_form %}
+              <form method="post" novalidate>
+                {% csrf_token %}
+                <div class="mb-3">
+                  <label class="form-label">{{ deadline_form.deadline_at.label }}</label>
+                  {{ deadline_form.deadline_at|add_class:"form-control" }}
+                  {% if deadline_form.deadline_at.errors %}
+                    <div class="text-danger small mt-1">{{ deadline_form.deadline_at.errors }}</div>
+                  {% endif %}
+                </div>
+                <div class="d-flex flex-wrap gap-2 justify-content-end">
+                  <button name="action_deadline_clear" value="1" class="btn btn-outline-danger"
+                          {% if not video or not video.deadline_at %}disabled{% endif %}>
+                    Удалить дедлайн
+                  </button>
+                  <button name="action_deadline_save" value="1" class="btn btn-primary">
+                    Сохранить дедлайн
+                  </button>
+                </div>
+              </form>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+      <div class="col-xl-6">
+        <div class="panel h-100">
+          <div class="panel-header">
+            <h2 class="panel-title">Материалы</h2>
+          </div>
+          <div class="panel-body">
+            {% if video %}
+              <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+                <div>
+                  <div class="fw-semibold">График занятий</div>
+                  {% if schedule_name %}
+                    <div class="text-muted small">{{ schedule_name }}</div>
+                  {% endif %}
+                </div>
+                <div class="d-flex gap-2">
+                  {% if video.has_schedule_file and schedule_download_url %}
+                    <a class="btn btn-outline-secondary btn-sm" href="{{ schedule_download_url }}" target="_blank" rel="noopener">
+                      Открыть
+                    </a>
+                    <a class="btn btn-outline-secondary btn-sm" href="{{ schedule_download_url }}" download>
+                      Скачать
+                    </a>
+                  {% elif video.has_schedule_file %}
+                    <span class="badge text-bg-warning">Ссылка недоступна</span>
+                  {% else %}
+                    <span class="badge text-bg-secondary">Не загружен</span>
+                  {% endif %}
+                </div>
+              </div>
+
+              {% if video.online_school_course %}
+                <div class="text-box">{{ video.online_school_course }}</div>
+              {% else %}
+                <div class="empty-state">Пользователь не указал онлайн-школу и курс.</div>
+              {% endif %}
+            {% else %}
+              <div class="empty-state">Материалы появятся после создания видеовизитки.</div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <div class="col-xl-6">
+        <div class="panel h-100">
+          <div class="panel-header">
+            <h2 class="panel-title">Транскрипция</h2>
+          </div>
+          <div class="panel-body">
+            {% if video and video.transcript_text %}
+              <div class="text-box">{{ video.transcript_text }}</div>
+            {% elif video %}
+              <div class="empty-state">Транскрипция ещё не заполнена.</div>
+            {% else %}
+              <div class="empty-state">Блок появится после загрузки видеовизитки.</div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <h2 class="panel-title">Оценка куратора</h2>
+      </div>
+      <div class="panel-body">
+        {% if form %}
+          <form method="post" novalidate>
+            {% csrf_token %}
+
+            <div class="row g-3 mb-3">
+              <div class="col-md-3">
+                <label class="form-label">{{ form.score.label }}</label>
+                {{ form.score|add_class:"form-control" }}
+                {% if form.score.errors %}
+                  <div class="text-danger small mt-1">{{ form.score.errors }}</div>
+                {% endif %}
+              </div>
+              <div class="col-md-9">
+                <label class="form-label">{{ form.review.label }}</label>
+                {{ form.review|add_class:"form-control" }}
+                {% if form.review.errors %}
+                  <div class="text-danger small mt-1">{{ form.review.errors }}</div>
+                {% endif %}
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label">{{ form.transcript_text.label }}</label>
+              {{ form.transcript_text|add_class:"form-control" }}
+              {% if form.transcript_text.errors %}
+                <div class="text-danger small mt-1">{{ form.transcript_text.errors }}</div>
+              {% endif %}
+            </div>
+
+            <div class="row g-3">
+              <div class="col-xl-6">
+                <div class="form-section">
+                  <h3 class="h6 mb-3">Итоги по видеовизитке</h3>
+                  <div class="mb-3">
+                    <label class="form-label">Занимался ли раньше и где</label>
+                    {{ form.online_school_prior_experience|add_class:"form-control" }}
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label">Что получилось, что было удобно, что не получилось</label>
+                    {{ form.online_school_observations|add_class:"form-control" }}
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label">Какие курсы выбраны на следующий год</label>
+                    {{ form.online_school_selected_courses|add_class:"form-control" }}
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label">Обоснование выбора</label>
+                    {{ form.online_school_choice_reason|add_class:"form-control" }}
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label">Нужна ли дополнительная помощь</label>
+                    {{ form.online_school_extra_help|add_class:"form-control" }}
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label">Опирался ли на предоставленные материалы</label>
+                    {{ form.online_school_used_materials|add_class:"form-control" }}
+                  </div>
+                  <div>
+                    <label class="form-label">Вопросы для обсуждения на собеседовании</label>
+                    {{ form.online_school_interview_questions|add_class:"form-control" }}
+                  </div>
+                </div>
+              </div>
+
+              <div class="col-xl-6">
+                <div class="form-section">
+                  <h3 class="h6 mb-3">Планирование и график</h3>
+                  <div class="mb-3">
+                    <label class="form-label">Как выглядит обычный школьный день</label>
+                    {{ form.schedule_school_day|add_class:"form-control" }}
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label">Сколько времени уходит на домашнюю работу</label>
+                    {{ form.schedule_homework_time|add_class:"form-control" }}
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label">Сколько времени уходит на кружки, спорт и допактивности</label>
+                    {{ form.schedule_activities_time|add_class:"form-control" }}
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label">Сколько времени уходит на ЕГЭ и олимпиады</label>
+                    {{ form.schedule_exam_prep_time|add_class:"form-control" }}
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label">Сколько времени уходит на отдых</label>
+                    {{ form.schedule_rest_time|add_class:"form-control" }}
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label">Как выглядит обычный выходной</label>
+                    {{ form.schedule_weekend_day|add_class:"form-control" }}
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label">Реалистичность графика</label>
+                    {{ form.schedule_realistic_assessment|add_class:"form-control" }}
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label">Нужна ли дополнительная помощь</label>
+                    {{ form.schedule_extra_help|add_class:"form-control" }}
+                  </div>
+                  <div class="mb-3">
+                    <label class="form-label">Опирался ли на предоставленные материалы</label>
+                    {{ form.schedule_used_materials|add_class:"form-control" }}
+                  </div>
+                  <div>
+                    <label class="form-label">Вопросы для обсуждения на собеседовании</label>
+                    {{ form.schedule_interview_questions|add_class:"form-control" }}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="d-flex gap-2 justify-content-end mt-3">
+              <a href="{% url 'staff_users_list' %}" class="btn btn-outline-secondary">Отмена</a>
+              <button type="submit" class="btn btn-primary">Сохранить</button>
+            </div>
+          </form>
+        {% else %}
+          <div class="empty-state">Оценивать пока нечего: у пользователя ещё нет видеовизитки.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

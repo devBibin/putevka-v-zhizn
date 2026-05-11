@@ -1,15 +1,18 @@
 import logging
 
 from django.contrib.auth import get_user_model
+from django.forms import BaseInlineFormSet
 from django.http import HttpResponseRedirect
 from django.urls import reverse
 
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 
-from core.models import TelegramAccount, RegistrationPersonalData
+from core.models import TelegramAccount, RegistrationPersonalData, MotivationLetterInstruction
+from review_by_tutor.models import InterviewTemplate
+from scholar_form.admin import UserPersonalDataInline
 from scholar_form.forms import UserInfoForm
-from scholar_form.models import UserInfo
+from scholar_form.models import UserInfo, UserPersonalData
 from django.db import models
 from django import forms
 
@@ -24,6 +27,33 @@ class UserInfoInline(admin.StackedInline):
     fk_name = 'user'
     can_delete = False
     verbose_name_plural = 'Доп. информация о пользователе'
+
+class MotivationLetterInlineFormSet(BaseInlineFormSet):
+    def save_new(self, form, commit=True):
+        obj = super().save_new(form, commit=False)
+        obj._skip_tg_notify = True
+        if commit:
+            obj.save()
+        return obj
+
+    def save_existing(self, form, instance, commit=True):
+        obj = super().save_existing(form, instance, commit=False)
+        obj._skip_tg_notify = True
+        if commit:
+            obj.save()
+        return obj
+
+class MotivationLetterInline(admin.StackedInline):
+    model = MotivationLetter
+    fk_name = "user"
+    can_delete = False
+    verbose_name_plural = 'Мотивационное письмо'
+
+    formfield_overrides = {
+        models.CharField: {'widget': forms.Textarea(attrs={'rows': 10, 'cols': 80})},
+    }
+
+    formset = MotivationLetterInlineFormSet
 
 
 class TelegramAccountInline(admin.StackedInline):
@@ -66,7 +96,7 @@ class RegistrationAttemptAdmin(admin.ModelAdmin):
         'created_at',
     )
     search_fields = ('email', 'telegram_username', 'phone')
-    readonly_fields = ('created_at', 'updated_at', 'telegram_account')
+    readonly_fields = ('created_at', 'updated_at', 'telegram_account', 'email_verification_code')
     fieldsets = (
         (None, {
             'fields': ('user', 'email', 'password', 'current_step')
@@ -91,7 +121,7 @@ class RegistrationAttemptAdmin(admin.ModelAdmin):
             return obj.telegram_account.telegram_verified
         return False
 
-    get_telegram_verified_display.short_description = "Telegram Verified"  # Заголовок столбца
+    get_telegram_verified_display.short_description = "Telegram Verified"
     get_telegram_verified_display.boolean = True
 
 logger = logging.getLogger(__name__)
@@ -99,21 +129,62 @@ logger = logging.getLogger(__name__)
 
 @admin.register(MotivationLetter)
 class MotivationLetterAdmin(admin.ModelAdmin):
-    list_display = ('id', 'user', 'created_at', 'admin_rating', 'gpt_review')
-    list_filter = ('created_at',)
-    search_fields = ('letter_text', 'user__username')
+    list_display = (
+        "id",
+        "user",
+        "status",
+        "is_done",
+        "submitted_at",
+        "updated_at",
+    )
+    list_filter = ("status", "is_done", ("submitted_at", admin.DateFieldListFilter))
+    search_fields = ("user__username", "user__first_name", "user__last_name", "letter_text")
+    ordering = ("-created_at",)
+    autocomplete_fields = ("user",)
 
-    fields = ('user', 'letter_text', 'admin_rating', 'gpt_review', 'created_at', 'updated_at')
-    readonly_fields = ('created_at', 'updated_at')
+    fieldsets = (
+        ("Основное", {
+            "fields": ("user", "status", "is_done", "submitted_at")
+        }),
+        ("Текст и оценка администратора", {
+            "fields": ("letter_text", "admin_rating", "admin_score")
+        }),
+        ("Служебное", {
+            "fields": ("created_at", "updated_at")
+        }),
+    )
+
+    readonly_fields = (
+        "created_at",
+        "updated_at",
+        "submitted_at",
+    )
 
 
-    formfield_overrides = {
-        models.CharField: {'widget': forms.Textarea(attrs={'rows': 10, 'cols': 80})},
-    }
+@admin.register(MotivationLetterInstruction)
+class MotivationLetterInstructionAdmin(admin.ModelAdmin):
+    list_display = ("title", "is_active", "updated_at")
+    list_filter = ("is_active",)
+    search_fields = ("title", "text", "url")
+    ordering = ("-updated_at",)
+    readonly_fields = ("uploaded_at", "updated_at")
+    fieldsets = (
+        ("Основное", {
+            "fields": ("title", "text", "url", "button_text", "is_active"),
+        }),
+        ("Наследие", {
+            "fields": ("file",),
+            "description": "Поле используется только как запасной вариант для старых записей без URL.",
+            "classes": ("collapse",),
+        }),
+        ("Даты", {
+            "fields": ("uploaded_at", "updated_at"),
+        }),
+    )
 
 @admin.register(Notification)
 class NotificationAdmin(admin.ModelAdmin):
-    list_display = ('message', 'display_recipients', 'created_at', 'sender__username')
+    list_display = ('message', 'display_recipients', 'created_at', 'display_sender')
     list_filter = ('created_at',)
     search_fields = ('recipients__username', 'message', 'sender__username')
     exclude = ('sender',)
@@ -140,6 +211,11 @@ class NotificationAdmin(admin.ModelAdmin):
 
     display_recipients.short_description = "Получатели"
 
+    def display_sender(self, obj):
+        return obj.sender.username if obj.sender else "-"
+
+    display_sender.short_description = "Sender"
+
 
 @admin.register(UserNotification)
 class UserNotificationAdmin(admin.ModelAdmin):
@@ -150,7 +226,7 @@ class UserNotificationAdmin(admin.ModelAdmin):
 
 
 class CustomUserAdmin(BaseUserAdmin):
-    inlines = (UserInfoInline, TelegramAccountInline, DocumentInline)
+    inlines = (UserInfoInline, TelegramAccountInline, DocumentInline, MotivationLetterInline, UserPersonalDataInline)
 
     list_display = ('username', 'email', 'first_name', 'last_name', 'is_staff')
     search_fields = ('username', 'first_name', 'last_name', 'email')

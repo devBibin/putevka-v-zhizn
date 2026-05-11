@@ -1,0 +1,14 @@
+:root{
+  --bs-primary:#2979FF;
+  --bs-primary-rgb:41,121,255;
+  --bs-success:#2E7D32;
+  --bs-warning:#F9A825;
+  --bs-danger:#D32F2F;
+  --bg-muted:#F7F9FC;
+}
+body{background-color:var(--bg-muted);}
+.card{border-radius:1rem;}
+.progress{height:.6rem;border-radius:1rem;}
+.navbar.sticky-top { z-index: 1100; }
+.navbar .dropdown-menu { z-index: 1200; }
+header.navbar, .navbar { pointer-events: auto; }
