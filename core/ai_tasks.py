@@ -1,6 +1,8 @@
 import hashlib
 import json
 import logging
+import os
+import tempfile
 from decimal import Decimal, InvalidOperation
 from datetime import timedelta
 from typing import Any
@@ -19,6 +21,23 @@ from core.models import AiTask, MotivationLetter, MotivationLetterRubricReview
 logger = logging.getLogger(__name__)
 
 FILE_TOKEN_MAX_AGE = int(getattr(settings, "AI_FILE_TOKEN_MAX_AGE", 3600))
+
+
+class DeletingFileResponse(FileResponse):
+    def __init__(self, *args, delete_path: str | None = None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.delete_path = delete_path
+
+    def close(self):
+        super().close()
+        if self.delete_path:
+            try:
+                os.remove(self.delete_path)
+                logger.debug("Deleted proxied AI temp file path=%s", self.delete_path)
+            except FileNotFoundError:
+                pass
+            except OSError:
+                logger.warning("Failed to delete proxied AI temp file path=%s", self.delete_path, exc_info=True)
 
 
 def _version_from_value(value: str) -> str:
@@ -412,6 +431,14 @@ def make_file_token(app_label: str, model_name: str, object_id: int, field_name:
     return TimestampSigner(salt="ai-file").sign(json.dumps([app_label, model_name, object_id, field_name]))
 
 
+def _scholar_video_yandex_source(obj, field_name: str) -> tuple[str, str]:
+    if field_name == "file" and getattr(obj, "yandex_disk_path", ""):
+        return obj.yandex_disk_path, obj.video_storage_name or "video.mp4"
+    if field_name == "schedule_file" and getattr(obj, "schedule_yandex_disk_path", ""):
+        return obj.schedule_yandex_disk_path, obj.schedule_storage_name or "schedule.pdf"
+    return "", ""
+
+
 def open_file_from_token(token: str):
     try:
         raw = TimestampSigner(salt="ai-file").unsign(token, max_age=FILE_TOKEN_MAX_AGE)
@@ -421,24 +448,25 @@ def open_file_from_token(token: str):
     model = apps.get_model(app_label, model_name)
     obj = model.objects.get(pk=object_id)
 
-    if app_label == "scholar_form" and model_name == "scholarvideo" and getattr(obj, "yandex_disk_path", ""):
-        import tempfile
+    if app_label == "scholar_form" and model_name == "scholarvideo":
         from scholar_form.services.yandex_disk import download_file_from_yandex_disk
 
-        suffix = "." + obj.video_storage_name.rsplit(".", 1)[-1] if "." in obj.video_storage_name else ".mp4"
-        tmp = tempfile.NamedTemporaryFile(suffix=suffix, delete=False)
-        tmp.close()
-        download_file_from_yandex_disk(obj.yandex_disk_path, tmp.name, log_context={"user_id": obj.user_id})
-        logger.info("Opened AI file from Yandex Disk source=%s.%s:%s filename=%s", app_label, model_name, object_id, obj.video_storage_name or "video.mp4")
-        return open(tmp.name, "rb"), obj.video_storage_name or "video.mp4"
+        disk_path, filename = _scholar_video_yandex_source(obj, field_name)
+        if disk_path:
+            suffix = "." + filename.rsplit(".", 1)[-1] if "." in filename else ".media"
+            tmp = tempfile.NamedTemporaryFile(suffix=suffix, delete=False)
+            tmp.close()
+            download_file_from_yandex_disk(disk_path, tmp.name, log_context={"user_id": obj.user_id})
+            logger.info("Opened AI file from Yandex Disk source=%s.%s:%s field=%s filename=%s", app_label, model_name, object_id, field_name, filename)
+            return open(tmp.name, "rb"), filename, tmp.name
 
     file_field = getattr(obj, field_name)
     if not file_field:
         raise Http404("File is missing")
     logger.info("Opened AI file source=%s.%s:%s field=%s filename=%s", app_label, model_name, object_id, field_name, file_field.name)
-    return file_field.open("rb"), file_field.name.rsplit("/", 1)[-1]
+    return file_field.open("rb"), file_field.name.rsplit("/", 1)[-1], None
 
 
 def file_response_from_token(token: str) -> FileResponse:
-    fh, filename = open_file_from_token(token)
-    return FileResponse(fh, as_attachment=True, filename=filename)
+    fh, filename, delete_path = open_file_from_token(token)
+    return DeletingFileResponse(fh, as_attachment=True, filename=filename, delete_path=delete_path)

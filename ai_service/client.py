@@ -17,6 +17,7 @@ class DjangoAiClient:
         self.client = httpx.Client(
             timeout=httpx.Timeout(300.0, connect=30.0, read=300.0, write=300.0),
             headers={"Authorization": f"Bearer {token}"} if token else {},
+            follow_redirects=True,
         )
 
     def _url(self, path: str) -> str:
@@ -73,9 +74,10 @@ class DjangoAiClient:
         elapsed = time.monotonic() - started
         log = logger.warning if response.is_error else logger.debug
         log(
-            "Django AI API %s status=%s elapsed=%.2fs task_id=%s",
+            "Django AI API %s status=%s redirects=%s elapsed=%.2fs task_id=%s",
             operation,
             response.status_code,
+            len(response.history),
             elapsed,
             task_id or "-",
         )
