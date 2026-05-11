@@ -70,6 +70,12 @@ docker compose -f docker-compose.ai.yml ps
 docker compose -f docker-compose.ai.yml logs -f ai-worker
 ```
 
+Открыть Dozzle для AI-воркера локально:
+
+```text
+http://127.0.0.1:8081
+```
+
 Остановить только AI-воркер:
 
 ```powershell
@@ -142,6 +148,21 @@ TELEGRAM_SOCKS5_PROXY=socks5:host:1080:user:password
 ```powershell
 docker build -f ai_service/Dockerfile -t putevka-ai-worker .
 docker run --env-file .env.ai.local putevka-ai-worker
+```
+
+Если AI-воркер запущен через `docker-compose.ai.yml`, рядом с ним поднимается Dozzle.
+Он слушает только `127.0.0.1:${AI_DOZZLE_PORT:-8081}` на AI-сервере и не открывается наружу.
+
+Для доступа с локального компьютера используй SSH tunnel:
+
+```powershell
+ssh -L 8081:127.0.0.1:8081 user@ai-server
+```
+
+После этого Dozzle AI-сервера будет доступен локально:
+
+```text
+http://127.0.0.1:8081
 ```
 
 ## Деплой через GitHub Actions
