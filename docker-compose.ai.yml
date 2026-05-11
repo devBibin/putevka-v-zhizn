@@ -16,6 +16,18 @@ services:
       - putevka_app
     restart: unless-stopped
 
+  dozzle:
+    image: amir20/dozzle:latest
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      - "127.0.0.1:${AI_DOZZLE_PORT:-8081}:8080"
+    environment:
+      DOZZLE_LEVEL: ${DOZZLE_LEVEL:-info}
+    networks:
+      - putevka_app
+    restart: unless-stopped
+
 networks:
   putevka_app:
     external: true
