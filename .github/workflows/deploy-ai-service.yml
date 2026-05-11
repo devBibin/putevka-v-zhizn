@@ -28,8 +28,8 @@ jobs:
 
       - name: Configure SSH
         env:
-          DEPLOY_HOST: ${{ secrets.AI_DEPLOY_HOST }}
-          DEPLOY_USER: ${{ secrets.AI_DEPLOY_USER }}
+          DEPLOY_HOST: ${{ vars.AI_DEPLOY_HOST || secrets.AI_DEPLOY_HOST }}
+          DEPLOY_USER: ${{ vars.AI_DEPLOY_USER || secrets.AI_DEPLOY_USER }}
           DEPLOY_SSH_KEY: ${{ secrets.AI_DEPLOY_SSH_KEY }}
         run: |
           set -euo pipefail
@@ -45,9 +45,9 @@ jobs:
 
       - name: Ensure deploy directory exists
         env:
-          DEPLOY_HOST: ${{ secrets.AI_DEPLOY_HOST }}
-          DEPLOY_USER: ${{ secrets.AI_DEPLOY_USER }}
-          DEPLOY_PATH: ${{ secrets.AI_DEPLOY_PATH }}
+          DEPLOY_HOST: ${{ vars.AI_DEPLOY_HOST || secrets.AI_DEPLOY_HOST }}
+          DEPLOY_USER: ${{ vars.AI_DEPLOY_USER || secrets.AI_DEPLOY_USER }}
+          DEPLOY_PATH: ${{ vars.AI_DEPLOY_PATH || secrets.AI_DEPLOY_PATH }}
         run: |
           set -euo pipefail
           test -n "$DEPLOY_PATH"
@@ -57,9 +57,9 @@ jobs:
 
       - name: Sync AI service files
         env:
-          DEPLOY_HOST: ${{ secrets.AI_DEPLOY_HOST }}
-          DEPLOY_USER: ${{ secrets.AI_DEPLOY_USER }}
-          DEPLOY_PATH: ${{ secrets.AI_DEPLOY_PATH }}
+          DEPLOY_HOST: ${{ vars.AI_DEPLOY_HOST || secrets.AI_DEPLOY_HOST }}
+          DEPLOY_USER: ${{ vars.AI_DEPLOY_USER || secrets.AI_DEPLOY_USER }}
+          DEPLOY_PATH: ${{ vars.AI_DEPLOY_PATH || secrets.AI_DEPLOY_PATH }}
         run: |
           set -euo pipefail
 
@@ -77,9 +77,9 @@ jobs:
 
       - name: Upload AI environment file
         env:
-          DEPLOY_HOST: ${{ secrets.AI_DEPLOY_HOST }}
-          DEPLOY_USER: ${{ secrets.AI_DEPLOY_USER }}
-          DEPLOY_PATH: ${{ secrets.AI_DEPLOY_PATH }}
+          DEPLOY_HOST: ${{ vars.AI_DEPLOY_HOST || secrets.AI_DEPLOY_HOST }}
+          DEPLOY_USER: ${{ vars.AI_DEPLOY_USER || secrets.AI_DEPLOY_USER }}
+          DEPLOY_PATH: ${{ vars.AI_DEPLOY_PATH || secrets.AI_DEPLOY_PATH }}
           DEPLOY_ENV_FILE: ${{ secrets.AI_DEPLOY_ENV_FILE }}
         run: |
           set -euo pipefail
@@ -91,9 +91,9 @@ jobs:
 
       - name: Deploy AI worker
         env:
-          DEPLOY_HOST: ${{ secrets.AI_DEPLOY_HOST }}
-          DEPLOY_USER: ${{ secrets.AI_DEPLOY_USER }}
-          DEPLOY_PATH: ${{ secrets.AI_DEPLOY_PATH }}
+          DEPLOY_HOST: ${{ vars.AI_DEPLOY_HOST || secrets.AI_DEPLOY_HOST }}
+          DEPLOY_USER: ${{ vars.AI_DEPLOY_USER || secrets.AI_DEPLOY_USER }}
+          DEPLOY_PATH: ${{ vars.AI_DEPLOY_PATH || secrets.AI_DEPLOY_PATH }}
           DEPLOY_BRANCH: ${{ github.ref_name }}
         run: |
           set -euo pipefail

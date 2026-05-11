@@ -1,87 +1,184 @@
-# AI Service
+# AI-сервис
 
-AI processing is asynchronous. Django owns the business data and stores work in `core.AiTask`.
-The AI worker runs as a separate process or on a separate server and communicates only through
-the internal HTTP API under `/internal/ai/`.
+AI-задачи выполняются асинхронно. Django хранит бизнес-данные и очередь работ в модели
+`core.AiTask`, а AI-воркер запускается отдельным процессом или на отдельном сервере.
+Воркер общается с Django только через внутренний HTTP API `/internal/ai/`.
 
-## Flow
+## Как это работает
 
-1. Django creates an `AiTask` when a motivation letter, interview video, scholar video, or interview transcript needs AI work.
-2. The AI worker calls `POST /internal/ai/tasks/claim/` and receives one task with a lease.
-3. The worker sends heartbeat requests while long tasks are running.
-4. The worker posts either `complete` with a structured result or `fail` with an error.
-5. Django validates and applies the result to the existing domain models.
+1. Django создает `AiTask`, когда нужно обработать мотивационное письмо, видео интервью,
+   видеовизитку кандидата или транскрипт интервью.
+2. AI-воркер вызывает `POST /internal/ai/tasks/claim/` и забирает одну задачу в работу.
+3. Пока выполняется долгая задача, воркер отправляет heartbeat-запросы, чтобы продлить lease.
+4. После обработки воркер отправляет `complete` со структурированным результатом или `fail`
+   с текстом ошибки.
+5. Django проверяет результат и применяет его к существующим моделям проекта.
 
-## Local Docker
+## Локальный запуск через Docker
+
+Сначала запусти основные сервисы Django и PostgreSQL:
 
 ```powershell
 docker compose up -d --build
 ```
 
-The main compose starts only:
+Основной `docker-compose.yml` запускает:
 
-- `web`: Django and non-AI background workers.
+- `web`: Django и не-AI фоновые процессы.
 - `db`: PostgreSQL.
 
-Create `.env.ai.local` from `.env.ai.example`, then start the AI worker separately:
+AI-воркер запускается отдельно. Создай локальный env-файл для него:
 
 ```powershell
 Copy-Item .env.ai.example .env.ai.local
-# edit .env.ai.local
+```
+
+Заполни `.env.ai.local`. Минимально нужны:
+
+```dotenv
+AI_SERVICE_TOKEN=тот_же_секрет_что_в_Django
+AI_DJANGO_BASE_URL=http://web:8000
+OPENAI_API_KEY=токен_OpenAI
+AI_WORKER_ID=ai-worker-local-1
+```
+
+Если используешь старую переменную, вместо `OPENAI_API_KEY` можно указать:
+
+```dotenv
+GPT_TOKEN=токен_OpenAI
+```
+
+Запусти AI-воркер:
+
+```powershell
 docker compose -f docker-compose.ai.yml up -d --build
 ```
 
-Both compose files use the same Docker network, `putevka_app`, so the local AI worker can reach
-Django at `http://web:8000`.
+Оба compose-файла используют одну Docker-сеть `putevka_app`, поэтому локальный AI-воркер
+должен видеть Django по адресу `http://web:8000`.
 
-Stop only the AI worker:
+Проверить контейнеры:
+
+```powershell
+docker compose ps
+docker compose -f docker-compose.ai.yml ps
+```
+
+Посмотреть логи AI-воркера:
+
+```powershell
+docker compose -f docker-compose.ai.yml logs -f ai-worker
+```
+
+Остановить только AI-воркер:
 
 ```powershell
 docker compose -f docker-compose.ai.yml down
 ```
 
-## Remote Server
+## Частые проблемы запуска
 
-Build and run `ai_service/Dockerfile` on the AI server. The worker needs:
+### `Connection refused` на `http://web:8000`
 
-- `AI_SERVICE_TOKEN`: same secret as Django.
-- `AI_DJANGO_BASE_URL`: public or private URL of Django, for example `https://app.example.org`.
-- `OPENAI_API_KEY` or `GPT_TOKEN`: OpenAI token, stored on the AI server.
-- `TELEGRAM_SOCKS5_PROXY`: optional proxy reused for OpenAI HTTP traffic.
+Это не ошибка Telegram-прокси. Это значит, что AI-воркер не смог подключиться к Django:
 
-Example:
+- контейнер `web` еще стартует;
+- контейнер `web` упал;
+- AI-воркер запущен не в сети `putevka_app`;
+- указан неправильный `AI_DJANGO_BASE_URL`.
+
+Проверь:
+
+```powershell
+docker compose ps
+docker compose logs -f web
+docker compose -f docker-compose.ai.yml logs -f ai-worker
+```
+
+Для локального Docker значение должно быть:
+
+```dotenv
+AI_DJANGO_BASE_URL=http://web:8000
+```
+
+Если воркер запускается не в Docker, а прямо на хосте, используй:
+
+```dotenv
+AI_DJANGO_BASE_URL=http://127.0.0.1:8000
+```
+
+### Telegram proxy не работает
+
+Переменная для Telegram:
+
+```dotenv
+TELEGRAM_SOCKS5_PROXY=socks5h://user:password@host:1080
+```
+
+Поддерживаются также короткие форматы:
+
+```dotenv
+TELEGRAM_SOCKS5_PROXY=socks5:host:1080
+TELEGRAM_SOCKS5_PROXY=socks5:host:1080:password
+TELEGRAM_SOCKS5_PROXY=socks5:host:1080:user:password
+```
+
+Если в логах видно `SOCKSHTTPSConnectionPool`, значит библиотека Telegram уже пытается идти
+через SOCKS-прокси. Ошибки вида `Connection refused`, `timed out` или `WinError 10013`
+обычно означают, что сам прокси недоступен из контейнера/хоста, заблокирован фаерволом
+или указан неверный адрес.
+
+## Запуск на отдельном сервере
+
+На AI-сервере собирается и запускается `ai_service/Dockerfile`. Воркеру нужны переменные:
+
+- `AI_SERVICE_TOKEN`: тот же секрет, что и в Django.
+- `AI_DJANGO_BASE_URL`: публичный или приватный URL Django, например `https://app.example.org`.
+- `OPENAI_API_KEY` или `GPT_TOKEN`: OpenAI-токен, хранится на AI-сервере.
+- `TELEGRAM_SOCKS5_PROXY`: опциональный SOCKS5-прокси, также используется для OpenAI HTTP-трафика.
+
+Пример:
 
 ```powershell
 docker build -f ai_service/Dockerfile -t putevka-ai-worker .
 docker run --env-file .env.ai.local putevka-ai-worker
 ```
 
-## GitHub Actions Deploy
+## Деплой через GitHub Actions
 
-The workflow `.github/workflows/deploy-ai-service.yml` deploys only the AI service files to a
-separate server and runs:
+Workflow `.github/workflows/deploy-ai-service.yml` деплоит только файлы AI-сервиса на отдельный
+сервер и запускает:
 
 ```powershell
 docker compose --env-file .env.ai.local -f docker-compose.ai.yml up -d --build --remove-orphans
 ```
 
-Required repository secrets:
+Нужные GitHub Variables:
 
-- `AI_DEPLOY_HOST`: AI server host or IP.
-- `AI_DEPLOY_USER`: SSH user on the AI server.
-- `AI_DEPLOY_SSH_KEY`: private SSH key with access to that user.
-- `AI_DEPLOY_PATH`: target directory on the AI server, for example `/opt/putevka-ai`.
-- `AI_DEPLOY_ENV_FILE`: full `.env.ai.local` contents.
+- `AI_DEPLOY_HOST`: хост или IP AI-сервера.
+- `AI_DEPLOY_USER`: SSH-пользователь на AI-сервере.
+- `AI_DEPLOY_PATH`: директория деплоя, например `/opt/putevka-ai`.
 
-The workflow runs manually from GitHub Actions or automatically on pushes to branches ending
-with `--ai` when AI service files change.
+Нужные GitHub Secrets:
 
-`entrypoint.sh` no longer starts `Shadows/gpt_reviewer.py`, `Shadows/gpt_transcriber.py`,
-`Shadows/gpt_transcriber_video.py`, or `Shadows/gpt_fill_form.py`.
+- `AI_DEPLOY_SSH_KEY`: приватный SSH-ключ с доступом к серверу.
+- `AI_DEPLOY_ENV_FILE`: полный текст `.env.ai.local`.
 
-## Backfill
+Для совместимости workflow также умеет читать `AI_DEPLOY_HOST`, `AI_DEPLOY_USER` и
+`AI_DEPLOY_PATH` из Secrets, если одноименные Variables не заданы.
 
-After deploying migrations, enqueue existing pending objects:
+Workflow запускается вручную из GitHub Actions или автоматически при push в ветки, если изменились файлы AI-сервиса.
+
+`entrypoint.sh` больше не запускает старые скрипты:
+
+- `Shadows/gpt_reviewer.py`
+- `Shadows/gpt_transcriber.py`
+- `Shadows/gpt_transcriber_video.py`
+- `Shadows/gpt_fill_form.py`
+
+## Постановка старых данных в очередь
+
+После деплоя миграций можно поставить уже существующие необработанные объекты в очередь:
 
 ```powershell
 python manage.py enqueue_ai_tasks
