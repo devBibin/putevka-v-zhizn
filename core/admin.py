@@ -184,7 +184,7 @@ class MotivationLetterInstructionAdmin(admin.ModelAdmin):
 
 @admin.register(Notification)
 class NotificationAdmin(admin.ModelAdmin):
-    list_display = ('message', 'display_recipients', 'created_at', 'sender__username')
+    list_display = ('message', 'display_recipients', 'created_at', 'display_sender')
     list_filter = ('created_at',)
     search_fields = ('recipients__username', 'message', 'sender__username')
     exclude = ('sender',)
@@ -210,6 +210,11 @@ class NotificationAdmin(admin.ModelAdmin):
             "..." if obj.recipients.count() > 10 else "")
 
     display_recipients.short_description = "Получатели"
+
+    def display_sender(self, obj):
+        return obj.sender.username if obj.sender else "-"
+
+    display_sender.short_description = "Sender"
 
 
 @admin.register(UserNotification)

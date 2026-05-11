@@ -8,8 +8,9 @@ PySocks
 django-formtools
 django-widget-tweaks
 openai>=1.52.0
-python-magic
-dj_database_url
+python-magic-bin; platform_system == "Windows"
+python-magic; platform_system != "Windows"
+dj-database-url
 psycopg
 Pillow
 pydantic
