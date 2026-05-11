@@ -1,7 +1,7 @@
 from django import forms
 from django.urls import reverse
 
-from .models import MotivationLetter
+from .models import MOTIVATION_LETTER_MAX_LENGTH, MotivationLetter
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
 from django.contrib.auth.password_validation import validate_password
@@ -96,6 +96,12 @@ class PhoneNumberForm(forms.Form):
         return normalized
 
 class MotivationLetterForm(forms.ModelForm):
+    letter_text = forms.CharField(
+        max_length=MOTIVATION_LETTER_MAX_LENGTH,
+        widget=forms.Textarea(),
+        label='Мотивационное письмо',
+    )
+
     def clean_letter_text(self):
         new_letter_text = self.cleaned_data.get('letter_text')
         if self.instance.pk:
@@ -112,7 +118,7 @@ class MotivationLetterForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         ta = self.fields["letter_text"].widget
-        maxlen = self.fields["letter_text"].max_length or 15000
+        maxlen = self.fields["letter_text"].max_length or MOTIVATION_LETTER_MAX_LENGTH
 
         ta.attrs.update({
             "id": "id_caption_upload",
