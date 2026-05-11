@@ -29,8 +29,10 @@ BASE_URL= # Base app URL, for example https://example.com
 
 # GPT
 
-GPT_TOKEN= # API token for OpenAI integration
+GPT_TOKEN= # Deprecated for web: OpenAI token should live in the AI worker env. Kept as fallback.
 OPENAI_PROXY= # Deprecated: OpenAI workers reuse TELEGRAM_SOCKS5_PROXY.
+AI_SERVICE_TOKEN= # Shared secret for Django internal AI API. Must match .env.ai.local.
+AI_FILE_TOKEN_MAX_AGE=3600
 
 
 # ZVONOK

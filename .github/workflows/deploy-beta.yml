@@ -1,0 +1,111 @@
+name: Deploy Beta Server
+
+on:
+  push:
+    branches:
+      - "**--beta"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: beta-server-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    if: endsWith(github.ref_name, '--beta')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Ensure rsync is available
+        run: |
+          if ! command -v rsync >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y rsync
+          fi
+
+      - name: Configure SSH
+        env:
+          DEPLOY_HOST: ${{ secrets.BETA_DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.BETA_DEPLOY_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.BETA_DEPLOY_SSH_KEY }}
+        run: |
+          set -euo pipefail
+
+          test -n "$DEPLOY_HOST"
+          test -n "$DEPLOY_USER"
+          test -n "$DEPLOY_SSH_KEY"
+
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/beta_deploy_key
+          chmod 600 ~/.ssh/beta_deploy_key
+          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+
+      - name: Ensure deploy directory exists
+        env:
+          DEPLOY_HOST: ${{ secrets.BETA_DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.BETA_DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.BETA_DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+
+          test -n "$DEPLOY_PATH"
+
+          ssh -i ~/.ssh/beta_deploy_key "$DEPLOY_USER@$DEPLOY_HOST" \
+            "mkdir -p '$DEPLOY_PATH'"
+
+      - name: Sync project to server
+        env:
+          DEPLOY_HOST: ${{ secrets.BETA_DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.BETA_DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.BETA_DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+
+          rsync -az --delete \
+            --exclude '.git/' \
+            --exclude '.github/' \
+            --exclude '.venv/' \
+            --exclude '.env' \
+            --exclude 'logs/' \
+            --exclude 'media/' \
+            --exclude 'staticfiles/' \
+            -e "ssh -i ~/.ssh/beta_deploy_key" \
+            ./ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"
+
+      - name: Upload beta environment file
+        env:
+          DEPLOY_HOST: ${{ secrets.BETA_DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.BETA_DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.BETA_DEPLOY_PATH }}
+          DEPLOY_ENV_FILE: ${{ secrets.BETA_DEPLOY_ENV_FILE }}
+        run: |
+          set -euo pipefail
+
+          if [ -n "${DEPLOY_ENV_FILE:-}" ]; then
+            printf '%s' "$DEPLOY_ENV_FILE" | \
+              ssh -i ~/.ssh/beta_deploy_key "$DEPLOY_USER@$DEPLOY_HOST" \
+              "umask 077 && cat > '$DEPLOY_PATH/.env'"
+          fi
+
+      - name: Deploy beta stack
+        env:
+          DEPLOY_HOST: ${{ secrets.BETA_DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.BETA_DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.BETA_DEPLOY_PATH }}
+          DEPLOY_BRANCH: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          ssh -i ~/.ssh/beta_deploy_key "$DEPLOY_USER@$DEPLOY_HOST" <<EOF
+          set -euo pipefail
+          cd '$DEPLOY_PATH'
+          echo "Deploying branch: $DEPLOY_BRANCH"
+          docker compose up -d --build --remove-orphans
+          docker compose ps
+          EOF

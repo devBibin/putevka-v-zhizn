@@ -9,6 +9,7 @@ import config
 from Putevka import settings
 from core.bot import send_tg_notification_to_user
 from core.models import MotivationLetter
+from core.ai_tasks import enqueue_motivation_letter_review
 from core.services.email_service import send_email_to_user
 from core.telegram_proxy import create_telegram_bot
 from scholar_form.models import UserInfo, UserPersonalData
@@ -133,3 +134,11 @@ def build_motivation_rating_message(letter, user_url: str) -> str:
         "👇 Откройте письмо по ссылке ниже\n"
         f"{user_url}"
     )
+
+
+@receiver(post_save, sender=MotivationLetter)
+def enqueue_motivation_letter_ai_task(sender, instance, **kwargs):
+    try:
+        enqueue_motivation_letter_review(instance)
+    except Exception as e:
+        logger.warning("Failed to enqueue motivation letter AI review for %s: %s", instance.pk, e)

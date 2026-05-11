@@ -19,11 +19,7 @@ RUN pip install --no-cache-dir \
 
 #COPY .env .
 COPY telegram_bot_polling.py .
-COPY Shadows/gpt_reviewer.py .
-COPY Shadows/gpt_transcriber.py .
-COPY Shadows/gpt_fill_form.py .
 COPY Shadows/notification_worker.py .
-COPY Shadows/gpt_transcriber_video.py .
 
 COPY . .
 

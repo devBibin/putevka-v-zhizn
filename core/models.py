@@ -616,6 +616,55 @@ class MotivationLetterInstruction(models.Model):
         return cls.objects.filter(is_active=True).order_by("-updated_at", "-uploaded_at").first()
 
 
+class AiTask(models.Model):
+    class Type(models.TextChoices):
+        MOTIVATION_LETTER_REVIEW = "motivation_letter_review", "Motivation letter review"
+        INTERVIEW_TRANSCRIPTION = "interview_transcription", "Interview transcription"
+        SCHOLAR_VIDEO_TRANSCRIPTION = "scholar_video_transcription", "Scholar video transcription"
+        INTERVIEW_RESULT_FILL = "interview_result_fill", "Interview result fill"
+
+    class Status(models.TextChoices):
+        PENDING = "PENDING", "Pending"
+        PROCESSING = "PROCESSING", "Processing"
+        DONE = "DONE", "Done"
+        FAILED = "FAILED", "Failed"
+        RETRY = "RETRY", "Retry"
+        CANCELLED = "CANCELLED", "Cancelled"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    task_type = models.CharField(max_length=64, choices=Type.choices, db_index=True)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.PENDING, db_index=True)
+
+    payload = models.JSONField(default=dict, blank=True)
+    result = models.JSONField(null=True, blank=True)
+    error = models.TextField(blank=True, default="")
+
+    source_app = models.CharField(max_length=64, db_index=True)
+    source_model = models.CharField(max_length=64, db_index=True)
+    source_object_id = models.PositiveIntegerField(db_index=True)
+    source_version = models.CharField(max_length=128, blank=True, default="")
+
+    attempts = models.PositiveIntegerField(default=0)
+    max_attempts = models.PositiveIntegerField(default=3)
+    locked_by = models.CharField(max_length=128, blank=True, default="")
+    locked_until = models.DateTimeField(null=True, blank=True, db_index=True)
+    started_at = models.DateTimeField(null=True, blank=True)
+    finished_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "AI task"
+        verbose_name_plural = "AI tasks"
+        indexes = [
+            models.Index(fields=["status", "locked_until", "created_at"]),
+            models.Index(fields=["source_app", "source_model", "source_object_id", "task_type"]),
+        ]
+
+    def __str__(self):
+        return f"{self.task_type} #{self.pk} {self.status}"
+
+
 class Notification(models.Model):
     message = models.TextField(verbose_name='Сообщение')
 
