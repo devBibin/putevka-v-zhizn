@@ -1066,17 +1066,17 @@ class AiServiceUnitTests(TestCase):
         from ai_service.client import DjangoAiClient
 
         responses = [
-            Mock(status_code=200, is_error=False, json=Mock(return_value={"task": {"id": "1"}}), raise_for_status=Mock()),
-            Mock(status_code=200, is_error=False, raise_for_status=Mock()),
-            Mock(status_code=200, is_error=False, raise_for_status=Mock()),
-            Mock(status_code=200, is_error=False, raise_for_status=Mock()),
-            Mock(status_code=200, is_error=False, content=b"file-bytes", raise_for_status=Mock()),
+            Mock(status_code=200, is_error=False, history=[], json=Mock(return_value={"task": {"id": "1"}}), raise_for_status=Mock()),
+            Mock(status_code=200, is_error=False, history=[], raise_for_status=Mock()),
+            Mock(status_code=200, is_error=False, history=[], raise_for_status=Mock()),
+            Mock(status_code=200, is_error=False, history=[], raise_for_status=Mock()),
+            Mock(status_code=200, is_error=False, history=[], content=b"file-bytes", raise_for_status=Mock()),
         ]
         http_client = Mock()
         http_client.post.side_effect = responses[:4]
         http_client.get.return_value = responses[4]
 
-        with patch("ai_service.client.httpx.Client", return_value=http_client), \
+        with patch("ai_service.client.httpx.Client", return_value=http_client) as httpx_client_cls, \
              patch.dict("os.environ", {"AI_DJANGO_BASE_URL": "http://django.local", "AI_WORKER_ID": "worker-1", "AI_SERVICE_TOKEN": "token"}):
             client = DjangoAiClient()
             self.assertEqual(client.claim(600), {"id": "1"})
@@ -1095,6 +1095,7 @@ class AiServiceUnitTests(TestCase):
         self.assertEqual(http_client.post.call_args_list[0].args[0], "http://django.local/internal/ai/tasks/claim/")
         self.assertEqual(http_client.post.call_args_list[0].kwargs["json"], {"worker_id": "worker-1", "lease_seconds": 600})
         self.assertFalse(http_client.post.call_args_list[3].kwargs["json"]["retryable"])
+        self.assertTrue(httpx_client_cls.call_args.kwargs["follow_redirects"])
 
     def test_openai_runtime_normalizes_proxy_and_builds_client(self):
         from ai_service.openai_runtime import make_openai_client, normalize_proxy_url
@@ -1303,6 +1304,36 @@ class AiTaskApiTests(IntegrationTestCase):
             self.assertEqual(failed.status_code, 200)
             failed_task.refresh_from_db()
             self.assertEqual(failed_task.status, AiTask.Status.FAILED)
+
+    def test_ai_file_proxy_downloads_yandex_disk_file_and_deletes_temp_file(self):
+        from core.ai_tasks import file_response_from_token, make_file_token
+
+        user = self.create_finished_candidate("ai-file@example.com")
+        video = ScholarVideo.objects.create(
+            user=user,
+            yandex_disk_path="disk:/candidate/video.mp4",
+            schedule_yandex_disk_path="disk:/candidate/schedule.pdf",
+        )
+
+        created_files = []
+
+        def fake_download(disk_path, local_path, *, log_context=None):
+            created_files.append(local_path)
+            with open(local_path, "wb") as fh:
+                fh.write(f"downloaded:{disk_path}".encode("utf-8"))
+
+        token = make_file_token("scholar_form", "scholarvideo", video.pk, "schedule_file")
+
+        with patch("scholar_form.services.yandex_disk.download_file_from_yandex_disk", side_effect=fake_download):
+            response = file_response_from_token(token)
+            body = b"".join(response.streaming_content)
+            temp_path = created_files[0]
+            self.assertTrue(os.path.exists(temp_path))
+            response.close()
+
+        self.assertEqual(body, b"downloaded:disk:/candidate/schedule.pdf")
+        self.assertEqual(response.headers["Content-Disposition"], 'attachment; filename="schedule.pdf"')
+        self.assertFalse(os.path.exists(temp_path))
 
 
 class CorePageFlowTests(IntegrationTestCase):
