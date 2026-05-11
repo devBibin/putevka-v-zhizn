@@ -31,6 +31,7 @@ urlpatterns = [
                   path("study/", include("my_study.urls")),
                   path('staff/', include('review_by_tutor.urls')),
                   path("before/", include('subscriber.urls')),
+                  path("internal/ai/", include("core.ai_urls")),
 
               ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT) \
               + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

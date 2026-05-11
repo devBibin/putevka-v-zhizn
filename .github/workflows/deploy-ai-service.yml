@@ -1,0 +1,108 @@
+name: Deploy AI Service
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ai-service-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Ensure rsync is available
+        run: |
+          set -euo pipefail
+          if ! command -v rsync >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y rsync
+          fi
+
+      - name: Configure SSH
+        env:
+          DEPLOY_HOST: ${{ secrets.AI_DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.AI_DEPLOY_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.AI_DEPLOY_SSH_KEY }}
+        run: |
+          set -euo pipefail
+
+          test -n "$DEPLOY_HOST"
+          test -n "$DEPLOY_USER"
+          test -n "$DEPLOY_SSH_KEY"
+
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/ai_deploy_key
+          chmod 600 ~/.ssh/ai_deploy_key
+          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+
+      - name: Ensure deploy directory exists
+        env:
+          DEPLOY_HOST: ${{ secrets.AI_DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.AI_DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.AI_DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+          test -n "$DEPLOY_PATH"
+
+          ssh -i ~/.ssh/ai_deploy_key "$DEPLOY_USER@$DEPLOY_HOST" \
+            "mkdir -p '$DEPLOY_PATH'"
+
+      - name: Sync AI service files
+        env:
+          DEPLOY_HOST: ${{ secrets.AI_DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.AI_DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.AI_DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+
+          rsync -az --delete \
+            --include 'ai_service/***' \
+            --include 'core/' \
+            --include 'core/__init__.py' \
+            --include 'core/llm_safe.py' \
+            --include 'requirements.txt' \
+            --include 'docker-compose.ai.yml' \
+            --include '.env.ai.example' \
+            --exclude '*' \
+            -e "ssh -i ~/.ssh/ai_deploy_key" \
+            ./ "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/"
+
+      - name: Upload AI environment file
+        env:
+          DEPLOY_HOST: ${{ secrets.AI_DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.AI_DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.AI_DEPLOY_PATH }}
+          DEPLOY_ENV_FILE: ${{ secrets.AI_DEPLOY_ENV_FILE }}
+        run: |
+          set -euo pipefail
+          test -n "$DEPLOY_ENV_FILE"
+
+          printf '%s' "$DEPLOY_ENV_FILE" | \
+            ssh -i ~/.ssh/ai_deploy_key "$DEPLOY_USER@$DEPLOY_HOST" \
+            "umask 077 && cat > '$DEPLOY_PATH/.env.ai.local'"
+
+      - name: Deploy AI worker
+        env:
+          DEPLOY_HOST: ${{ secrets.AI_DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.AI_DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.AI_DEPLOY_PATH }}
+          DEPLOY_BRANCH: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          ssh -i ~/.ssh/ai_deploy_key "$DEPLOY_USER@$DEPLOY_HOST" <<EOF
+          set -euo pipefail
+          cd '$DEPLOY_PATH'
+          echo "Deploying AI service from branch: $DEPLOY_BRANCH"
+          docker network inspect putevka_app >/dev/null 2>&1 || docker network create putevka_app
+          docker compose --env-file .env.ai.local -f docker-compose.ai.yml up -d --build --remove-orphans
+          docker compose --env-file .env.ai.local -f docker-compose.ai.yml ps
+          EOF

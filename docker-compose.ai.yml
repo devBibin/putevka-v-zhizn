@@ -1,0 +1,21 @@
+services:
+  ai-worker:
+    build:
+      context: .
+      dockerfile: ai_service/Dockerfile
+    env_file:
+      - path: .env.ai.local
+        required: false
+    environment:
+      AI_DJANGO_BASE_URL: ${AI_DJANGO_BASE_URL:-http://web:8000}
+      AI_WORKER_ID: ${AI_WORKER_ID:-ai-worker-local-1}
+      AI_WORKER_POLLING_INTERVAL: ${AI_WORKER_POLLING_INTERVAL:-10}
+      AI_WORKER_LEASE_SECONDS: ${AI_WORKER_LEASE_SECONDS:-900}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    networks:
+      - putevka_app
+    restart: unless-stopped
+
+networks:
+  putevka_app:
+    external: true

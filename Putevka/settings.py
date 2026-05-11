@@ -29,6 +29,8 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = os.getenv("SECRET_KEY", "local-dev-insecure-secret-key")
+AI_SERVICE_TOKEN = os.getenv("AI_SERVICE_TOKEN", "")
+AI_FILE_TOKEN_MAX_AGE = int(os.getenv("AI_FILE_TOKEN_MAX_AGE", "3600"))
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv("DEBUG", "true").lower() in {"1", "true", "yes", "on"}

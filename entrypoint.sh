@@ -42,6 +42,9 @@ python manage.py migrate
 # Collect static files
 python manage.py collectstatic --noinput
 
+# Queue existing pending AI work for the external AI service.
+python manage.py enqueue_ai_tasks
+
 #тестовые данные
 #python manage.py loaddata my_study/fixtures/subjects.json
 #python manage.py loaddata my_study/fixtures/schools_courses.json
@@ -67,14 +70,6 @@ if not User.objects.filter(username=user_name).exists():
 python Shadows/notification_worker.py &
 
 python telegram_bot_polling.py &
-
-python Shadows/gpt_reviewer.py &
-
-python Shadows/gpt_transcriber.py &
-
-python Shadows/gpt_transcriber_video.py &
-
-python Shadows/gpt_fill_form.py &
 
 # Start Gunicorn server
 #exec gunicorn Putevka.wsgi:application --bind 0.0.0.0:8000
