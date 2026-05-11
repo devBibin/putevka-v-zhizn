@@ -10,6 +10,7 @@ from unittest.mock import Mock, patch
 
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import RequestFactory
 from django.test import TestCase, override_settings
@@ -1388,6 +1389,93 @@ class CorePageFlowTests(IntegrationTestCase):
         self.assertEqual(response.status_code, 400)
         letter.refresh_from_db()
         self.assertEqual(letter.letter_text, "Draft text")
+
+    def test_motivation_letter_form_allows_twenty_thousand_chars(self):
+        from core.forms import MotivationLetterForm
+
+        form = MotivationLetterForm(data={"letter_text": "x" * 20000})
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.fields["letter_text"].max_length, 20000)
+        self.assertEqual(form.fields["letter_text"].widget.attrs["maxlength"], "20000")
+
+        too_long = MotivationLetterForm(data={"letter_text": "x" * 20001})
+        self.assertFalse(too_long.is_valid())
+
+    def test_motivation_letter_form_exposes_limit_and_autosave_attrs(self):
+        from core.forms import MOTIVATION_LETTER_MAX_LENGTH, MotivationLetterForm
+
+        form = MotivationLetterForm()
+        field = form.fields["letter_text"]
+        attrs = field.widget.attrs
+
+        self.assertEqual(MOTIVATION_LETTER_MAX_LENGTH, 20000)
+        self.assertEqual(field.max_length, 20000)
+        self.assertEqual(attrs["maxlength"], "20000")
+        self.assertEqual(attrs["data-maxlen"], "20000")
+        self.assertEqual(attrs["rows"], 15)
+        self.assertEqual(attrs["hx-post"], reverse("motivation_letter_autosave"))
+        self.assertEqual(attrs["hx-trigger"], "input changed delay:800ms")
+
+        submitted = MotivationLetter.objects.create(
+            user=self.user,
+            letter_text="Already submitted",
+            status=MotivationLetter.Status.SUBMITTED,
+        )
+        submitted_form = MotivationLetterForm(instance=submitted)
+        self.assertTrue(submitted_form.fields["letter_text"].disabled)
+
+    def test_motivation_letter_model_validates_length_and_submission_rules(self):
+        exact_limit = MotivationLetter(
+            user=self.user,
+            letter_text="x" * 20000,
+            status=MotivationLetter.Status.DRAFT,
+        )
+        exact_limit.full_clean()
+        self.assertEqual(exact_limit.word_count(), 1)
+
+        too_long = MotivationLetter(
+            user=self.user,
+            letter_text="x" * 20001,
+            status=MotivationLetter.Status.DRAFT,
+        )
+        with self.assertRaises(ValidationError):
+            too_long.full_clean()
+
+        blank_submitted = MotivationLetter(
+            user=self.user,
+            letter_text="   ",
+            status=MotivationLetter.Status.SUBMITTED,
+        )
+        with self.assertRaises(ValidationError):
+            blank_submitted.full_clean()
+
+        submitted = MotivationLetter.objects.create(
+            user=self.user,
+            letter_text="First second third",
+            status=MotivationLetter.Status.SUBMITTED,
+        )
+        self.assertTrue(submitted.is_done)
+        self.assertIsNotNone(submitted.submitted_at)
+        self.assertEqual(submitted.word_count(), 3)
+
+    def test_motivation_autosave_rejects_over_limit_and_keeps_previous_text(self):
+        response = self.client.post(
+            reverse("motivation_letter_autosave"),
+            {"letter_text": "Saved draft"},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 200)
+
+        response = self.client.post(
+            reverse("motivation_letter_autosave"),
+            {"letter_text": "x" * 20001},
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(response.status_code, 400)
+
+        letter = MotivationLetter.objects.get(user=self.user)
+        self.assertEqual(letter.letter_text, "Saved draft")
+        self.assertEqual(letter.status, MotivationLetter.Status.DRAFT)
 
 
 class DocumentAndStudyPageFlowTests(IntegrationTestCase):

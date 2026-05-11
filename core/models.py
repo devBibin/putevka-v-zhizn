@@ -17,6 +17,9 @@ from django.conf import settings
 from scholar_form.models import StaffNote
 
 
+MOTIVATION_LETTER_MAX_LENGTH = 20000
+
+
 class TelegramAccount(models.Model):
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
@@ -185,6 +188,7 @@ class MotivationLetter(models.Model):
 
     letter_text = models.TextField(
         blank=True,
+        max_length=MOTIVATION_LETTER_MAX_LENGTH,
         help_text='Вставьте своё мотивационное письмо сюда',
         verbose_name='Текст мотивационного письма'
     )
@@ -259,6 +263,13 @@ class MotivationLetter(models.Model):
                 and self.letter_text != original.letter_text
             ):
                 raise ValidationError("Нельзя изменять текст письма после отправки.")
+
+        if len(self.letter_text or "") > MOTIVATION_LETTER_MAX_LENGTH:
+            raise ValidationError({
+                "letter_text": (
+                    f"Letter text must not exceed {MOTIVATION_LETTER_MAX_LENGTH} characters."
+                )
+            })
 
         if self.status == self.Status.SUBMITTED and not self.submitted_at:
             self.submitted_at = timezone.now()
