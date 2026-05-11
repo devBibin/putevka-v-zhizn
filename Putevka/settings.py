@@ -35,7 +35,7 @@ AI_FILE_TOKEN_MAX_AGE = int(os.getenv("AI_FILE_TOKEN_MAX_AGE", "3600"))
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv("DEBUG", "true").lower() in {"1", "true", "yes", "on"}
 
-ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
+ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1,web").split(",")
 
 CSRF_TRUSTED_ORIGINS = os.getenv(
     "CSRF_TRUSTED_ORIGINS",
@@ -200,6 +200,15 @@ DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL")
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/'
 
+LOG_DIR = os.path.join(BASE_DIR, 'logs')
+if not os.path.exists(LOG_DIR):
+    os.makedirs(LOG_DIR)
+
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
+DJANGO_LOG_LEVEL = os.getenv("DJANGO_LOG_LEVEL", LOG_LEVEL).upper()
+APP_LOG_LEVEL = os.getenv("APP_LOG_LEVEL", LOG_LEVEL).upper()
+AI_LOG_LEVEL = os.getenv("AI_LOG_LEVEL", APP_LOG_LEVEL).upper()
+
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
@@ -210,7 +219,7 @@ LOGGING = {
             'style': '{',
         },
         'simple': {
-            'format': '{levelname} {message}',
+            'format': '{levelname} {asctime} {name}:{lineno} {message}',
             'style': '{',
         },
         'standard': {
@@ -233,19 +242,20 @@ LOGGING = {
 
     'handlers': {
         'console': {
-            'level': 'INFO',
-            'filters': ['require_debug_true', 'user_info_filter'],
+            'level': LOG_LEVEL,
+            'filters': ['user_info_filter'],
             'class': 'logging.StreamHandler',
             'formatter': 'simple',
         },
         'file_info': {
-            'level': 'INFO',
+            'level': APP_LOG_LEVEL,
             'class': 'logging.handlers.RotatingFileHandler',
             'filename': os.path.join(BASE_DIR, 'logs', 'output_to_file_level_info.log'),
             'maxBytes': 1024 * 1024 * 5,
             'backupCount': 5,
             'formatter': 'standard',
             'filters': ['user_info_filter'],
+            'encoding': 'utf-8',
         },
         'file_error': {
             'level': 'ERROR',
@@ -255,6 +265,17 @@ LOGGING = {
             'backupCount': 10,
             'formatter': 'standard',
             'filters': ['user_info_filter'],
+            'encoding': 'utf-8',
+        },
+        'ai_file': {
+            'level': AI_LOG_LEVEL,
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': os.path.join(BASE_DIR, 'logs', 'ai_django.log'),
+            'maxBytes': 1024 * 1024 * 10,
+            'backupCount': 5,
+            'formatter': 'standard',
+            'filters': ['user_info_filter'],
+            'encoding': 'utf-8',
         },
         'telegram_errors': {
             'level': 'ERROR',
@@ -272,40 +293,71 @@ LOGGING = {
     'loggers': {
         'django': {
             'handlers': ['console', 'file_info', ],
-            'level': 'INFO',
+            'level': DJANGO_LOG_LEVEL,
             'propagate': False,
         },
         'django.request': {
             'handlers': ['telegram_errors', 'file_error'],
-            'level': 'INFO',
+            'level': 'ERROR',
             'propagate': False,
         },
         'core': {
             'handlers': ['console', 'file_info', 'file_error', 'telegram_errors'],
-            'level': 'INFO',  # В разработке может быть DEBUG, на продакшене INFO
+            'level': APP_LOG_LEVEL,
             'propagate': False,
         },
         'documents': {
             'handlers': ['console', 'file_info', 'file_error', 'telegram_errors'],
-            'level': 'INFO',  # В разработке может быть DEBUG, на продакшене INFO
+            'level': APP_LOG_LEVEL,
             'propagate': False,
         },
         'scholar_form': {
             'handlers': ['console', 'file_info', 'file_error', 'telegram_errors'],
-            'level': 'INFO',  # В разработке может быть DEBUG, на продакшене INFO
+            'level': APP_LOG_LEVEL,
+            'propagate': False,
+        },
+        'review_by_tutor': {
+            'handlers': ['console', 'file_info', 'file_error', 'telegram_errors'],
+            'level': APP_LOG_LEVEL,
+            'propagate': False,
+        },
+        'my_study': {
+            'handlers': ['console', 'file_info', 'file_error', 'telegram_errors'],
+            'level': APP_LOG_LEVEL,
+            'propagate': False,
+        },
+        'subscriber': {
+            'handlers': ['console', 'file_info', 'file_error', 'telegram_errors'],
+            'level': APP_LOG_LEVEL,
+            'propagate': False,
+        },
+        'Shadows': {
+            'handlers': ['console', 'file_info', 'file_error', 'telegram_errors'],
+            'level': APP_LOG_LEVEL,
+            'propagate': False,
+        },
+        'ai_service': {
+            'handlers': ['console', 'ai_file', 'file_error', 'telegram_errors'],
+            'level': AI_LOG_LEVEL,
+            'propagate': False,
+        },
+        'httpx': {
+            'handlers': ['console', 'file_info', 'file_error'],
+            'level': os.getenv("HTTPX_LOG_LEVEL", "WARNING").upper(),
+            'propagate': False,
+        },
+        'openai': {
+            'handlers': ['console', 'file_info', 'file_error'],
+            'level': os.getenv("OPENAI_LOG_LEVEL", "WARNING").upper(),
             'propagate': False,
         },
         '': {
             'handlers': ['console', 'file_info', 'file_error'],
-            'level': 'INFO',
-            'propagate': True,
+            'level': LOG_LEVEL,
+            'propagate': False,
         }
     }
 }
-
-LOG_DIR = os.path.join(BASE_DIR, 'logs')
-if not os.path.exists(LOG_DIR):
-    os.makedirs(LOG_DIR)
 
 ALLOWED_VIDEO_MIME = {
     "video/mp4", "video/quicktime", "video/x-matroska", "video/webm", "application/octet-stream"

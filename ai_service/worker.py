@@ -4,6 +4,8 @@ import tempfile
 import threading
 import time
 
+import httpx
+
 from ai_service.client import DjangoAiClient
 from ai_service.logging_config import configure_logging
 from ai_service.tasks.fill_form import ask_openai_fill
@@ -70,7 +72,12 @@ def execute_task(client: DjangoAiClient, task: dict) -> dict:
 
 
 def run_once(client: DjangoAiClient) -> bool:
-    task = client.claim(lease_seconds=LEASE_SECONDS)
+    try:
+        task = client.claim(lease_seconds=LEASE_SECONDS)
+    except httpx.HTTPError:
+        logger.warning("Django AI API is unavailable, retrying in %ss", POLLING_INTERVAL, exc_info=True)
+        time.sleep(POLLING_INTERVAL)
+        return False
     if not task:
         logger.debug("No AI task claimed")
         return False

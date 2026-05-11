@@ -1,5 +1,6 @@
 import hashlib
 import json
+import logging
 from decimal import Decimal, InvalidOperation
 from datetime import timedelta
 from typing import Any
@@ -14,6 +15,8 @@ from django.utils.dateparse import parse_date, parse_datetime
 
 from core.models import AiTask, MotivationLetter, MotivationLetterRubricReview
 
+
+logger = logging.getLogger(__name__)
 
 FILE_TOKEN_MAX_AGE = int(getattr(settings, "AI_FILE_TOKEN_MAX_AGE", 3600))
 
@@ -41,23 +44,44 @@ def _pending_exists(task_type: str, obj: models.Model, source_version: str = "")
 
 def create_ai_task(task_type: str, obj: models.Model, payload: dict[str, Any], source_version: str = "") -> AiTask:
     if _pending_exists(task_type, obj, source_version):
-        return AiTask.objects.filter(
+        task = AiTask.objects.filter(
             task_type=task_type,
             status__in=[AiTask.Status.PENDING, AiTask.Status.PROCESSING, AiTask.Status.RETRY],
             source_version=source_version,
             **_source_kwargs(obj),
         ).latest("created_at")
+        logger.info(
+            "AI task already pending task_id=%s task_type=%s source=%s.%s:%s status=%s",
+            task.pk,
+            task_type,
+            obj._meta.app_label,
+            obj._meta.model_name,
+            obj.pk,
+            task.status,
+        )
+        return task
 
-    return AiTask.objects.create(
+    task = AiTask.objects.create(
         task_type=task_type,
         payload=payload,
         source_version=source_version,
         **_source_kwargs(obj),
     )
+    logger.info(
+        "AI task created task_id=%s task_type=%s source=%s.%s:%s payload_keys=%s",
+        task.pk,
+        task_type,
+        obj._meta.app_label,
+        obj._meta.model_name,
+        obj.pk,
+        ",".join(sorted(payload.keys())),
+    )
+    return task
 
 
 def enqueue_motivation_letter_review(letter: MotivationLetter) -> AiTask | None:
     if letter.status != MotivationLetter.Status.SUBMITTED or not (letter.letter_text or "").strip():
+        logger.debug("Skipped motivation letter AI enqueue letter_id=%s status=%s", letter.pk, letter.status)
         return None
     version = _version_from_value(letter.letter_text)
     return create_ai_task(
@@ -70,8 +94,10 @@ def enqueue_motivation_letter_review(letter: MotivationLetter) -> AiTask | None:
 
 def enqueue_interview_transcription(interview) -> AiTask | None:
     if not getattr(interview, "video", None):
+        logger.debug("Skipped interview transcription enqueue interview_id=%s reason=no_video", getattr(interview, "pk", None))
         return None
     if interview.transcript_status == "DONE":
+        logger.debug("Skipped interview transcription enqueue interview_id=%s reason=already_done", interview.pk)
         return None
     token = make_file_token("review_by_tutor", "interview", interview.pk, "video")
     return create_ai_task(
@@ -84,6 +110,12 @@ def enqueue_interview_transcription(interview) -> AiTask | None:
 
 def enqueue_scholar_video_transcription(video) -> AiTask | None:
     if not video.has_video_file or video.transcript_status == "DONE":
+        logger.debug(
+            "Skipped scholar video transcription enqueue video_id=%s has_file=%s status=%s",
+            getattr(video, "pk", None),
+            getattr(video, "has_video_file", None),
+            getattr(video, "transcript_status", None),
+        )
         return None
     token = make_file_token("scholar_form", "scholarvideo", video.pk, "file")
     return create_ai_task(
@@ -96,8 +128,10 @@ def enqueue_scholar_video_transcription(video) -> AiTask | None:
 
 def enqueue_interview_result_fill(interview) -> AiTask | None:
     if interview.transcript_status != "DONE" or not (interview.transcript or "").strip():
+        logger.debug("Skipped interview fill enqueue interview_id=%s transcript_status=%s", interview.pk, interview.transcript_status)
         return None
     if interview.ai_fill_status == "DONE":
+        logger.debug("Skipped interview fill enqueue interview_id=%s reason=already_done", interview.pk)
         return None
     fields_schema = build_interview_result_schema()
     return create_ai_task(
@@ -123,6 +157,7 @@ def claim_next_task(worker_id: str, lease_seconds: int = 600) -> AiTask | None:
             .first()
         )
         if not task:
+            logger.debug("No claimable AI tasks worker_id=%s", worker_id)
             return None
         task.status = AiTask.Status.PROCESSING
         task.locked_by = worker_id
@@ -132,6 +167,14 @@ def claim_next_task(worker_id: str, lease_seconds: int = 600) -> AiTask | None:
         task.error = ""
         task.save(update_fields=["status", "locked_by", "locked_until", "started_at", "attempts", "error", "updated_at"])
         mark_source_processing(task)
+        logger.info(
+            "AI task locked task_id=%s task_type=%s worker_id=%s attempt=%s lease_until=%s",
+            task.pk,
+            task.task_type,
+            worker_id,
+            task.attempts,
+            lease_until.isoformat(),
+        )
         return task
 
 
@@ -153,6 +196,8 @@ def heartbeat_task(task_id, worker_id: str, lease_seconds: int = 600) -> bool:
         locked_until=timezone.now() + timedelta(seconds=lease_seconds),
         updated_at=timezone.now(),
     )
+    if updated:
+        logger.debug("AI task heartbeat task_id=%s worker_id=%s lease=%s", task_id, worker_id, lease_seconds)
     return bool(updated)
 
 
@@ -170,6 +215,7 @@ def complete_task(task_id, worker_id: str, result: dict[str, Any]) -> AiTask:
         task.locked_until = None
         task.finished_at = timezone.now()
         task.save(update_fields=["status", "result", "error", "locked_until", "finished_at", "updated_at"])
+        logger.info("AI task persisted done task_id=%s task_type=%s worker_id=%s", task.pk, task.task_type, worker_id)
         return task
 
 
@@ -186,6 +232,15 @@ def fail_task(task_id, worker_id: str, error: str, retryable: bool = True) -> Ai
         task.save(update_fields=["status", "error", "locked_until", "finished_at", "updated_at"])
         if final:
             mark_source_failed(task, task.error)
+        logger.warning(
+            "AI task persisted failure task_id=%s task_type=%s status=%s worker_id=%s final=%s error=%s",
+            task.pk,
+            task.task_type,
+            task.status,
+            worker_id,
+            final,
+            task.error[:300],
+        )
         return task
 
 
@@ -208,6 +263,7 @@ def mark_source_processing(task: AiTask) -> None:
         obj.ai_fill_status = obj.AiFillStatus.PROCESSING
         obj.ai_fill_error = ""
         obj.save(update_fields=["ai_fill_status", "ai_fill_error"])
+    logger.info("AI source marked processing task_id=%s source=%s.%s:%s", task.pk, task.source_app, task.source_model, task.source_object_id)
 
 
 def mark_source_failed(task: AiTask, error: str) -> None:
@@ -224,6 +280,7 @@ def mark_source_failed(task: AiTask, error: str) -> None:
         obj.ai_fill_status = obj.AiFillStatus.FAILED
         obj.ai_fill_error = error
         obj.save(update_fields=["ai_fill_status", "ai_fill_error"])
+    logger.warning("AI source marked failed task_id=%s source=%s.%s:%s", task.pk, task.source_app, task.source_model, task.source_object_id)
 
 
 def apply_task_result(task: AiTask, result: dict[str, Any]) -> None:
@@ -233,6 +290,7 @@ def apply_task_result(task: AiTask, result: dict[str, Any]) -> None:
         MotivationLetterRubricReview.objects.update_or_create(letter=obj, defaults=review_kwargs)
         obj.is_done = True
         obj.save(update_fields=["is_done", "updated_at"])
+        logger.info("Applied AI motivation review task_id=%s letter_id=%s score=%s", task.pk, obj.pk, review_kwargs.get("total_score"))
     elif task.task_type == AiTask.Type.INTERVIEW_TRANSCRIPTION:
         obj.transcript = result.get("transcript", "")
         obj.transcript_status = "DONE"
@@ -240,14 +298,17 @@ def apply_task_result(task: AiTask, result: dict[str, Any]) -> None:
         obj.transcript_updated_at = timezone.now()
         obj.save(update_fields=["transcript", "transcript_status", "transcript_error", "transcript_updated_at"])
         enqueue_interview_result_fill(obj)
+        logger.info("Applied AI interview transcript task_id=%s interview_id=%s transcript_chars=%s", task.pk, obj.pk, len(obj.transcript or ""))
     elif task.task_type == AiTask.Type.SCHOLAR_VIDEO_TRANSCRIPTION:
         obj.transcript_text = result.get("transcript", "")
         obj.transcript_status = "DONE"
         obj.transcript_error = ""
         obj.transcript_updated_at = timezone.now()
         obj.save(update_fields=["transcript_text", "transcript_status", "transcript_error", "transcript_updated_at"])
+        logger.info("Applied AI scholar video transcript task_id=%s video_id=%s transcript_chars=%s", task.pk, obj.pk, len(obj.transcript_text or ""))
     elif task.task_type == AiTask.Type.INTERVIEW_RESULT_FILL:
         apply_interview_result(obj, result.get("answers", {}))
+        logger.info("Applied AI interview result fill task_id=%s interview_id=%s answer_fields=%s", task.pk, obj.pk, len(result.get("answers", {})))
 
 
 def build_interview_result_schema() -> dict[str, str]:
@@ -273,6 +334,7 @@ def apply_interview_result(interview, answers: dict[str, Any]) -> None:
     fields = [f for f in InterviewResult._meta.get_fields() if getattr(f, "concrete", False) and f.name in answers]
     update_fields = apply_answers_to_result(result_obj, fields, answers)
     if not update_fields:
+        logger.warning("AI returned no applicable InterviewResult updates interview_id=%s answer_fields=%s", interview.pk, len(answers))
         raise ValueError("AI returned no applicable InterviewResult updates")
     result_obj.updated_at = timezone.now()
     update_fields.append("updated_at")
@@ -281,6 +343,7 @@ def apply_interview_result(interview, answers: dict[str, Any]) -> None:
     interview.ai_filled_at = timezone.now()
     interview.ai_fill_error = ""
     interview.save(update_fields=["ai_fill_status", "ai_filled_at", "ai_fill_error"])
+    logger.info("InterviewResult updated from AI interview_id=%s fields=%s", interview.pk, ",".join(update_fields))
 
 
 def _empty(value: Any) -> bool:
@@ -366,11 +429,13 @@ def open_file_from_token(token: str):
         tmp = tempfile.NamedTemporaryFile(suffix=suffix, delete=False)
         tmp.close()
         download_file_from_yandex_disk(obj.yandex_disk_path, tmp.name, log_context={"user_id": obj.user_id})
+        logger.info("Opened AI file from Yandex Disk source=%s.%s:%s filename=%s", app_label, model_name, object_id, obj.video_storage_name or "video.mp4")
         return open(tmp.name, "rb"), obj.video_storage_name or "video.mp4"
 
     file_field = getattr(obj, field_name)
     if not file_field:
         raise Http404("File is missing")
+    logger.info("Opened AI file source=%s.%s:%s field=%s filename=%s", app_label, model_name, object_id, field_name, file_field.name)
     return file_field.open("rb"), file_field.name.rsplit("/", 1)[-1]
 
 
