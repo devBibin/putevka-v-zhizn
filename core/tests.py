@@ -18,7 +18,14 @@ from django.urls import reverse
 from django.utils import timezone
 
 from core.llm_safe import compute_score, parse_llm_json
-from core.models import AiTask, MotivationLetter, Notification, RegistrationPersonalData, UserNotification
+from core.models import (
+    AiTask,
+    MotivationLetter,
+    MotivationLetterRubricReview,
+    Notification,
+    RegistrationPersonalData,
+    UserNotification,
+)
 from documents.ctx_builders import base_user_context, merge_context
 from documents.jinja_env import build_jinja_env, date_ru, money_text_ru
 from documents.models import DocTemplate, Document
@@ -1250,6 +1257,64 @@ class AiServiceUnitTests(TestCase):
 
 
 class AiTaskApiTests(IntegrationTestCase):
+    def test_motivation_letter_review_enqueue_skips_reviewed_letters(self):
+        from core.ai_tasks import enqueue_motivation_letter_review
+
+        with_rubric_user = self.create_finished_candidate("ai-rubric-exists@example.com")
+        with_rubric = MotivationLetter.objects.create(
+            user=with_rubric_user,
+            letter_text="submitted letter",
+            status=MotivationLetter.Status.SUBMITTED,
+        )
+        AiTask.objects.filter(source_object_id=with_rubric.pk).delete()
+        MotivationLetterRubricReview.objects.create(letter=with_rubric, total_score=55)
+
+        with_score_user = self.create_finished_candidate("ai-admin-score@example.com")
+        with_score = MotivationLetter.objects.create(
+            user=with_score_user,
+            letter_text="submitted letter",
+            status=MotivationLetter.Status.SUBMITTED,
+            admin_score=60,
+        )
+        AiTask.objects.filter(source_object_id=with_score.pk).delete()
+
+        with_rating_user = self.create_finished_candidate("ai-admin-rating@example.com")
+        with_rating = MotivationLetter.objects.create(
+            user=with_rating_user,
+            letter_text="submitted letter",
+            status=MotivationLetter.Status.SUBMITTED,
+            admin_rating="Checked by admin",
+        )
+        AiTask.objects.filter(source_object_id=with_rating.pk).delete()
+
+        for letter in (with_rubric, with_score, with_rating):
+            self.assertIsNone(enqueue_motivation_letter_review(letter))
+
+        self.assertFalse(
+            AiTask.objects.filter(
+                task_type=AiTask.Type.MOTIVATION_LETTER_REVIEW,
+                source_model="motivationletter",
+                source_object_id__in=[with_rubric.pk, with_score.pk, with_rating.pk],
+            ).exists()
+        )
+
+    def test_motivation_letter_review_enqueue_creates_task_for_unreviewed_letter(self):
+        from core.ai_tasks import enqueue_motivation_letter_review
+
+        user = self.create_finished_candidate("ai-unreviewed@example.com")
+        letter = MotivationLetter.objects.create(
+            user=user,
+            letter_text="submitted letter",
+            status=MotivationLetter.Status.SUBMITTED,
+        )
+        AiTask.objects.filter(source_object_id=letter.pk).delete()
+
+        task = enqueue_motivation_letter_review(letter)
+
+        self.assertIsNotNone(task)
+        self.assertEqual(task.task_type, AiTask.Type.MOTIVATION_LETTER_REVIEW)
+        self.assertEqual(task.source_object_id, letter.pk)
+
     def test_ai_task_api_claim_complete_fail_and_forbidden(self):
         from core.ai_tasks import create_ai_task
 

@@ -102,6 +102,17 @@ def enqueue_motivation_letter_review(letter: MotivationLetter) -> AiTask | None:
     if letter.status != MotivationLetter.Status.SUBMITTED or not (letter.letter_text or "").strip():
         logger.debug("Skipped motivation letter AI enqueue letter_id=%s status=%s", letter.pk, letter.status)
         return None
+    if hasattr(letter, "rubric_review"):
+        logger.info("Skipped motivation letter AI enqueue letter_id=%s reason=rubric_exists", letter.pk)
+        return None
+    if letter.admin_score is not None or (letter.admin_rating or "").strip():
+        logger.info(
+            "Skipped motivation letter AI enqueue letter_id=%s reason=admin_review_exists admin_score_set=%s admin_rating_set=%s",
+            letter.pk,
+            letter.admin_score is not None,
+            bool((letter.admin_rating or "").strip()),
+        )
+        return None
     version = _version_from_value(letter.letter_text)
     return create_ai_task(
         AiTask.Type.MOTIVATION_LETTER_REVIEW,
