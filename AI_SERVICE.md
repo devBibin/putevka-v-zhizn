@@ -30,7 +30,7 @@ docker compose up -d --build
 AI-воркер запускается отдельно. Создай локальный env-файл для него:
 
 ```powershell
-Copy-Item .env.ai.example .env.ai.local
+cp .env.ai.example .env.ai.local
 ```
 
 Заполни `.env.ai.local`. Минимально нужны:

@@ -1,9 +1,12 @@
+import json
+import os
 import shutil
 import tempfile
 from datetime import date
+from decimal import Decimal
 from io import BytesIO
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -14,7 +17,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from core.llm_safe import compute_score, parse_llm_json
-from core.models import MotivationLetter, Notification, RegistrationPersonalData, UserNotification
+from core.models import AiTask, MotivationLetter, Notification, RegistrationPersonalData, UserNotification
 from documents.ctx_builders import base_user_context, merge_context
 from documents.jinja_env import build_jinja_env, date_ru, money_text_ru
 from documents.models import DocTemplate, Document
@@ -990,6 +993,316 @@ class SubscriberFlowTests(TestCase):
 
         response = self.client.get(reverse("thanks_subscribe"))
         self.assertRedirects(response, reverse("announce"))
+
+
+class AiServiceUnitTests(TestCase):
+    def test_worker_executes_supported_task_types_without_external_calls(self):
+        from ai_service.worker import execute_task
+
+        client = Mock()
+
+        with patch("ai_service.worker.review_letter", return_value={"review": {"total_score": 75}}) as review:
+            result = execute_task(client, {"id": "task-1", "type": "motivation_letter_review", "payload": {"letter_text": "text"}})
+        self.assertEqual(result["review"]["total_score"], 75)
+        review.assert_called_once_with("text")
+
+        with patch("ai_service.worker._with_downloaded_file", return_value="media.mp4"), \
+             patch("ai_service.worker.transcribe_media_file", return_value="transcript") as transcribe, \
+             patch("ai_service.worker.os.remove") as remove:
+            result = execute_task(
+                client,
+                {
+                    "id": "task-2",
+                    "type": "interview_transcription",
+                    "payload": {"file_url": "http://files/video.mp4", "language": "ru"},
+                },
+            )
+        self.assertEqual(result, {"transcript": "transcript"})
+        transcribe.assert_called_once_with("media.mp4", language="ru")
+        remove.assert_called_once_with("media.mp4")
+
+        with patch("ai_service.worker.ask_openai_fill", return_value={"field": "value"}) as fill:
+            result = execute_task(
+                client,
+                {"id": "task-3", "type": "interview_result_fill", "payload": {"fields_schema": {"field": "Text"}, "transcript": "hello"}},
+            )
+        self.assertEqual(result, {"answers": {"field": "value"}})
+        fill.assert_called_once_with({"field": "Text"}, "hello")
+
+        with self.assertRaisesMessage(ValueError, "Unknown AI task type"):
+            execute_task(client, {"id": "task-4", "type": "unknown", "payload": {}})
+
+    def test_worker_retries_when_django_api_is_unavailable(self):
+        import httpx
+        from ai_service.worker import run_once
+
+        client = Mock()
+        client.claim.side_effect = httpx.ConnectError("refused")
+
+        with patch("ai_service.worker.time.sleep") as sleep:
+            self.assertFalse(run_once(client))
+
+        sleep.assert_called_once()
+
+    def test_worker_run_once_completes_and_fails_tasks(self):
+        from ai_service.worker import run_once
+
+        client = Mock()
+        client.claim.return_value = {"id": "task-ok", "type": "interview_result_fill", "payload": {}}
+
+        with patch("ai_service.worker.execute_task", return_value={"answers": {"field": "value"}}):
+            self.assertTrue(run_once(client))
+
+        client.complete.assert_called_once_with("task-ok", {"answers": {"field": "value"}})
+
+        client = Mock()
+        client.claim.return_value = {"id": "task-fail", "type": "interview_result_fill", "payload": {}}
+        with patch("ai_service.worker.execute_task", side_effect=RuntimeError("bad result")):
+            self.assertTrue(run_once(client))
+
+        client.fail.assert_called_once_with("task-fail", "bad result", retryable=True)
+
+    def test_django_ai_client_posts_expected_payloads_and_downloads_content(self):
+        from ai_service.client import DjangoAiClient
+
+        responses = [
+            Mock(status_code=200, is_error=False, json=Mock(return_value={"task": {"id": "1"}}), raise_for_status=Mock()),
+            Mock(status_code=200, is_error=False, raise_for_status=Mock()),
+            Mock(status_code=200, is_error=False, raise_for_status=Mock()),
+            Mock(status_code=200, is_error=False, raise_for_status=Mock()),
+            Mock(status_code=200, is_error=False, content=b"file-bytes", raise_for_status=Mock()),
+        ]
+        http_client = Mock()
+        http_client.post.side_effect = responses[:4]
+        http_client.get.return_value = responses[4]
+
+        with patch("ai_service.client.httpx.Client", return_value=http_client), \
+             patch.dict("os.environ", {"AI_DJANGO_BASE_URL": "http://django.local", "AI_WORKER_ID": "worker-1", "AI_SERVICE_TOKEN": "token"}):
+            client = DjangoAiClient()
+            self.assertEqual(client.claim(600), {"id": "1"})
+            client.heartbeat("task-id", 700)
+            client.complete("task-id", {"ok": True})
+            client.fail("task-id", "bad", retryable=False)
+            target = tempfile.NamedTemporaryFile(delete=False)
+            target.close()
+            try:
+                client.download("http://django.local/file", target.name)
+                with open(target.name, "rb") as fh:
+                    self.assertEqual(fh.read(), b"file-bytes")
+            finally:
+                os.remove(target.name)
+
+        self.assertEqual(http_client.post.call_args_list[0].args[0], "http://django.local/internal/ai/tasks/claim/")
+        self.assertEqual(http_client.post.call_args_list[0].kwargs["json"], {"worker_id": "worker-1", "lease_seconds": 600})
+        self.assertFalse(http_client.post.call_args_list[3].kwargs["json"]["retryable"])
+
+    def test_openai_runtime_normalizes_proxy_and_builds_client(self):
+        from ai_service.openai_runtime import make_openai_client, normalize_proxy_url
+
+        self.assertIsNone(normalize_proxy_url(""))
+        self.assertEqual(normalize_proxy_url(" socks5h://proxy:1080 "), "socks5://proxy:1080")
+        self.assertEqual(normalize_proxy_url("http://proxy:8080"), "http://proxy:8080")
+
+        with patch("ai_service.openai_runtime.httpx.Client") as http_client, \
+             patch("ai_service.openai_runtime.OpenAI") as openai_cls, \
+             patch.dict("os.environ", {"OPENAI_API_KEY": "key", "TELEGRAM_SOCKS5_PROXY": "socks5h://proxy:1080", "OPENAI_MAX_RETRIES": "2"}):
+            make_openai_client()
+
+        self.assertEqual(http_client.call_args.kwargs["proxy"], "socks5://proxy:1080")
+        self.assertEqual(openai_cls.call_args.kwargs["api_key"], "key")
+        self.assertEqual(openai_cls.call_args.kwargs["max_retries"], 2)
+
+    def test_ai_logging_config_uses_rotating_files(self):
+        from ai_service.logging_config import configure_logging
+
+        with tempfile.TemporaryDirectory() as log_dir, \
+             patch.dict("os.environ", {"AI_LOG_DIR": log_dir, "LOG_LEVEL": "DEBUG", "AI_LOG_LEVEL": "INFO"}), \
+             patch("ai_service.logging_config.logging.config.dictConfig") as dict_config:
+            configure_logging()
+
+        config_payload = dict_config.call_args.args[0]
+        self.assertIn("ai_service", config_payload["loggers"])
+        self.assertTrue(config_payload["handlers"]["file_info"]["filename"].endswith("ai_service.log"))
+        self.assertTrue(config_payload["handlers"]["file_error"]["filename"].endswith("ai_service_errors.log"))
+
+    def test_fill_form_ask_openai_fill_parses_json_response(self):
+        from ai_service.tasks.fill_form import ask_openai_fill
+
+        response = SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content='{"field": "value"}'))]
+        )
+        client = Mock()
+        client.chat.completions.create.return_value = response
+
+        with patch("ai_service.tasks.fill_form.make_openai_client", return_value=client), \
+             patch.dict("os.environ", {"OPENAI_MODEL": "gpt-test"}):
+            result = ask_openai_fill({"field": "Verbose name"}, "transcript")
+
+        self.assertEqual(result, {"field": "value"})
+        self.assertEqual(client.chat.completions.create.call_args.kwargs["model"], "gpt-test")
+        self.assertEqual(client.chat.completions.create.call_args.kwargs["response_format"], {"type": "json_object"})
+
+    def test_reviewer_parses_valid_openai_payload_and_computes_score(self):
+        from ai_service.tasks.reviewer import RUBRIC_VERSION, review_letter
+
+        payload = {
+            "char_count": 1600,
+            "word_count": 250,
+            "content": {
+                "specialty_choice_score": "10",
+                "university_choice_score": "10",
+                "current_preparation_score": "10",
+                "admission_trajectory_score": "10",
+                "next_year_preparation_score": "10",
+                "higher_education_value_score": "10",
+                "support_criticality_score": "10",
+            },
+            "rhetoric": {"composition_penalty": "0", "style_penalty": "0"},
+            "literacy": {"orthography_penalty": "0", "syntax_penalty": "0"},
+            "flags": {"suspected_ai_generated": False, "returned_for_revision": False},
+            "extractions": {
+                "family": "",
+                "hobbies": "",
+                "achievements": "",
+                "traits": "",
+                "school_teachers": "",
+                "prep_subjects": "",
+                "specialty": "",
+                "preferred_universities": "",
+                "relocation": "",
+                "olympiads": "",
+                "motivation": "",
+                "help_criticality": "",
+                "extra": "",
+            },
+            "reviewer_comment": "ok",
+            "justification": "clear",
+        }
+        response = SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content=json.dumps(payload)))]
+        )
+        client = Mock()
+        client.chat.completions.create.return_value = response
+
+        with patch("ai_service.tasks.reviewer.make_openai_client", return_value=client), \
+             patch("ai_service.tasks.reviewer.OPENAI_MODEL", "gpt-review"):
+            result = review_letter("letter text")
+
+        self.assertEqual(result["review"]["total_score"], 70)
+        self.assertEqual(result["review"]["schema_version"], RUBRIC_VERSION)
+        self.assertEqual(result["review"]["model_name"], "gpt-review")
+
+    def test_transcribe_media_file_handles_short_and_chunked_media(self):
+        from ai_service.tasks import transcribe
+
+        extracted = []
+
+        def fake_extract(source, target, start_sec=None, duration_sec=None):
+            extracted.append((source, start_sec, duration_sec))
+
+        with patch.object(transcribe, "MAX_MODEL_AUDIO_SECONDS", 10), \
+             patch("ai_service.tasks.transcribe._probe_duration_seconds", return_value=9.0), \
+             patch("ai_service.tasks.transcribe._extract_audio", side_effect=fake_extract), \
+             patch("ai_service.tasks.transcribe._transcribe_audio_file", return_value="one"):
+            self.assertEqual(transcribe.transcribe_media_file("short.mp4"), "one")
+
+        extracted.clear()
+        with patch.object(transcribe, "MAX_MODEL_AUDIO_SECONDS", 5), \
+             patch.object(transcribe, "CHUNK_SECONDS", 4), \
+             patch.object(transcribe, "CHUNK_OVERLAP_SECONDS", 1), \
+             patch("ai_service.tasks.transcribe._probe_duration_seconds", return_value=8.0), \
+             patch("ai_service.tasks.transcribe._extract_audio", side_effect=fake_extract), \
+             patch("ai_service.tasks.transcribe._transcribe_audio_file", side_effect=["alpha", "beta", "gamma"]):
+            result = transcribe.transcribe_media_file("long.mp4", language="ru")
+
+        self.assertIn("[00:00:00]\nalpha", result)
+        self.assertIn("[00:00:03]\nbeta", result)
+        self.assertIn("[00:00:06]\ngamma", result)
+        self.assertEqual(extracted, [("long.mp4", 0, 4), ("long.mp4", 3, 4), ("long.mp4", 6, 3)])
+
+    def test_fill_form_normalizes_values_and_preserves_existing_text(self):
+        from ai_service.tasks.fill_form import apply_answers_to_result
+        from review_by_tutor.models import Interview, InterviewResult
+
+        user = User.objects.create_user(username="ai-fill@example.com")
+        TestAssignment.objects.create(user=user, title="Interview")
+        interview = Interview.objects.create(user=user)
+        result = InterviewResult.objects.create(interview=interview, other_notes="curator note")
+
+        fields = [
+            InterviewResult._meta.get_field("other_notes"),
+            InterviewResult._meta.get_field("interviewer_score"),
+            InterviewResult._meta.get_field("school_distance_km"),
+        ]
+        updated = apply_answers_to_result(
+            result,
+            fields,
+            {"other_notes": "ai note", "interviewer_score": "87 баллов", "school_distance_km": "4,75"},
+        )
+
+        self.assertEqual(set(updated), {"other_notes", "interviewer_score", "school_distance_km"})
+        self.assertIn("curator note", result.other_notes)
+        self.assertIn("ai note", result.other_notes)
+        self.assertEqual(result.interviewer_score, 87)
+        self.assertEqual(result.school_distance_km, Decimal("4.75"))
+
+
+class AiTaskApiTests(IntegrationTestCase):
+    def test_ai_task_api_claim_complete_fail_and_forbidden(self):
+        from core.ai_tasks import create_ai_task
+
+        user = self.create_finished_candidate("ai-api@example.com")
+        letter = MotivationLetter.objects.create(user=user, letter_text="letter", status=MotivationLetter.Status.SUBMITTED)
+        task = AiTask.objects.filter(source_app="core", source_model="motivationletter", source_object_id=letter.pk).earliest("created_at")
+
+        with override_settings(AI_SERVICE_TOKEN="secret"):
+            forbidden = self.client.post(reverse("ai_task_claim"), {}, content_type="application/json")
+            self.assertEqual(forbidden.status_code, 403)
+
+            response = self.client.post(
+                reverse("ai_task_claim"),
+                {"worker_id": "worker-1", "lease_seconds": 60},
+                content_type="application/json",
+                HTTP_AUTHORIZATION="Bearer secret",
+            )
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.json()["task"]["id"], str(task.pk))
+
+            heartbeat = self.client.post(
+                reverse("ai_task_heartbeat", args=[task.pk]),
+                {"worker_id": "worker-1", "lease_seconds": 60},
+                content_type="application/json",
+                HTTP_AUTHORIZATION="Bearer secret",
+            )
+            self.assertEqual(heartbeat.status_code, 200)
+
+            with patch("core.ai_tasks.apply_task_result"):
+                complete = self.client.post(
+                    reverse("ai_task_complete", args=[task.pk]),
+                    {"worker_id": "worker-1", "result": {"ok": True}},
+                    content_type="application/json",
+                    HTTP_AUTHORIZATION="Bearer secret",
+                )
+            self.assertEqual(complete.status_code, 200)
+            task.refresh_from_db()
+            self.assertEqual(task.status, AiTask.Status.DONE)
+
+            failed_task = create_ai_task(AiTask.Type.MOTIVATION_LETTER_REVIEW, letter, {"letter_text": "other"}, source_version="v2")
+            failed_task.status = AiTask.Status.PROCESSING
+            failed_task.locked_by = "worker-1"
+            failed_task.attempts = failed_task.max_attempts
+            failed_task.save(update_fields=["status", "locked_by", "attempts"])
+
+            with patch("core.ai_tasks.mark_source_failed"):
+                failed = self.client.post(
+                    reverse("ai_task_fail", args=[failed_task.pk]),
+                    {"worker_id": "worker-1", "error": "boom", "retryable": True},
+                    content_type="application/json",
+                    HTTP_AUTHORIZATION="Bearer secret",
+                )
+            self.assertEqual(failed.status_code, 200)
+            failed_task.refresh_from_db()
+            self.assertEqual(failed_task.status, AiTask.Status.FAILED)
 
 
 class CorePageFlowTests(IntegrationTestCase):
