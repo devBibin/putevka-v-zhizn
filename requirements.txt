@@ -22,3 +22,4 @@ openpyxl
 httpx
 socksio
 botocore
+coverage

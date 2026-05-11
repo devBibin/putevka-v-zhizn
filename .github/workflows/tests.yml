@@ -1,0 +1,60 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Django tests and coverage
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libmagic1
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt
+
+      - name: Run tests with coverage
+        env:
+          SECRET_KEY: test-secret-key
+          DEBUG: "true"
+          ALLOWED_HOSTS: localhost,127.0.0.1,testserver
+          CSRF_TRUSTED_ORIGINS: http://localhost,http://127.0.0.1
+          BASE_URL: http://localhost:8000
+          TG_TOKEN_ADMIN: ""
+          TG_TOKEN_USERS: ""
+          TELEGRAM_STAFF_CHAT_IDS: "{}"
+          TELEGRAM_LOG_CHAT_ID: ""
+          TG_BOT_USERS_USERNAME: test_bot
+          YC_EMAIL_USER: ""
+          YC_EMAIL_PASSWORD: ""
+          DEFAULT_FROM_EMAIL: test@example.com
+          YANDEX_DISK_OAUTH_TOKEN: ""
+        run: |
+          coverage run --source=core,documents,my_study,review_by_tutor,scholar_form,subscriber manage.py test -v 2
+          coverage report --fail-under=70 --show-missing
+          coverage xml
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml
+          path: coverage.xml
