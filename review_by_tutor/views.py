@@ -1,8 +1,12 @@
 import logging
+import mimetypes
+from pathlib import PurePosixPath
 from io import BytesIO
+from urllib.parse import unquote, urlparse
 from zipfile import ZIP_DEFLATED, ZipFile
 from datetime import timedelta
 
+import requests
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth import get_user_model
@@ -11,7 +15,7 @@ from django.core.mail import send_mail
 from django.core.paginator import Paginator, PageNotAnInteger, EmptyPage
 from django.db import transaction
 from django.db.models import Q, Subquery, OuterRef, Count, Exists, CharField, Value, When, Case, IntegerField
-from django.http import Http404, FileResponse, JsonResponse
+from django.http import Http404, FileResponse, JsonResponse, StreamingHttpResponse
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
 from django.utils import timezone
@@ -40,14 +44,203 @@ from review_by_tutor.services.staff_users import build_staff_users_queryset, get
 from review_by_tutor.utils.contact_form import handle_send_notification
 from review_by_tutor.utils.selection_stages import require_selection_step
 from scholar_form.models import UserInfo, ScholarVideo, StaffNote
+from scholar_form.services.yandex_disk import (
+    YandexDiskError,
+    get_download_url,
+    get_public_download_url,
+    get_public_resource_metadata,
+    get_resource_metadata,
+)
 from scholar_form.views import build_video_asset_context
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
+VIDEO_ALLOWED_MIME = {"video/mp4", "video/webm", "video/quicktime", "video/x-quicktime", "video/x-matroska"}
+VIDEO_ALLOWED_EXT = {".mp4", ".webm", ".mov", ".mkv"}
+VIDEO_STREAM_CHUNK_SIZE = 1024 * 1024
 
 
 def _staff_check(user):
     return user.is_staff
+
+
+def _is_yandex_disk_public_url(value: str) -> bool:
+    parsed = urlparse(value)
+    host = (parsed.netloc or "").lower()
+    return parsed.scheme in {"http", "https"} and host in {"disk.yandex.ru", "disk.yandex.com", "yadi.sk"}
+
+
+def _path_from_yandex_client_url(value: str) -> str:
+    parsed = urlparse(value)
+    host = (parsed.netloc or "").lower()
+    if host not in {"disk.yandex.ru", "disk.yandex.com"}:
+        return ""
+
+    marker = "/client/disk/"
+    if marker not in parsed.path:
+        return ""
+
+    tail = parsed.path.split(marker, 1)[1].strip("/")
+    return f"disk:/{unquote(tail)}" if tail else ""
+
+
+def _normalize_interview_video_source(value: str) -> tuple[str, str]:
+    raw = (value or "").strip()
+    if not raw:
+        return "", ""
+
+    client_path = _path_from_yandex_client_url(raw)
+    if client_path:
+        return "yandex_disk_path", client_path
+
+    if raw.startswith("disk:/"):
+        return "yandex_disk_path", raw
+
+    parsed = urlparse(raw)
+    if parsed.scheme in {"http", "https"}:
+        if _is_yandex_disk_public_url(raw):
+            return "yandex_public_url", raw
+        raise YandexDiskError("Поддерживаются только ссылки Яндекс Диска.")
+
+    return "yandex_disk_path", f"disk:/{raw.lstrip('/')}"
+
+
+def _guess_video_mime(name: str, fallback: str = "") -> str:
+    guessed, _ = mimetypes.guess_type(name or "")
+    return fallback or guessed or "application/octet-stream"
+
+
+def _validate_video_metadata(*, name: str, mime: str, size: int | None):
+    ext = PurePosixPath(name or "").suffix.lower()
+    normalized_mime = (mime or "").split(";", 1)[0].strip().lower()
+
+    if ext not in VIDEO_ALLOWED_EXT and normalized_mime not in VIDEO_ALLOWED_MIME:
+        raise YandexDiskError("Файл на Яндекс Диске должен быть видео MP4, WebM, MOV или MKV.")
+
+    if size is not None and size <= 0:
+        raise YandexDiskError("Файл на Яндекс Диске пустой.")
+
+
+def _is_video_resource(item: dict) -> bool:
+    if item.get("type") != "file":
+        return False
+    name = item.get("name") or ""
+    mime = item.get("mime_type") or _guess_video_mime(name)
+    ext = PurePosixPath(name).suffix.lower()
+    normalized_mime = (mime or "").split(";", 1)[0].strip().lower()
+    return ext in VIDEO_ALLOWED_EXT or normalized_mime in VIDEO_ALLOWED_MIME
+
+
+def _embedded_items(metadata: dict) -> list[dict]:
+    embedded = metadata.get("_embedded") or {}
+    items = embedded.get("items") or []
+    return items if isinstance(items, list) else []
+
+
+def _single_video_from_folder(metadata: dict) -> dict:
+    videos = [item for item in _embedded_items(metadata) if _is_video_resource(item)]
+    if not videos:
+        raise YandexDiskError("В папке Яндекс Диска не найдено видеофайлов.")
+    if len(videos) > 1:
+        raise YandexDiskError("В папке Яндекс Диска несколько видеофайлов. Укажите ссылку или путь на конкретный файл.")
+    return videos[0]
+
+
+def _join_disk_child_path(parent_path: str, child_name: str) -> str:
+    parent = parent_path.rstrip("/")
+    if parent.startswith("disk:/"):
+        return f"{parent}/{child_name}"
+    return f"disk:/{parent.lstrip('/')}/{child_name}"
+
+
+def _apply_interview_video_link(interview: Interview, source_value: str, uploaded_by):
+    source_type, source_ref = _normalize_interview_video_source(source_value)
+    interview.video_yandex_disk_url = (source_value or "").strip()
+    interview.video_yandex_disk_path = ""
+    interview.video_source_type = source_type
+    interview.video_name = ""
+    interview.video_size = None
+    interview.video_mime = ""
+    interview.video_link_error = ""
+    interview.video_link_checked_at = timezone.now()
+
+    if not source_ref:
+        return
+
+    if source_type == "yandex_disk_path":
+        metadata = get_resource_metadata(
+            source_ref,
+            log_context={"interview_id": interview.pk, "user_id": interview.user_id},
+        )
+        if metadata.get("type") == "dir":
+            child = _single_video_from_folder(metadata)
+            source_ref = _join_disk_child_path(source_ref, child.get("name") or "")
+            metadata = child
+        elif metadata.get("type") != "file":
+            raise YandexDiskError("Укажите ссылку или путь на видеофайл либо папку с одним видеофайлом.")
+
+        name = metadata.get("name") or PurePosixPath(source_ref.replace("disk:/", "", 1)).name
+        mime = metadata.get("mime_type") or _guess_video_mime(name)
+        size = metadata.get("size")
+        _validate_video_metadata(name=name, mime=mime, size=size)
+        interview.video_yandex_disk_path = source_ref
+    else:
+        metadata = get_public_resource_metadata(
+            source_ref,
+            log_context={"interview_id": interview.pk, "user_id": interview.user_id},
+        )
+        public_path = ""
+        if metadata.get("type") == "dir":
+            child = _single_video_from_folder(metadata)
+            public_path = child.get("path") or child.get("name") or ""
+            metadata = child
+        elif metadata.get("type") != "file":
+            raise YandexDiskError("Укажите ссылку на видеофайл либо папку с одним видеофайлом.")
+
+        name = metadata.get("name") or "video"
+        mime = metadata.get("mime_type") or _guess_video_mime(name)
+        size = metadata.get("size")
+        _validate_video_metadata(name=name, mime=mime, size=size)
+        interview.video_yandex_disk_path = public_path
+        href = get_public_download_url(
+            source_ref,
+            public_path=public_path,
+            log_context={"interview_id": interview.pk, "user_id": interview.user_id},
+        )
+        head = requests.head(href, allow_redirects=True, timeout=30)
+        if head.status_code >= 400:
+            probe = requests.get(href, headers={"Range": "bytes=0-0"}, stream=True, timeout=30)
+            probe.close()
+            if probe.status_code >= 400:
+                raise YandexDiskError("Не удалось проверить публичный видеофайл на Яндекс Диске.")
+        mime = mime or head.headers.get("Content-Type") or _guess_video_mime(name)
+        size_header = head.headers.get("Content-Length")
+        size = size or (int(size_header) if size_header and size_header.isdigit() else None)
+        _validate_video_metadata(name=name, mime=mime, size=size)
+
+    interview.video_name = name
+    interview.video_size = size
+    interview.video_mime = _guess_video_mime(name, mime)
+    interview.video_uploaded_by = uploaded_by
+    interview.video_uploaded_at = timezone.now()
+    interview.transcript_status = "PENDING"
+    interview.transcript_error = ""
+    interview.transcript = ""
+
+
+def _interview_video_download_href(interview: Interview) -> str:
+    if interview.video_source_type == "yandex_disk_path" and interview.video_yandex_disk_path:
+        return get_download_url(
+            interview.video_yandex_disk_path,
+            log_context={"interview_id": interview.pk, "user_id": interview.user_id},
+        )
+    if interview.video_source_type == "yandex_public_url" and interview.video_yandex_disk_url:
+        return get_public_download_url(
+            interview.video_yandex_disk_url,
+            public_path=interview.video_yandex_disk_path,
+            log_context={"interview_id": interview.pk, "user_id": interview.user_id},
+        )
+    raise Http404("Видео на Яндекс Диске не настроено")
 
 
 def _letter_display_name(user) -> str:
@@ -952,6 +1145,7 @@ def interview_detail(request, user_id: int):
             form = InterviewForm(request.POST, request.FILES, instance=interview)
             if form.is_valid():
                 obj = form.save(commit=False)
+                video_link = form.cleaned_data.get("video_yandex_disk_url", "")
 
                 if "filled_form" in request.FILES:
                     obj.filled_uploaded_by = request.user
@@ -960,9 +1154,42 @@ def interview_detail(request, user_id: int):
                 if "video" in request.FILES:
                     obj.video_uploaded_by = request.user
                     obj.video_uploaded_at = timezone.now()
+                    obj.video_yandex_disk_url = ""
+                    obj.video_yandex_disk_path = ""
+                    obj.video_source_type = ""
+                    obj.video_name = ""
+                    obj.video_size = None
+                    obj.video_mime = ""
+                    obj.video_link_error = ""
+                    obj.video_link_checked_at = None
                     obj.transcript_status = "PENDING"
                     obj.transcript_error = ""
                     obj.transcript = ""
+                elif video_link:
+                    try:
+                        _apply_interview_video_link(obj, video_link, request.user)
+                    except YandexDiskError as exc:
+                        form.add_error("video_yandex_disk_url", str(exc))
+                        messages.error(request, str(exc))
+                        ctx = {
+                            "user_obj": user_obj,
+                            "form": form,
+                            "interview": interview,
+                            "template_obj": template_obj,
+                            "active": "interview",
+                            "result_form": result_form,
+                            "interview_sections": sections,
+                            "send_notification_form": send_notification_form,
+                        }
+                        return render(request, "staff_templates/interview_detail.html", ctx)
+                else:
+                    obj.video_yandex_disk_path = ""
+                    obj.video_source_type = ""
+                    obj.video_name = ""
+                    obj.video_size = None
+                    obj.video_mime = ""
+                    obj.video_link_error = ""
+                    obj.video_link_checked_at = None
 
                 obj.save()
                 messages.success(request, "Файлы собеседования сохранены.")
@@ -996,6 +1223,52 @@ def interview_detail(request, user_id: int):
 
     }
     return render(request, "staff_templates/interview_detail.html", ctx)
+
+
+@login_required
+@user_passes_test(_staff_check)
+def interview_video_stream(request, user_id: int):
+    user_obj = get_object_or_404(User, pk=user_id)
+    interview = get_object_or_404(Interview, user=user_obj)
+
+    if interview.video and not interview.video_source_type:
+        return FileResponse(interview.video.open("rb"), content_type=interview.video_mime or None)
+
+    href = _interview_video_download_href(interview)
+    headers = {}
+    range_header = request.headers.get("Range")
+    if range_header:
+        headers["Range"] = range_header
+
+    try:
+        upstream = requests.get(href, headers=headers, stream=True, timeout=60)
+    except requests.RequestException as exc:
+        logger.warning("Failed to open interview video stream user_id=%s error=%s", user_id, exc)
+        raise Http404("Видео сейчас недоступно")
+
+    if upstream.status_code >= 400:
+        logger.warning(
+            "Yandex Disk interview video stream failed user_id=%s status=%s body=%s",
+            user_id,
+            upstream.status_code,
+            (upstream.text or "")[:300],
+        )
+        raise Http404("Видео сейчас недоступно")
+
+    status = 206 if upstream.status_code == 206 else 200
+    content_type = upstream.headers.get("Content-Type") or interview.video_mime or "application/octet-stream"
+    response = StreamingHttpResponse(
+        upstream.iter_content(chunk_size=VIDEO_STREAM_CHUNK_SIZE),
+        status=status,
+        content_type=content_type,
+    )
+
+    for header in ("Content-Length", "Content-Range", "Accept-Ranges"):
+        value = upstream.headers.get(header)
+        if value:
+            response[header] = value
+    response["Cache-Control"] = "private, no-store"
+    return response
 
 
 @login_required

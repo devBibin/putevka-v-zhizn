@@ -5,8 +5,10 @@ import tempfile
 import subprocess
 
 import django
+import requests
 from dotenv import load_dotenv
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from openai import OpenAI
@@ -22,6 +24,7 @@ os.environ.setdefault("DJANGO_SETTINGS_MODULE", "Putevka.settings")
 django.setup()
 
 from review_by_tutor.models import Interview
+from scholar_form.services.yandex_disk import get_download_url, get_public_download_url
 
 logger = logging.getLogger(__name__)
 
@@ -151,10 +154,42 @@ def transcribe_video_file(video_path: str) -> str:
 
 def pick_interviews_to_transcribe():
     return Interview.objects.filter(
-        video__isnull=False
-    ).exclude(video__exact="").filter(
+        Q(video__isnull=False) & ~Q(video__exact="") |
+        Q(video_source_type="yandex_disk_path", video_yandex_disk_path__gt="") |
+        Q(video_source_type="yandex_public_url", video_yandex_disk_url__gt="")
+    ).filter(
         transcript_status__in=["PENDING", "FAILED"]
     ).order_by("updated_at")[:BATCH_LIMIT]
+
+
+def interview_video_download_href(interview: "Interview") -> str:
+    if interview.video_source_type == "yandex_disk_path" and interview.video_yandex_disk_path:
+        return get_download_url(
+            interview.video_yandex_disk_path,
+            log_context={"interview_id": interview.pk, "user_id": interview.user_id},
+        )
+    if interview.video_source_type == "yandex_public_url" and interview.video_yandex_disk_url:
+        return get_public_download_url(
+            interview.video_yandex_disk_url,
+            public_path=interview.video_yandex_disk_path,
+            log_context={"interview_id": interview.pk, "user_id": interview.user_id},
+        )
+    return ""
+
+
+def download_interview_video_to_temp(interview: "Interview") -> str:
+    href = interview_video_download_href(interview)
+    suffix = os.path.splitext(interview.video_name or "interview_video.mp4")[1] or ".mp4"
+    fd, temp_path = tempfile.mkstemp(prefix=f"interview_{interview.pk}_", suffix=suffix)
+    os.close(fd)
+
+    response = requests.get(href, stream=True, timeout=60)
+    response.raise_for_status()
+    with open(temp_path, "wb") as f:
+        for chunk in response.iter_content(chunk_size=1024 * 1024):
+            if chunk:
+                f.write(chunk)
+    return temp_path
 
 
 def process_one(interview: "Interview") -> None:
@@ -162,7 +197,11 @@ def process_one(interview: "Interview") -> None:
         obj = Interview.objects.select_for_update().get(pk=interview.pk)
         if obj.transcript_status == "DONE":
             return
-        if not obj.video:
+        has_yandex_video = bool(
+            (obj.video_source_type == "yandex_disk_path" and obj.video_yandex_disk_path) or
+            (obj.video_source_type == "yandex_public_url" and obj.video_yandex_disk_url)
+        )
+        if not obj.video and not has_yandex_video:
             obj.transcript_status = "FAILED"
             obj.transcript_error = "Video missing"
             obj.save(update_fields=["transcript_status", "transcript_error"])
@@ -172,11 +211,20 @@ def process_one(interview: "Interview") -> None:
         obj.transcript_error = ""
         obj.save(update_fields=["transcript_status", "transcript_error"])
 
-    video_path = obj.video.path
-    if not os.path.exists(video_path):
-        raise FileNotFoundError(video_path)
+    temp_video_path = None
+    try:
+        if obj.video_source_type:
+            temp_video_path = download_interview_video_to_temp(obj)
+            video_path = temp_video_path
+        else:
+            video_path = obj.video.path
+            if not os.path.exists(video_path):
+                raise FileNotFoundError(video_path)
 
-    text = transcribe_video_file(video_path)
+        text = transcribe_video_file(video_path)
+    finally:
+        if temp_video_path and os.path.exists(temp_video_path):
+            os.remove(temp_video_path)
 
     obj.transcript = text
     obj.transcript_status = "DONE"

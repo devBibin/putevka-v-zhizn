@@ -20,26 +20,31 @@
         <div class="card shadow-sm mb-4">
             <div class="card-header bg-white d-flex align-items-center justify-content-between">
                 <strong>Видео собеседования</strong>
-                {% if interview.video %}
-                    <a href="{{ interview.video.url }}" class="btn btn-sm btn-outline-primary" download>
+                {% if interview.video or interview.video_source_type %}
+                    <a href="{% if interview.video_source_type %}{% url 'interview_video_stream' user_obj.id %}{% else %}{{ interview.video.url }}{% endif %}" class="btn btn-sm btn-outline-primary" download>
                         Скачать видео
                     </a>
                 {% endif %}
             </div>
 
             <div class="card-body">
-                {% if interview.video %}
+                {% if interview.video or interview.video_source_type %}
                     <video controls style="width: 100%; max-height: 420px;">
-                        <source src="{{ interview.video.url }}">
+                        <source src="{% if interview.video_source_type %}{% url 'interview_video_stream' user_obj.id %}{% else %}{{ interview.video.url }}{% endif %}"{% if interview.video_mime %} type="{{ interview.video_mime }}"{% endif %}>
                         Ваш браузер не поддерживает видео.
                     </video>
 
                     <div class="text-muted small mt-2">
+                        {% if interview.video_name %}{{ interview.video_name }}{% endif %}
+                        {% if interview.video_name and interview.video_uploaded_at %} · {% endif %}
                         {% if interview.video_uploaded_at %}
                             {{ interview.video_uploaded_at|date:"d.m.Y H:i" }}{% endif %}
                         {% if interview.video_uploaded_by %} ·
                             {{ interview.video_uploaded_by.get_full_name|default:interview.video_uploaded_by.username }}{% endif %}
                     </div>
+                    {% if interview.video_link_error %}
+                        <div class="alert alert-warning small mt-2 mb-0">{{ interview.video_link_error }}</div>
+                    {% endif %}
                 {% else %}
                     <div class="text-muted">Видео ещё не загружено.</div>
                 {% endif %}
@@ -121,6 +126,25 @@
                         <div class="form-text">
                             Загрузите видеофайл (может быть большим — загрузка займёт время).
                         </div>
+
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Ссылка или путь на Яндекс Диске</label>
+                        {% render_field form.video_yandex_disk_url class+="form-control" %}
+                        {% if form.video_yandex_disk_url.errors %}
+                            <div class="text-danger small mt-1">{{ form.video_yandex_disk_url.errors }}</div>
+                        {% endif %}
+                        <div class="form-text">
+                            Укажите путь вида disk:/... для файла, доступного сервисному аккаунту, или публичную ссылку Яндекс Диска.
+                            Если выбран локальный файл выше, он заменит ссылку.
+                        </div>
+                        {% if interview.video_yandex_disk_path %}
+                            <div class="small text-muted mt-1">Путь: {{ interview.video_yandex_disk_path }}</div>
+                        {% endif %}
+                        {% if interview.video_link_error %}
+                            <div class="alert alert-warning small mt-2 mb-0">{{ interview.video_link_error }}</div>
+                        {% endif %}
 
                         <!-- Progress UI -->
                         <div id="upload-progress-wrap" class="mt-2 d-none">
