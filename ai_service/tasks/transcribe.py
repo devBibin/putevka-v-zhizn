@@ -14,6 +14,9 @@ MAX_MODEL_AUDIO_SECONDS = int(os.getenv("OPENAI_TRANSCRIBE_MAX_SECONDS", "1400")
 CHUNK_SECONDS = int(os.getenv("OPENAI_TRANSCRIBE_CHUNK_SECONDS", "1100"))
 CHUNK_OVERLAP_SECONDS = int(os.getenv("OPENAI_TRANSCRIBE_CHUNK_OVERLAP_SECONDS", "2"))
 DIARIZE_MODEL = "gpt-4o-transcribe-diarize"
+DIARIZE_MAX_MODEL_AUDIO_SECONDS = int(os.getenv("OPENAI_DIARIZE_MAX_SECONDS", "300"))
+DIARIZE_CHUNK_SECONDS = int(os.getenv("OPENAI_DIARIZE_CHUNK_SECONDS", "300"))
+DIARIZE_CHUNK_OVERLAP_SECONDS = int(os.getenv("OPENAI_DIARIZE_CHUNK_OVERLAP_SECONDS", "1"))
 
 
 def _run(cmd: list[str], error_prefix: str) -> str:
@@ -142,7 +145,10 @@ def transcribe_media_file(media_path: str, language: str | None = "ru") -> str:
     duration = _probe_duration_seconds(media_path)
     logger.info("Media duration probed file=%s duration=%.2fs", media_path, duration)
     is_diarized = _is_diarize_model()
-    if duration <= MAX_MODEL_AUDIO_SECONDS:
+    max_model_audio_seconds = DIARIZE_MAX_MODEL_AUDIO_SECONDS if is_diarized else MAX_MODEL_AUDIO_SECONDS
+    chunk_seconds = DIARIZE_CHUNK_SECONDS if is_diarized else CHUNK_SECONDS
+    chunk_overlap_seconds = DIARIZE_CHUNK_OVERLAP_SECONDS if is_diarized else CHUNK_OVERLAP_SECONDS
+    if duration <= max_model_audio_seconds:
         with tempfile.TemporaryDirectory() as tmp:
             audio_path = os.path.join(tmp, "audio.wav")
             _extract_audio(media_path, audio_path)
@@ -155,13 +161,13 @@ def transcribe_media_file(media_path: str, language: str | None = "ru") -> str:
 
     parts: list[str] = []
     with tempfile.TemporaryDirectory() as tmp:
-        step = max(1, CHUNK_SECONDS - CHUNK_OVERLAP_SECONDS)
+        step = max(1, chunk_seconds - chunk_overlap_seconds)
         start = 0
         idx = 0
         total = int(duration) + 1
         while start < total:
             chunk_path = os.path.join(tmp, f"chunk_{idx:03d}.wav")
-            chunk_duration = min(CHUNK_SECONDS, total - start)
+            chunk_duration = min(chunk_seconds, total - start)
             logger.info("Transcribing media chunk index=%s start=%s duration=%s", idx, start, chunk_duration)
             _extract_audio(media_path, chunk_path, start_sec=start, duration_sec=chunk_duration)
             if is_diarized:
