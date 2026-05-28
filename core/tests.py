@@ -2,6 +2,8 @@ import json
 import os
 import shutil
 import tempfile
+import threading
+import time
 from datetime import date
 from decimal import Decimal
 from io import BytesIO, StringIO
@@ -1138,7 +1140,7 @@ class AiServiceUnitTests(TestCase):
         from ai_service.tasks.fill_form import ask_openai_fill
 
         response = SimpleNamespace(
-            choices=[SimpleNamespace(message=SimpleNamespace(content='{"field": "value"}'))]
+            choices=[SimpleNamespace(message=SimpleNamespace(content='{"answers": {"field": "value"}}'))]
         )
         client = Mock()
         client.chat.completions.create.return_value = response
@@ -1282,6 +1284,45 @@ class AiServiceUnitTests(TestCase):
         self.assertIn("[00:00:06] A: three", result)
         self.assertEqual(extracted, [(0, 4), (3, 4), (6, 3)])
 
+    def test_chunked_transcription_runs_chunks_concurrently_and_preserves_order(self):
+        from ai_service.tasks import transcribe
+
+        active = 0
+        max_active = 0
+        lock = threading.Lock()
+        two_active = threading.Event()
+
+        def fake_extract(source, target, start_sec=None, duration_sec=None):
+            open(target, "wb").close()
+
+        def fake_transcribe(chunk_path, language):
+            nonlocal active, max_active
+            name = os.path.basename(chunk_path)
+            with lock:
+                active += 1
+                max_active = max(max_active, active)
+                if active >= 2:
+                    two_active.set()
+            two_active.wait(timeout=1)
+            if name == "chunk_000.wav":
+                time.sleep(0.05)
+            with lock:
+                active -= 1
+            return name
+
+        with patch.object(transcribe, "MAX_MODEL_AUDIO_SECONDS", 5), \
+             patch.object(transcribe, "CHUNK_SECONDS", 4), \
+             patch.object(transcribe, "CHUNK_OVERLAP_SECONDS", 1), \
+             patch.object(transcribe, "CHUNK_TRANSCRIBE_CONCURRENCY", 2), \
+             patch("ai_service.tasks.transcribe._probe_duration_seconds", return_value=8.0), \
+             patch("ai_service.tasks.transcribe._extract_audio", side_effect=fake_extract), \
+             patch("ai_service.tasks.transcribe._transcribe_audio_file", side_effect=fake_transcribe):
+            result = transcribe.transcribe_media_file("long.mp4", language="ru")
+
+        self.assertGreaterEqual(max_active, 2)
+        self.assertLess(result.index("chunk_000.wav"), result.index("chunk_001.wav"))
+        self.assertLess(result.index("chunk_001.wav"), result.index("chunk_002.wav"))
+
     def test_diarized_transcription_passes_required_openai_options(self):
         from ai_service.tasks import transcribe
 
@@ -1339,6 +1380,28 @@ class AiServiceUnitTests(TestCase):
         self.assertIn("ai note", result.other_notes)
         self.assertEqual(result.interviewer_score, 87)
         self.assertEqual(result.school_distance_km, Decimal("4.75"))
+
+    def test_apply_interview_result_accepts_verbose_and_schema_answer_keys(self):
+        from core.ai_tasks import apply_interview_result
+        from review_by_tutor.models import Interview, InterviewResult
+
+        user = User.objects.create_user(username="ai-fill-keys@example.com")
+        TestAssignment.objects.create(user=user, title="Interview")
+        interview = Interview.objects.create(user=user)
+
+        apply_interview_result(
+            interview,
+            {
+                "Прочие замечания": "кандидат мотивирован",
+                "Итоговая оценка интервьюера (field: interviewer_score, type: IntegerField)": "88 баллов",
+                "Удалённость от дома (км)": "3,5",
+            },
+        )
+
+        result = InterviewResult.objects.get(interview=interview)
+        self.assertEqual(result.other_notes, "кандидат мотивирован")
+        self.assertEqual(result.interviewer_score, 88)
+        self.assertEqual(result.school_distance_km, Decimal("3.5"))
 
 
 class AiTaskApiTests(IntegrationTestCase):
@@ -1478,6 +1541,37 @@ class AiTaskApiTests(IntegrationTestCase):
             self.assertEqual(failed.status_code, 200)
             failed_task.refresh_from_db()
             self.assertEqual(failed_task.status, AiTask.Status.FAILED)
+
+    def test_ai_task_complete_marks_unapplicable_fill_result_failed(self):
+        from core.ai_tasks import create_ai_task
+
+        user = self.create_finished_candidate("ai-fill-empty@example.com")
+        interview = Interview.objects.create(user=user)
+        task = create_ai_task(
+            AiTask.Type.INTERVIEW_RESULT_FILL,
+            interview,
+            {"fields_schema": {"other_notes": "Other notes"}, "transcript": "hello"},
+            source_version="fill-v1",
+        )
+        task.status = AiTask.Status.PROCESSING
+        task.locked_by = "worker-1"
+        task.save(update_fields=["status", "locked_by"])
+
+        with override_settings(AI_SERVICE_TOKEN="secret"):
+            response = self.client.post(
+                reverse("ai_task_complete", args=[task.pk]),
+                {"worker_id": "worker-1", "result": {"answers": {"unknown_field": "value"}}},
+                content_type="application/json",
+                HTTP_AUTHORIZATION="Bearer secret",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["status"], AiTask.Status.FAILED)
+        task.refresh_from_db()
+        interview.refresh_from_db()
+        self.assertEqual(task.status, AiTask.Status.FAILED)
+        self.assertIn("no applicable", task.error)
+        self.assertEqual(interview.ai_fill_status, interview.AiFillStatus.FAILED)
 
     def test_ai_file_proxy_downloads_yandex_disk_file_and_deletes_temp_file(self):
         from core.ai_tasks import file_response_from_token, make_file_token

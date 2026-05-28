@@ -3,6 +3,7 @@ import logging
 import subprocess
 import tempfile
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from ai_service.openai_runtime import make_openai_client
 
@@ -13,6 +14,7 @@ OPENAI_TRANSCRIBE_MODEL = os.getenv("OPENAI_TRANSCRIBE_MODEL", "gpt-4o-transcrib
 MAX_MODEL_AUDIO_SECONDS = int(os.getenv("OPENAI_TRANSCRIBE_MAX_SECONDS", "1400"))
 CHUNK_SECONDS = int(os.getenv("OPENAI_TRANSCRIBE_CHUNK_SECONDS", "1100"))
 CHUNK_OVERLAP_SECONDS = int(os.getenv("OPENAI_TRANSCRIBE_CHUNK_OVERLAP_SECONDS", "2"))
+CHUNK_TRANSCRIBE_CONCURRENCY = int(os.getenv("OPENAI_TRANSCRIBE_CHUNK_CONCURRENCY", "2"))
 DIARIZE_MODEL = "gpt-4o-transcribe-diarize"
 DIARIZE_MAX_MODEL_AUDIO_SECONDS = int(os.getenv("OPENAI_DIARIZE_MAX_SECONDS", "300"))
 DIARIZE_CHUNK_SECONDS = int(os.getenv("OPENAI_DIARIZE_CHUNK_SECONDS", "300"))
@@ -140,6 +142,14 @@ def _transcribe_audio_file_diarized(audio_path: str, language: str | None, *, of
     return text
 
 
+def _transcribe_chunk(chunk_path: str, language: str | None, *, start_seconds: int, is_diarized: bool) -> str:
+    if is_diarized:
+        text = _transcribe_audio_file_diarized(chunk_path, language, offset_seconds=start_seconds).strip()
+        return f"{text}\n"
+    text = _transcribe_audio_file(chunk_path, language).strip()
+    return f"[{_format_timestamp(start_seconds)}]\n{text}\n"
+
+
 def transcribe_media_file(media_path: str, language: str | None = "ru") -> str:
     started = time.monotonic()
     duration = _probe_duration_seconds(media_path)
@@ -165,19 +175,28 @@ def transcribe_media_file(media_path: str, language: str | None = "ru") -> str:
         start = 0
         idx = 0
         total = int(duration) + 1
+        chunks: list[tuple[int, int, str]] = []
         while start < total:
             chunk_path = os.path.join(tmp, f"chunk_{idx:03d}.wav")
             chunk_duration = min(chunk_seconds, total - start)
-            logger.info("Transcribing media chunk index=%s start=%s duration=%s", idx, start, chunk_duration)
+            logger.info("Preparing media chunk index=%s start=%s duration=%s", idx, start, chunk_duration)
             _extract_audio(media_path, chunk_path, start_sec=start, duration_sec=chunk_duration)
-            if is_diarized:
-                text = _transcribe_audio_file_diarized(chunk_path, language, offset_seconds=start).strip()
-                parts.append(f"{text}\n")
-            else:
-                text = _transcribe_audio_file(chunk_path, language).strip()
-                parts.append(f"[{_format_timestamp(start)}]\n{text}\n")
+            chunks.append((idx, start, chunk_path))
             idx += 1
             start += step
+        max_workers = max(1, min(CHUNK_TRANSCRIBE_CONCURRENCY, len(chunks)))
+        logger.info("Transcribing media chunks concurrently chunks=%s max_workers=%s", len(chunks), max_workers)
+        indexed_parts: list[tuple[int, str]] = []
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {
+                executor.submit(_transcribe_chunk, chunk_path, language, start_seconds=chunk_start, is_diarized=is_diarized): chunk_idx
+                for chunk_idx, chunk_start, chunk_path in chunks
+            }
+            for future in as_completed(futures):
+                chunk_idx = futures[future]
+                indexed_parts.append((chunk_idx, future.result()))
+                logger.info("Media chunk transcribed index=%s", chunk_idx)
+        parts = [text for _, text in sorted(indexed_parts, key=lambda item: item[0])]
     result = "\n".join(parts).strip()
     logger.info("Media transcription finished chunks=%s chars=%s elapsed=%.2fs", idx, len(result), time.monotonic() - started)
     return result

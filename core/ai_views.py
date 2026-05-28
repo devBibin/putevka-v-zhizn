@@ -7,6 +7,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_GET, require_POST
 
 from core.ai_tasks import (
+    AiTaskResultApplicationError,
     claim_next_task,
     complete_task,
     fail_task,
@@ -70,7 +71,13 @@ def complete(request, task_id):
     if not _authorized(request):
         return _forbidden(request)
     body = _json_body(request)
-    task = complete_task(task_id, body.get("worker_id") or "ai-worker", body.get("result") or {})
+    worker_id = body.get("worker_id") or "ai-worker"
+    try:
+        task = complete_task(task_id, worker_id, body.get("result") or {})
+    except AiTaskResultApplicationError as exc:
+        task = fail_task(task_id, worker_id, str(exc), retryable=False)
+        logger.warning("AI task completion rejected task_id=%s task_type=%s worker_id=%s error=%s", task.pk, task.task_type, worker_id, exc)
+        return JsonResponse({"id": str(task.pk), "status": task.status, "error": task.error})
     logger.info("AI task completed task_id=%s task_type=%s worker_id=%s", task.pk, task.task_type, body.get("worker_id") or "ai-worker")
     return JsonResponse({"id": str(task.pk), "status": task.status})
 
