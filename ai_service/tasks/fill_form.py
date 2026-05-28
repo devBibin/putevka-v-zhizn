@@ -37,6 +37,8 @@ def ask_openai_fill(fields_schema: dict[str, str], transcript: str) -> dict[str,
     )
     raw = response.choices[0].message.content or "{}"
     answers = json.loads(raw)
+    if isinstance(answers, dict) and isinstance(answers.get("answers"), dict):
+        answers = answers["answers"]
     logger.info("OpenAI fill response chars=%s answer_fields=%s elapsed=%.2fs", len(raw), len(answers), time.monotonic() - started)
     return answers
 

@@ -2,6 +2,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import tempfile
 from decimal import Decimal, InvalidOperation
 from datetime import timedelta
@@ -21,6 +22,10 @@ from core.models import AiTask, MotivationLetter, MotivationLetterRubricReview
 logger = logging.getLogger(__name__)
 
 FILE_TOKEN_MAX_AGE = int(getattr(settings, "AI_FILE_TOKEN_MAX_AGE", 3600))
+
+
+class AiTaskResultApplicationError(ValueError):
+    pass
 
 
 class DeletingFileResponse(FileResponse):
@@ -266,6 +271,8 @@ def complete_task(task_id, worker_id: str, result: dict[str, Any]) -> AiTask:
 def fail_task(task_id, worker_id: str, error: str, retryable: bool = True) -> AiTask:
     with transaction.atomic():
         task = AiTask.objects.select_for_update().get(pk=task_id)
+        if task.status in {AiTask.Status.DONE, AiTask.Status.FAILED, AiTask.Status.CANCELLED}:
+            return task
         if task.locked_by and task.locked_by != worker_id:
             raise ValueError("Task is locked by another worker")
         final = not retryable or task.attempts >= task.max_attempts
@@ -375,11 +382,12 @@ def apply_interview_result(interview, answers: dict[str, Any]) -> None:
     from review_by_tutor.models import InterviewResult
 
     result_obj, _ = InterviewResult.objects.get_or_create(interview=interview)
-    fields = [f for f in InterviewResult._meta.get_fields() if getattr(f, "concrete", False) and f.name in answers]
-    update_fields = apply_answers_to_result(result_obj, fields, answers)
+    fields = [f for f in InterviewResult._meta.get_fields() if getattr(f, "concrete", False)]
+    normalized_answers = normalize_interview_result_answers(fields, answers)
+    update_fields = apply_answers_to_result(result_obj, fields, normalized_answers)
     if not update_fields:
         logger.warning("AI returned no applicable InterviewResult updates interview_id=%s answer_fields=%s", interview.pk, len(answers))
-        raise ValueError("AI returned no applicable InterviewResult updates")
+        raise AiTaskResultApplicationError("AI returned no applicable InterviewResult updates")
     result_obj.updated_at = timezone.now()
     update_fields.append("updated_at")
     result_obj.save(update_fields=update_fields)
@@ -388,6 +396,47 @@ def apply_interview_result(interview, answers: dict[str, Any]) -> None:
     interview.ai_fill_error = ""
     interview.save(update_fields=["ai_fill_status", "ai_filled_at", "ai_fill_error"])
     logger.info("InterviewResult updated from AI interview_id=%s fields=%s", interview.pk, ",".join(update_fields))
+
+
+def _normalize_answer_key(value: Any) -> str:
+    value = re.sub(r"\(.*?\)", " ", str(value or ""))
+    value = re.sub(r"field\s*:\s*[a-zA-Z0-9_]+", " ", value, flags=re.IGNORECASE)
+    return re.sub(r"[\W_]+", "", value, flags=re.UNICODE).casefold()
+
+
+def _answer_key_candidates(field: models.Field) -> set[str]:
+    return {
+        field.name,
+        _normalize_answer_key(field.name),
+        _normalize_answer_key(getattr(field, "verbose_name", "")),
+    }
+
+
+def normalize_interview_result_answers(fields: list[models.Field], answers: dict[str, Any]) -> dict[str, Any]:
+    if not isinstance(answers, dict):
+        return {}
+    by_key: dict[str, str] = {}
+    field_names = {field.name for field in fields}
+    for field in fields:
+        for candidate in _answer_key_candidates(field):
+            if candidate:
+                by_key[candidate] = field.name
+
+    normalized: dict[str, Any] = {}
+    unknown_keys: list[str] = []
+    for raw_key, value in answers.items():
+        key = str(raw_key or "").strip()
+        if key in field_names:
+            normalized[key] = value
+            continue
+        field_name = by_key.get(_normalize_answer_key(key))
+        if field_name:
+            normalized[field_name] = value
+        else:
+            unknown_keys.append(key)
+    if unknown_keys:
+        logger.info("Ignored unknown AI answer keys keys=%s", ",".join(unknown_keys[:20]))
+    return normalized
 
 
 def _empty(value: Any) -> bool:
