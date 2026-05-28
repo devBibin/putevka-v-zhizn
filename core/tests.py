@@ -38,7 +38,7 @@ from my_study.models import (
     Subject,
     UniversityPriority,
 )
-from review_by_tutor.models import TestAssignment
+from review_by_tutor.models import Interview, TestAssignment
 from review_by_tutor.services.staff_users import build_staff_users_queryset, get_staff_users_filters
 from scholar_form.models import ScholarVideo, UserInfo, VideoInstruction
 from scholar_form.views import (
@@ -1257,6 +1257,38 @@ class AiServiceUnitTests(TestCase):
         self.assertIn("[00:00:11] A: question", formatted)
         self.assertIn("[00:00:15] B: answer", formatted)
 
+    def test_diarized_transcription_passes_required_openai_options(self):
+        from ai_service.tasks import transcribe
+
+        tmp = tempfile.NamedTemporaryFile(delete=False)
+        tmp.write(b"audio")
+        tmp.close()
+
+        create = Mock(
+            return_value={
+                "segments": [
+                    {"speaker": "A", "start": 0, "text": "question"},
+                    {"speaker": "B", "start": 2, "text": "answer"},
+                ]
+            }
+        )
+        client = SimpleNamespace(audio=SimpleNamespace(transcriptions=SimpleNamespace(create=create)))
+
+        try:
+            with patch.object(transcribe, "OPENAI_TRANSCRIBE_MODEL", "gpt-4o-transcribe-diarize"), \
+                 patch("ai_service.tasks.transcribe.make_openai_client", return_value=client):
+                result = transcribe._transcribe_audio_file_diarized(tmp.name, "ru")
+        finally:
+            os.remove(tmp.name)
+
+        kwargs = create.call_args.kwargs
+        self.assertEqual(kwargs["model"], "gpt-4o-transcribe-diarize")
+        self.assertEqual(kwargs["response_format"], "diarized_json")
+        self.assertEqual(kwargs["chunking_strategy"], "auto")
+        self.assertEqual(kwargs["language"], "ru")
+        self.assertIn("[00:00:00] A: question", result)
+        self.assertIn("[00:00:02] B: answer", result)
+
     def test_fill_form_normalizes_values_and_preserves_existing_text(self):
         from ai_service.tasks.fill_form import apply_answers_to_result
         from review_by_tutor.models import Interview, InterviewResult
@@ -1343,6 +1375,29 @@ class AiTaskApiTests(IntegrationTestCase):
         self.assertEqual(task.task_type, AiTask.Type.MOTIVATION_LETTER_REVIEW)
         self.assertEqual(task.source_object_id, letter.pk)
 
+    def test_interview_transcription_enqueue_accepts_yandex_disk_video(self):
+        from core.ai_tasks import enqueue_interview_transcription
+
+        user = self.create_finished_candidate("ai-interview-yandex@example.com")
+        interview = Interview.objects.create(
+            user=user,
+            video_source_type="yandex_disk_path",
+            video_yandex_disk_path="disk:/interviews/candidate.mp4",
+            video_name="candidate.mp4",
+            transcript_status="PENDING",
+        )
+        AiTask.objects.filter(source_model="interview", source_object_id=interview.pk).delete()
+
+        task = enqueue_interview_transcription(interview)
+
+        self.assertIsNotNone(task)
+        self.assertEqual(task.task_type, AiTask.Type.INTERVIEW_TRANSCRIPTION)
+        self.assertEqual(task.source_app, "review_by_tutor")
+        self.assertEqual(task.source_model, "interview")
+        self.assertEqual(task.source_object_id, interview.pk)
+        self.assertEqual(task.source_version, "disk:/interviews/candidate.mp4")
+        self.assertIn("/internal/ai/files/", task.payload["file_url"])
+
     def test_ai_task_api_claim_complete_fail_and_forbidden(self):
         from core.ai_tasks import create_ai_task
 
@@ -1427,6 +1482,36 @@ class AiTaskApiTests(IntegrationTestCase):
 
         self.assertEqual(body, b"downloaded:disk:/candidate/schedule.pdf")
         self.assertEqual(response.headers["Content-Disposition"], 'attachment; filename="schedule.pdf"')
+        self.assertFalse(os.path.exists(temp_path))
+
+    def test_ai_file_proxy_downloads_interview_yandex_disk_video(self):
+        from core.ai_tasks import file_response_from_token, make_file_token
+
+        user = self.create_finished_candidate("ai-interview-file@example.com")
+        interview = Interview.objects.create(
+            user=user,
+            video_source_type="yandex_disk_path",
+            video_yandex_disk_path="disk:/interviews/interview.mp4",
+            video_name="interview.mp4",
+        )
+        created_files = []
+
+        def fake_download(disk_path, local_path, *, log_context=None):
+            created_files.append(local_path)
+            with open(local_path, "wb") as fh:
+                fh.write(f"interview:{disk_path}".encode("utf-8"))
+
+        token = make_file_token("review_by_tutor", "interview", interview.pk, "video")
+
+        with patch("scholar_form.services.yandex_disk.download_file_from_yandex_disk", side_effect=fake_download):
+            response = file_response_from_token(token)
+            body = b"".join(response.streaming_content)
+            temp_path = created_files[0]
+            self.assertTrue(os.path.exists(temp_path))
+            response.close()
+
+        self.assertEqual(body, b"interview:disk:/interviews/interview.mp4")
+        self.assertEqual(response.headers["Content-Disposition"], 'attachment; filename="interview.mp4"')
         self.assertFalse(os.path.exists(temp_path))
 
 
