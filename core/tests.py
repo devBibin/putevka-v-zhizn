@@ -1218,12 +1218,21 @@ class AiServiceUnitTests(TestCase):
             self.assertEqual(transcribe.transcribe_media_file("short.mp4"), "one")
 
         extracted.clear()
+        chunk_text_by_name = {
+            "chunk_000.wav": "alpha",
+            "chunk_001.wav": "beta",
+            "chunk_002.wav": "gamma",
+        }
+
+        def fake_transcribe(chunk_path, language):
+            return chunk_text_by_name[os.path.basename(chunk_path)]
+
         with patch.object(transcribe, "MAX_MODEL_AUDIO_SECONDS", 5), \
              patch.object(transcribe, "CHUNK_SECONDS", 4), \
              patch.object(transcribe, "CHUNK_OVERLAP_SECONDS", 1), \
              patch("ai_service.tasks.transcribe._probe_duration_seconds", return_value=8.0), \
              patch("ai_service.tasks.transcribe._extract_audio", side_effect=fake_extract), \
-             patch("ai_service.tasks.transcribe._transcribe_audio_file", side_effect=["alpha", "beta", "gamma"]):
+             patch("ai_service.tasks.transcribe._transcribe_audio_file", side_effect=fake_transcribe):
             result = transcribe.transcribe_media_file("long.mp4", language="ru")
 
         self.assertIn("[00:00:00]\nalpha", result)
@@ -1267,6 +1276,15 @@ class AiServiceUnitTests(TestCase):
         def fake_extract(source, target, start_sec=None, duration_sec=None):
             extracted.append((start_sec, duration_sec))
 
+        chunk_text_by_name = {
+            "chunk_000.wav": "[00:00:00] A: one",
+            "chunk_001.wav": "[00:00:03] B: two",
+            "chunk_002.wav": "[00:00:06] A: three",
+        }
+
+        def fake_diarize(chunk_path, language, *, offset_seconds=0):
+            return chunk_text_by_name[os.path.basename(chunk_path)]
+
         with patch.object(transcribe, "OPENAI_TRANSCRIBE_MODEL", "gpt-4o-transcribe-diarize"), \
              patch.object(transcribe, "DIARIZE_MAX_MODEL_AUDIO_SECONDS", 5), \
              patch.object(transcribe, "DIARIZE_CHUNK_SECONDS", 4), \
@@ -1275,7 +1293,7 @@ class AiServiceUnitTests(TestCase):
              patch("ai_service.tasks.transcribe._extract_audio", side_effect=fake_extract), \
              patch(
                  "ai_service.tasks.transcribe._transcribe_audio_file_diarized",
-                 side_effect=["[00:00:00] A: one", "[00:00:03] B: two", "[00:00:06] A: three"],
+                 side_effect=fake_diarize,
              ):
             result = transcribe.transcribe_media_file("long.mp4", language="ru")
 
