@@ -1229,6 +1229,34 @@ class AiServiceUnitTests(TestCase):
         self.assertIn("[00:00:06]\ngamma", result)
         self.assertEqual(extracted, [("long.mp4", 0, 4), ("long.mp4", 3, 4), ("long.mp4", 6, 3)])
 
+    def test_transcribe_media_file_handles_diarized_response(self):
+        from ai_service.tasks import transcribe
+
+        with patch.object(transcribe, "OPENAI_TRANSCRIBE_MODEL", "gpt-4o-transcribe-diarize"), \
+             patch.object(transcribe, "MAX_MODEL_AUDIO_SECONDS", 10), \
+             patch("ai_service.tasks.transcribe._probe_duration_seconds", return_value=9.0), \
+             patch("ai_service.tasks.transcribe._extract_audio"), \
+             patch(
+                 "ai_service.tasks.transcribe._transcribe_audio_file_diarized",
+                 return_value="[00:00:01] A: hello\n[00:00:04] B: hi",
+             ) as diarize:
+            result = transcribe.transcribe_media_file("short.mp4", language="ru")
+
+        self.assertEqual(result, "[00:00:01] A: hello\n[00:00:04] B: hi")
+        diarize.assert_called_once()
+
+        formatted = transcribe._format_diarized_result(
+            {
+                "segments": [
+                    {"speaker": "A", "start": 1.2, "text": "question"},
+                    {"speaker": "B", "start": 5.8, "text": "answer"},
+                ]
+            },
+            offset_seconds=10,
+        )
+        self.assertIn("[00:00:11] A: question", formatted)
+        self.assertIn("[00:00:15] B: answer", formatted)
+
     def test_fill_form_normalizes_values_and_preserves_existing_text(self):
         from ai_service.tasks.fill_form import apply_answers_to_result
         from review_by_tutor.models import Interview, InterviewResult
