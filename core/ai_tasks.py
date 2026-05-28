@@ -123,18 +123,32 @@ def enqueue_motivation_letter_review(letter: MotivationLetter) -> AiTask | None:
 
 
 def enqueue_interview_transcription(interview) -> AiTask | None:
-    if not getattr(interview, "video", None):
+    has_local_video = bool(getattr(interview, "video", None))
+    has_yandex_video = bool(
+        getattr(interview, "video_source_type", "") == "yandex_disk_path"
+        and getattr(interview, "video_yandex_disk_path", "")
+    ) or bool(
+        getattr(interview, "video_source_type", "") == "yandex_public_url"
+        and getattr(interview, "video_yandex_disk_url", "")
+    )
+    if not has_local_video and not has_yandex_video:
         logger.debug("Skipped interview transcription enqueue interview_id=%s reason=no_video", getattr(interview, "pk", None))
         return None
     if interview.transcript_status == "DONE":
         logger.debug("Skipped interview transcription enqueue interview_id=%s reason=already_done", interview.pk)
         return None
     token = make_file_token("review_by_tutor", "interview", interview.pk, "video")
+    source_version = (
+        getattr(interview, "video_yandex_disk_path", "")
+        or getattr(interview, "video_yandex_disk_url", "")
+        or getattr(interview.video, "name", "")
+        or str(interview.pk)
+    )
     return create_ai_task(
         AiTask.Type.INTERVIEW_TRANSCRIPTION,
         interview,
         {"file_url": f"/internal/ai/files/{token}/", "language": "ru"},
-        source_version=getattr(interview.video, "name", "") or str(interview.pk),
+        source_version=source_version,
     )
 
 
@@ -450,6 +464,17 @@ def _scholar_video_yandex_source(obj, field_name: str) -> tuple[str, str]:
     return "", ""
 
 
+def _interview_yandex_source(obj, field_name: str) -> tuple[str, str, str]:
+    if field_name != "video":
+        return "", "", ""
+    source_type = getattr(obj, "video_source_type", "")
+    if source_type == "yandex_disk_path" and getattr(obj, "video_yandex_disk_path", ""):
+        return "private", obj.video_yandex_disk_path, obj.video_name or "interview_video.mp4"
+    if source_type == "yandex_public_url" and getattr(obj, "video_yandex_disk_url", ""):
+        return "public", obj.video_yandex_disk_url, obj.video_name or "interview_video.mp4"
+    return "", "", ""
+
+
 def open_file_from_token(token: str):
     try:
         raw = TimestampSigner(salt="ai-file").unsign(token, max_age=FILE_TOKEN_MAX_AGE)
@@ -458,6 +483,32 @@ def open_file_from_token(token: str):
         raise Http404("File token is invalid")
     model = apps.get_model(app_label, model_name)
     obj = model.objects.get(pk=object_id)
+
+    if app_label == "review_by_tutor" and model_name == "interview":
+        from scholar_form.services.yandex_disk import get_public_download_url, download_file_from_yandex_disk
+        import requests
+
+        source_kind, source_ref, filename = _interview_yandex_source(obj, field_name)
+        if source_kind:
+            suffix = "." + filename.rsplit(".", 1)[-1] if "." in filename else ".media"
+            tmp = tempfile.NamedTemporaryFile(suffix=suffix, delete=False)
+            tmp.close()
+            if source_kind == "private":
+                download_file_from_yandex_disk(source_ref, tmp.name, log_context={"user_id": obj.user_id, "interview_id": obj.pk})
+            else:
+                url = get_public_download_url(
+                    source_ref,
+                    public_path=getattr(obj, "video_yandex_disk_path", ""),
+                    log_context={"user_id": obj.user_id, "interview_id": obj.pk},
+                )
+                response = requests.get(url, stream=True, timeout=300)
+                response.raise_for_status()
+                with open(tmp.name, "wb") as out:
+                    for chunk in response.iter_content(chunk_size=1024 * 1024):
+                        if chunk:
+                            out.write(chunk)
+            logger.info("Opened AI interview file from Yandex Disk source=%s.%s:%s filename=%s", app_label, model_name, object_id, filename)
+            return open(tmp.name, "rb"), filename, tmp.name
 
     if app_label == "scholar_form" and model_name == "scholarvideo":
         from scholar_form.services.yandex_disk import download_file_from_yandex_disk

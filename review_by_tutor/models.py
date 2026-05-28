@@ -325,6 +325,23 @@ class Interview(models.Model):
         related_name="interview_video_uploaded",
     )
     video_uploaded_at = models.DateTimeField(null=True, blank=True)
+    video_yandex_disk_url = models.TextField("Yandex Disk video link/path", blank=True)
+    video_yandex_disk_path = models.CharField(max_length=1024, blank=True, default="")
+    video_source_type = models.CharField(
+        max_length=32,
+        blank=True,
+        default="",
+        choices=[
+            ("", "Local file"),
+            ("yandex_disk_path", "Yandex Disk path"),
+            ("yandex_public_url", "Yandex Disk public URL"),
+        ],
+    )
+    video_name = models.CharField(max_length=255, blank=True, default="")
+    video_size = models.PositiveBigIntegerField(null=True, blank=True)
+    video_mime = models.CharField(max_length=127, blank=True, default="")
+    video_link_error = models.TextField(blank=True, default="")
+    video_link_checked_at = models.DateTimeField(null=True, blank=True)
 
     transcript = models.TextField("Транскрипт", blank=True)
     transcript_status = models.CharField(

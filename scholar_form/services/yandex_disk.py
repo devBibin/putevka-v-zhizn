@@ -322,6 +322,59 @@ def get_download_url(path: str, *, log_context=None) -> str:
     return href
 
 
+def get_public_download_url(public_key: str, *, public_path: str = "", log_context=None) -> str:
+    params = {"public_key": public_key, "limit": 1000}
+    if public_path:
+        params["path"] = public_path
+    response = _request(
+        "GET",
+        "/public/resources/download",
+        params=params,
+        operation="get public download link",
+        request_error_message="Не удалось получить ссылку для скачивания публичного файла с Яндекс Диска.",
+        log_context=_log_context(log_context),
+    )
+    if response.status_code != 200:
+        _raise_api_error(response, "Не удалось получить ссылку для скачивания публичного файла с Яндекс Диска.")
+
+    href = response.json().get("href")
+    if not href:
+        raise YandexDiskError("Яндекс Диск не вернул ссылку для скачивания публичного файла.")
+    return href
+
+
+def get_public_resource_metadata(public_key: str, *, public_path: str = "", log_context=None) -> dict:
+    params = {"public_key": public_key}
+    if public_path:
+        params["path"] = public_path
+    response = _request(
+        "GET",
+        "/public/resources",
+        params=params,
+        operation="get public resource metadata",
+        request_error_message="Не удалось проверить публичный файл на Яндекс Диске.",
+        log_context=_log_context(log_context),
+    )
+    if response.status_code != 200:
+        _raise_api_error(response, "Не удалось проверить публичный файл на Яндекс Диске.")
+    return response.json()
+
+
+def get_resource_metadata(path: str, *, log_context=None) -> dict:
+    normalized_path = _normalize_disk_path(path)
+    response = _request(
+        "GET",
+        "/resources",
+        params={"path": normalized_path, "limit": 1000},
+        operation="get resource metadata",
+        request_error_message="Не удалось проверить файл на Яндекс Диске.",
+        log_context=_log_context(log_context, disk_path=normalized_path),
+    )
+    if response.status_code != 200:
+        _raise_api_error(response, "Не удалось проверить файл на Яндекс Диске.")
+    return response.json()
+
+
 def resource_exists(path: str, *, log_context=None) -> bool:
     normalized_path = _normalize_disk_path(path)
     response = _request(

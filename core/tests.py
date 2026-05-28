@@ -4,7 +4,7 @@ import shutil
 import tempfile
 from datetime import date
 from decimal import Decimal
-from io import BytesIO
+from io import BytesIO, StringIO
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
@@ -38,7 +38,7 @@ from my_study.models import (
     Subject,
     UniversityPriority,
 )
-from review_by_tutor.models import TestAssignment
+from review_by_tutor.models import Interview, TestAssignment
 from review_by_tutor.services.staff_users import build_staff_users_queryset, get_staff_users_filters
 from scholar_form.models import ScholarVideo, UserInfo, VideoInstruction
 from scholar_form.views import (
@@ -1229,6 +1229,91 @@ class AiServiceUnitTests(TestCase):
         self.assertIn("[00:00:06]\ngamma", result)
         self.assertEqual(extracted, [("long.mp4", 0, 4), ("long.mp4", 3, 4), ("long.mp4", 6, 3)])
 
+    def test_transcribe_media_file_handles_diarized_response(self):
+        from ai_service.tasks import transcribe
+
+        with patch.object(transcribe, "OPENAI_TRANSCRIBE_MODEL", "gpt-4o-transcribe-diarize"), \
+             patch.object(transcribe, "MAX_MODEL_AUDIO_SECONDS", 10), \
+             patch("ai_service.tasks.transcribe._probe_duration_seconds", return_value=9.0), \
+             patch("ai_service.tasks.transcribe._extract_audio"), \
+             patch(
+                 "ai_service.tasks.transcribe._transcribe_audio_file_diarized",
+                 return_value="[00:00:01] A: hello\n[00:00:04] B: hi",
+             ) as diarize:
+            result = transcribe.transcribe_media_file("short.mp4", language="ru")
+
+        self.assertEqual(result, "[00:00:01] A: hello\n[00:00:04] B: hi")
+        diarize.assert_called_once()
+
+        formatted = transcribe._format_diarized_result(
+            {
+                "segments": [
+                    {"speaker": "A", "start": 1.2, "text": "question"},
+                    {"speaker": "B", "start": 5.8, "text": "answer"},
+                ]
+            },
+            offset_seconds=10,
+        )
+        self.assertIn("[00:00:11] A: question", formatted)
+        self.assertIn("[00:00:15] B: answer", formatted)
+
+    def test_diarized_transcription_uses_smaller_chunks(self):
+        from ai_service.tasks import transcribe
+
+        extracted = []
+
+        def fake_extract(source, target, start_sec=None, duration_sec=None):
+            extracted.append((start_sec, duration_sec))
+
+        with patch.object(transcribe, "OPENAI_TRANSCRIBE_MODEL", "gpt-4o-transcribe-diarize"), \
+             patch.object(transcribe, "DIARIZE_MAX_MODEL_AUDIO_SECONDS", 5), \
+             patch.object(transcribe, "DIARIZE_CHUNK_SECONDS", 4), \
+             patch.object(transcribe, "DIARIZE_CHUNK_OVERLAP_SECONDS", 1), \
+             patch("ai_service.tasks.transcribe._probe_duration_seconds", return_value=8.0), \
+             patch("ai_service.tasks.transcribe._extract_audio", side_effect=fake_extract), \
+             patch(
+                 "ai_service.tasks.transcribe._transcribe_audio_file_diarized",
+                 side_effect=["[00:00:00] A: one", "[00:00:03] B: two", "[00:00:06] A: three"],
+             ):
+            result = transcribe.transcribe_media_file("long.mp4", language="ru")
+
+        self.assertIn("[00:00:00] A: one", result)
+        self.assertIn("[00:00:03] B: two", result)
+        self.assertIn("[00:00:06] A: three", result)
+        self.assertEqual(extracted, [(0, 4), (3, 4), (6, 3)])
+
+    def test_diarized_transcription_passes_required_openai_options(self):
+        from ai_service.tasks import transcribe
+
+        tmp = tempfile.NamedTemporaryFile(delete=False)
+        tmp.write(b"audio")
+        tmp.close()
+
+        create = Mock(
+            return_value={
+                "segments": [
+                    {"speaker": "A", "start": 0, "text": "question"},
+                    {"speaker": "B", "start": 2, "text": "answer"},
+                ]
+            }
+        )
+        client = SimpleNamespace(audio=SimpleNamespace(transcriptions=SimpleNamespace(create=create)))
+
+        try:
+            with patch.object(transcribe, "OPENAI_TRANSCRIBE_MODEL", "gpt-4o-transcribe-diarize"), \
+                 patch("ai_service.tasks.transcribe.make_openai_client", return_value=client):
+                result = transcribe._transcribe_audio_file_diarized(tmp.name, "ru")
+        finally:
+            os.remove(tmp.name)
+
+        kwargs = create.call_args.kwargs
+        self.assertEqual(kwargs["model"], "gpt-4o-transcribe-diarize")
+        self.assertEqual(kwargs["response_format"], "diarized_json")
+        self.assertEqual(kwargs["chunking_strategy"], "auto")
+        self.assertEqual(kwargs["language"], "ru")
+        self.assertIn("[00:00:00] A: question", result)
+        self.assertIn("[00:00:02] B: answer", result)
+
     def test_fill_form_normalizes_values_and_preserves_existing_text(self):
         from ai_service.tasks.fill_form import apply_answers_to_result
         from review_by_tutor.models import Interview, InterviewResult
@@ -1315,6 +1400,29 @@ class AiTaskApiTests(IntegrationTestCase):
         self.assertEqual(task.task_type, AiTask.Type.MOTIVATION_LETTER_REVIEW)
         self.assertEqual(task.source_object_id, letter.pk)
 
+    def test_interview_transcription_enqueue_accepts_yandex_disk_video(self):
+        from core.ai_tasks import enqueue_interview_transcription
+
+        user = self.create_finished_candidate("ai-interview-yandex@example.com")
+        interview = Interview.objects.create(
+            user=user,
+            video_source_type="yandex_disk_path",
+            video_yandex_disk_path="disk:/interviews/candidate.mp4",
+            video_name="candidate.mp4",
+            transcript_status="PENDING",
+        )
+        AiTask.objects.filter(source_model="interview", source_object_id=interview.pk).delete()
+
+        task = enqueue_interview_transcription(interview)
+
+        self.assertIsNotNone(task)
+        self.assertEqual(task.task_type, AiTask.Type.INTERVIEW_TRANSCRIPTION)
+        self.assertEqual(task.source_app, "review_by_tutor")
+        self.assertEqual(task.source_model, "interview")
+        self.assertEqual(task.source_object_id, interview.pk)
+        self.assertEqual(task.source_version, "disk:/interviews/candidate.mp4")
+        self.assertIn("/internal/ai/files/", task.payload["file_url"])
+
     def test_ai_task_api_claim_complete_fail_and_forbidden(self):
         from core.ai_tasks import create_ai_task
 
@@ -1400,6 +1508,142 @@ class AiTaskApiTests(IntegrationTestCase):
         self.assertEqual(body, b"downloaded:disk:/candidate/schedule.pdf")
         self.assertEqual(response.headers["Content-Disposition"], 'attachment; filename="schedule.pdf"')
         self.assertFalse(os.path.exists(temp_path))
+
+    def test_ai_file_proxy_downloads_interview_yandex_disk_video(self):
+        from core.ai_tasks import file_response_from_token, make_file_token
+
+        user = self.create_finished_candidate("ai-interview-file@example.com")
+        interview = Interview.objects.create(
+            user=user,
+            video_source_type="yandex_disk_path",
+            video_yandex_disk_path="disk:/interviews/interview.mp4",
+            video_name="interview.mp4",
+        )
+        created_files = []
+
+        def fake_download(disk_path, local_path, *, log_context=None):
+            created_files.append(local_path)
+            with open(local_path, "wb") as fh:
+                fh.write(f"interview:{disk_path}".encode("utf-8"))
+
+        token = make_file_token("review_by_tutor", "interview", interview.pk, "video")
+
+        with patch("scholar_form.services.yandex_disk.download_file_from_yandex_disk", side_effect=fake_download):
+            response = file_response_from_token(token)
+            body = b"".join(response.streaming_content)
+            temp_path = created_files[0]
+            self.assertTrue(os.path.exists(temp_path))
+            response.close()
+
+        self.assertEqual(body, b"interview:disk:/interviews/interview.mp4")
+        self.assertEqual(response.headers["Content-Disposition"], 'attachment; filename="interview.mp4"')
+        self.assertFalse(os.path.exists(temp_path))
+
+    def test_enqueue_ai_tasks_command_counts_created_tasks(self):
+        from django.core.management import call_command
+
+        user = self.create_finished_candidate("ai-command@example.com")
+        MotivationLetter.objects.create(
+            user=user,
+            letter_text="submitted letter",
+            status=MotivationLetter.Status.SUBMITTED,
+        )
+        Interview.objects.create(
+            user=user,
+            video_source_type="yandex_disk_path",
+            video_yandex_disk_path="disk:/interviews/command.mp4",
+            video_name="command.mp4",
+            transcript_status="PENDING",
+        )
+        ScholarVideo.objects.create(user=user, yandex_disk_path="disk:/video-command.mp4")
+        AiTask.objects.all().delete()
+
+        out = StringIO()
+        call_command("enqueue_ai_tasks", stdout=out)
+
+        output = out.getvalue()
+        self.assertIn("motivation_letter_review=1", output)
+        self.assertIn("interview_transcription=1", output)
+        self.assertIn("scholar_video_transcription=1", output)
+        self.assertEqual(AiTask.objects.filter(task_type=AiTask.Type.MOTIVATION_LETTER_REVIEW).count(), 1)
+        self.assertEqual(AiTask.objects.filter(task_type=AiTask.Type.INTERVIEW_TRANSCRIPTION).count(), 1)
+        self.assertEqual(AiTask.objects.filter(task_type=AiTask.Type.SCHOLAR_VIDEO_TRANSCRIPTION).count(), 1)
+
+    def test_interview_yandex_link_helpers_support_file_folder_and_public_url(self):
+        from review_by_tutor import views
+
+        self.assertEqual(
+            views._normalize_interview_video_source("disk:/folder/video.mp4"),
+            ("yandex_disk_path", "disk:/folder/video.mp4"),
+        )
+        self.assertEqual(
+            views._normalize_interview_video_source("folder/video.mp4"),
+            ("yandex_disk_path", "disk:/folder/video.mp4"),
+        )
+        self.assertEqual(
+            views._normalize_interview_video_source("https://disk.yandex.ru/i/abc"),
+            ("yandex_public_url", "https://disk.yandex.ru/i/abc"),
+        )
+
+        folder = {
+            "type": "dir",
+            "_embedded": {
+                "items": [
+                    {"type": "file", "name": "notes.txt", "mime_type": "text/plain"},
+                    {"type": "file", "name": "interview.mp4", "mime_type": "video/mp4", "size": 100},
+                ]
+            },
+        }
+        self.assertEqual(views._single_video_from_folder(folder)["name"], "interview.mp4")
+
+        user = self.create_finished_candidate("ai-link-helper@example.com")
+        interview = Interview.objects.create(user=user)
+        with patch(
+            "review_by_tutor.views.get_resource_metadata",
+            return_value={"type": "file", "name": "private.mp4", "mime_type": "video/mp4", "size": 123},
+        ):
+            views._apply_interview_video_link(interview, "disk:/interviews/private.mp4", user)
+
+        self.assertEqual(interview.video_source_type, "yandex_disk_path")
+        self.assertEqual(interview.video_yandex_disk_path, "disk:/interviews/private.mp4")
+        self.assertEqual(interview.video_name, "private.mp4")
+        self.assertEqual(interview.transcript_status, "PENDING")
+
+    def test_interview_public_folder_link_selects_single_video(self):
+        from review_by_tutor import views
+
+        user = self.create_finished_candidate("ai-public-folder@example.com")
+        interview = Interview.objects.create(user=user)
+        metadata = {
+            "type": "dir",
+            "_embedded": {
+                "items": [
+                    {
+                        "type": "file",
+                        "name": "public-video.webm",
+                        "path": "/public-video.webm",
+                        "mime_type": "video/webm",
+                        "size": 321,
+                    }
+                ]
+            },
+        }
+        response = SimpleNamespace(
+            status_code=206,
+            headers={"Content-Type": "video/webm", "Content-Length": "321"},
+            close=lambda: None,
+        )
+
+        with patch("review_by_tutor.views.get_public_resource_metadata", return_value=metadata), \
+             patch("review_by_tutor.views.get_public_download_url", return_value="https://download.example/video"), \
+             patch("review_by_tutor.views.requests.head", return_value=SimpleNamespace(status_code=405, headers={}, url="")), \
+             patch("review_by_tutor.views.requests.get", return_value=response):
+            views._apply_interview_video_link(interview, "https://disk.yandex.ru/d/public", user)
+
+        self.assertEqual(interview.video_source_type, "yandex_public_url")
+        self.assertEqual(interview.video_yandex_disk_path, "/public-video.webm")
+        self.assertEqual(interview.video_name, "public-video.webm")
+        self.assertEqual(interview.video_mime, "video/webm")
 
 
 class CorePageFlowTests(IntegrationTestCase):

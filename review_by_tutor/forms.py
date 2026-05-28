@@ -288,7 +288,15 @@ class DocumentCommentForm(forms.ModelForm):
 class InterviewForm(forms.ModelForm):
     class Meta:
         model = Interview
-        fields = ["notes", "video"]
+        fields = ["notes", "video", "video_yandex_disk_url"]
+        widgets = {
+            "video_yandex_disk_url": forms.TextInput(
+                attrs={
+                    "class": "form-control",
+                    "placeholder": "disk:/Собеседования/2026/video.mp4 или https://disk.yandex.ru/...",
+                }
+            ),
+        }
 
 
 class TestAssignmentCreateForm(forms.ModelForm):

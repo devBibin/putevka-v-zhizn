@@ -11,6 +11,7 @@ urlpatterns = [
     path("documents/<int:user_id>/", views.staff_documents_detail, name="staff_documents_detail"),
     path("study/<int:user_id>/", views.staff_study_detail, name="staff_study_detail"),
     path("interview/<int:user_id>/", views.interview_detail, name="interview_detail"),
+    path("interview/<int:user_id>/video-stream/", views.interview_video_stream, name="interview_video_stream"),
     path("notes/<int:user_id>/", views.staff_notes_by_user, name="staff_notes"),
     path("users/", views.staff_users_list, name="staff_users_list"),
 

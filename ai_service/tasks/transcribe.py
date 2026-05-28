@@ -9,10 +9,14 @@ from ai_service.openai_runtime import make_openai_client
 
 logger = logging.getLogger(__name__)
 
-OPENAI_TRANSCRIBE_MODEL = os.getenv("OPENAI_TRANSCRIBE_MODEL", "gpt-4o-transcribe")
+OPENAI_TRANSCRIBE_MODEL = os.getenv("OPENAI_TRANSCRIBE_MODEL", "gpt-4o-transcribe").strip()
 MAX_MODEL_AUDIO_SECONDS = int(os.getenv("OPENAI_TRANSCRIBE_MAX_SECONDS", "1400"))
 CHUNK_SECONDS = int(os.getenv("OPENAI_TRANSCRIBE_CHUNK_SECONDS", "1100"))
 CHUNK_OVERLAP_SECONDS = int(os.getenv("OPENAI_TRANSCRIBE_CHUNK_OVERLAP_SECONDS", "2"))
+DIARIZE_MODEL = "gpt-4o-transcribe-diarize"
+DIARIZE_MAX_MODEL_AUDIO_SECONDS = int(os.getenv("OPENAI_DIARIZE_MAX_SECONDS", "300"))
+DIARIZE_CHUNK_SECONDS = int(os.getenv("OPENAI_DIARIZE_CHUNK_SECONDS", "300"))
+DIARIZE_CHUNK_OVERLAP_SECONDS = int(os.getenv("OPENAI_DIARIZE_CHUNK_OVERLAP_SECONDS", "1"))
 
 
 def _run(cmd: list[str], error_prefix: str) -> str:
@@ -52,7 +56,56 @@ def _extract_audio(video_path: str, audio_path: str, start_sec: int | None = Non
     _run(cmd, "ffmpeg")
 
 
+def _is_diarize_model() -> bool:
+    return OPENAI_TRANSCRIBE_MODEL.strip().lower() == DIARIZE_MODEL
+
+
+def _format_timestamp(seconds: float | int | None) -> str:
+    total = max(int(seconds or 0), 0)
+    hh = total // 3600
+    mm = (total % 3600) // 60
+    ss = total % 60
+    return f"{hh:02d}:{mm:02d}:{ss:02d}"
+
+
+def _iter_diarized_segments(result) -> list[dict]:
+    if isinstance(result, dict):
+        return result.get("segments") or []
+    segments = getattr(result, "segments", None) or []
+    normalized = []
+    for segment in segments:
+        if isinstance(segment, dict):
+            normalized.append(segment)
+        else:
+            normalized.append(
+                {
+                    "speaker": getattr(segment, "speaker", ""),
+                    "start": getattr(segment, "start", None),
+                    "end": getattr(segment, "end", None),
+                    "text": getattr(segment, "text", ""),
+                }
+            )
+    return normalized
+
+
+def _format_diarized_result(result, *, offset_seconds: int = 0) -> str:
+    lines = []
+    for segment in _iter_diarized_segments(result):
+        text = (segment.get("text") or "").strip()
+        if not text:
+            continue
+        speaker = (segment.get("speaker") or "Speaker").strip()
+        start = float(segment.get("start") or 0) + offset_seconds
+        lines.append(f"[{_format_timestamp(start)}] {speaker}: {text}")
+    if lines:
+        return "\n".join(lines)
+    return (getattr(result, "text", None) or (result.get("text") if isinstance(result, dict) else "") or str(result)).strip()
+
+
 def _transcribe_audio_file(audio_path: str, language: str | None) -> str:
+    if _is_diarize_model():
+        return _transcribe_audio_file_diarized(audio_path, language)
+
     client = make_openai_client()
     started = time.monotonic()
     size = os.path.getsize(audio_path)
@@ -67,34 +120,62 @@ def _transcribe_audio_file(audio_path: str, language: str | None) -> str:
     return text
 
 
+def _transcribe_audio_file_diarized(audio_path: str, language: str | None, *, offset_seconds: int = 0) -> str:
+    client = make_openai_client()
+    started = time.monotonic()
+    size = os.path.getsize(audio_path)
+    logger.info("OpenAI diarized transcription request model=%s audio_bytes=%s language=%s", OPENAI_TRANSCRIBE_MODEL, size, language or "-")
+    with open(audio_path, "rb") as fh:
+        kwargs = {
+            "model": OPENAI_TRANSCRIBE_MODEL,
+            "file": fh,
+            "response_format": "diarized_json",
+            "chunking_strategy": "auto",
+        }
+        if language:
+            kwargs["language"] = language
+        result = client.audio.transcriptions.create(**kwargs)
+    text = _format_diarized_result(result, offset_seconds=offset_seconds)
+    logger.info("OpenAI diarized transcription response chars=%s elapsed=%.2fs", len(text), time.monotonic() - started)
+    return text
+
+
 def transcribe_media_file(media_path: str, language: str | None = "ru") -> str:
     started = time.monotonic()
     duration = _probe_duration_seconds(media_path)
     logger.info("Media duration probed file=%s duration=%.2fs", media_path, duration)
-    if duration <= MAX_MODEL_AUDIO_SECONDS:
+    is_diarized = _is_diarize_model()
+    max_model_audio_seconds = DIARIZE_MAX_MODEL_AUDIO_SECONDS if is_diarized else MAX_MODEL_AUDIO_SECONDS
+    chunk_seconds = DIARIZE_CHUNK_SECONDS if is_diarized else CHUNK_SECONDS
+    chunk_overlap_seconds = DIARIZE_CHUNK_OVERLAP_SECONDS if is_diarized else CHUNK_OVERLAP_SECONDS
+    if duration <= max_model_audio_seconds:
         with tempfile.TemporaryDirectory() as tmp:
             audio_path = os.path.join(tmp, "audio.wav")
             _extract_audio(media_path, audio_path)
-            text = _transcribe_audio_file(audio_path, language)
+            if is_diarized:
+                text = _transcribe_audio_file_diarized(audio_path, language)
+            else:
+                text = _transcribe_audio_file(audio_path, language)
             logger.info("Media transcription finished chunks=1 elapsed=%.2fs", time.monotonic() - started)
             return text
 
     parts: list[str] = []
     with tempfile.TemporaryDirectory() as tmp:
-        step = max(1, CHUNK_SECONDS - CHUNK_OVERLAP_SECONDS)
+        step = max(1, chunk_seconds - chunk_overlap_seconds)
         start = 0
         idx = 0
         total = int(duration) + 1
         while start < total:
             chunk_path = os.path.join(tmp, f"chunk_{idx:03d}.wav")
-            chunk_duration = min(CHUNK_SECONDS, total - start)
+            chunk_duration = min(chunk_seconds, total - start)
             logger.info("Transcribing media chunk index=%s start=%s duration=%s", idx, start, chunk_duration)
             _extract_audio(media_path, chunk_path, start_sec=start, duration_sec=chunk_duration)
-            text = _transcribe_audio_file(chunk_path, language).strip()
-            hh = start // 3600
-            mm = (start % 3600) // 60
-            ss = start % 60
-            parts.append(f"[{hh:02d}:{mm:02d}:{ss:02d}]\n{text}\n")
+            if is_diarized:
+                text = _transcribe_audio_file_diarized(chunk_path, language, offset_seconds=start).strip()
+                parts.append(f"{text}\n")
+            else:
+                text = _transcribe_audio_file(chunk_path, language).strip()
+                parts.append(f"[{_format_timestamp(start)}]\n{text}\n")
             idx += 1
             start += step
     result = "\n".join(parts).strip()
