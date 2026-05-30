@@ -268,7 +268,7 @@ def complete_task(task_id, worker_id: str, result: dict[str, Any]) -> AiTask:
         return task
 
 
-def fail_task(task_id, worker_id: str, error: str, retryable: bool = True) -> AiTask:
+def fail_task(task_id, worker_id: str, error: str, retryable: bool = True, result: dict[str, Any] | None = None) -> AiTask:
     with transaction.atomic():
         task = AiTask.objects.select_for_update().get(pk=task_id)
         if task.status in {AiTask.Status.DONE, AiTask.Status.FAILED, AiTask.Status.CANCELLED}:
@@ -278,9 +278,14 @@ def fail_task(task_id, worker_id: str, error: str, retryable: bool = True) -> Ai
         final = not retryable or task.attempts >= task.max_attempts
         task.status = AiTask.Status.FAILED if final else AiTask.Status.RETRY
         task.error = (error or "")[:5000]
+        if result is not None:
+            task.result = result
         task.locked_until = None
         task.finished_at = timezone.now() if final else None
-        task.save(update_fields=["status", "error", "locked_until", "finished_at", "updated_at"])
+        update_fields = ["status", "error", "locked_until", "finished_at", "updated_at"]
+        if result is not None:
+            update_fields.append("result")
+        task.save(update_fields=update_fields)
         if final:
             mark_source_failed(task, task.error)
         logger.warning(

@@ -72,10 +72,11 @@ def complete(request, task_id):
         return _forbidden(request)
     body = _json_body(request)
     worker_id = body.get("worker_id") or "ai-worker"
+    result = body.get("result") or {}
     try:
-        task = complete_task(task_id, worker_id, body.get("result") or {})
+        task = complete_task(task_id, worker_id, result)
     except AiTaskResultApplicationError as exc:
-        task = fail_task(task_id, worker_id, str(exc), retryable=False)
+        task = fail_task(task_id, worker_id, str(exc), retryable=False, result=result)
         logger.warning("AI task completion rejected task_id=%s task_type=%s worker_id=%s error=%s", task.pk, task.task_type, worker_id, exc)
         return JsonResponse({"id": str(task.pk), "status": task.status, "error": task.error})
     logger.info("AI task completed task_id=%s task_type=%s worker_id=%s", task.pk, task.task_type, body.get("worker_id") or "ai-worker")

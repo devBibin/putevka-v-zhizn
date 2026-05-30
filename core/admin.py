@@ -8,7 +8,7 @@ from django.urls import reverse
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 
-from core.models import TelegramAccount, RegistrationPersonalData, MotivationLetterInstruction
+from core.models import AiTask, TelegramAccount, RegistrationPersonalData, MotivationLetterInstruction
 from review_by_tutor.models import InterviewTemplate
 from scholar_form.admin import UserPersonalDataInline
 from scholar_form.forms import UserInfoForm
@@ -181,6 +181,67 @@ class MotivationLetterInstructionAdmin(admin.ModelAdmin):
             "fields": ("uploaded_at", "updated_at"),
         }),
     )
+
+
+@admin.register(AiTask)
+class AiTaskAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "task_type",
+        "status",
+        "source",
+        "attempts",
+        "max_attempts",
+        "locked_by",
+        "created_at",
+        "updated_at",
+    )
+    list_filter = (
+        "task_type",
+        "status",
+        ("created_at", admin.DateFieldListFilter),
+        ("updated_at", admin.DateFieldListFilter),
+        ("locked_until", admin.DateFieldListFilter),
+    )
+    search_fields = (
+        "id",
+        "source_app",
+        "source_model",
+        "source_object_id",
+        "source_version",
+        "locked_by",
+        "error",
+    )
+    ordering = ("-created_at",)
+    readonly_fields = (
+        "id",
+        "created_at",
+        "updated_at",
+        "started_at",
+        "finished_at",
+    )
+    fieldsets = (
+        ("Task", {
+            "fields": ("id", "task_type", "status", "attempts", "max_attempts")
+        }),
+        ("Source", {
+            "fields": ("source_app", "source_model", "source_object_id", "source_version")
+        }),
+        ("Payload", {
+            "fields": ("payload", "result", "error")
+        }),
+        ("Lock", {
+            "fields": ("locked_by", "locked_until")
+        }),
+        ("Dates", {
+            "fields": ("created_at", "updated_at", "started_at", "finished_at")
+        }),
+    )
+
+    @admin.display(description="Source")
+    def source(self, obj):
+        return f"{obj.source_app}.{obj.source_model} #{obj.source_object_id}"
+
 
 @admin.register(Notification)
 class NotificationAdmin(admin.ModelAdmin):

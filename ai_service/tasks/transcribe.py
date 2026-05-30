@@ -14,7 +14,9 @@ OPENAI_TRANSCRIBE_MODEL = os.getenv("OPENAI_TRANSCRIBE_MODEL", "gpt-4o-transcrib
 MAX_MODEL_AUDIO_SECONDS = int(os.getenv("OPENAI_TRANSCRIBE_MAX_SECONDS", "1400"))
 CHUNK_SECONDS = int(os.getenv("OPENAI_TRANSCRIBE_CHUNK_SECONDS", "1100"))
 CHUNK_OVERLAP_SECONDS = int(os.getenv("OPENAI_TRANSCRIBE_CHUNK_OVERLAP_SECONDS", "2"))
-CHUNK_TRANSCRIBE_CONCURRENCY = int(os.getenv("OPENAI_TRANSCRIBE_CHUNK_CONCURRENCY", "2"))
+CHUNK_TRANSCRIBE_CONCURRENCY = int(os.getenv("OPENAI_TRANSCRIBE_CHUNK_CONCURRENCY", "0") or "0") or None
+CHUNK_TRANSCRIBE_MIN_CONCURRENCY = int(os.getenv("OPENAI_TRANSCRIBE_CHUNK_MIN_CONCURRENCY", "1"))
+CHUNK_TRANSCRIBE_MAX_CONCURRENCY = int(os.getenv("OPENAI_TRANSCRIBE_CHUNK_MAX_CONCURRENCY", "4"))
 DIARIZE_MODEL = "gpt-4o-transcribe-diarize"
 DIARIZE_MAX_MODEL_AUDIO_SECONDS = int(os.getenv("OPENAI_DIARIZE_MAX_SECONDS", "300"))
 DIARIZE_CHUNK_SECONDS = int(os.getenv("OPENAI_DIARIZE_CHUNK_SECONDS", "300"))
@@ -150,6 +152,19 @@ def _transcribe_chunk(chunk_path: str, language: str | None, *, start_seconds: i
     return f"[{_format_timestamp(start_seconds)}]\n{text}\n"
 
 
+def _chunk_transcribe_workers(chunk_count: int) -> int:
+    if chunk_count <= 1:
+        return 1
+    if CHUNK_TRANSCRIBE_CONCURRENCY:
+        return max(1, min(CHUNK_TRANSCRIBE_CONCURRENCY, chunk_count))
+
+    cpu_count = os.cpu_count() or 1
+    max_concurrency = max(1, CHUNK_TRANSCRIBE_MAX_CONCURRENCY)
+    min_concurrency = max(1, min(CHUNK_TRANSCRIBE_MIN_CONCURRENCY, max_concurrency))
+    adaptive_limit = max(min_concurrency, min(max_concurrency, cpu_count))
+    return max(1, min(chunk_count, adaptive_limit))
+
+
 def transcribe_media_file(media_path: str, language: str | None = "ru") -> str:
     started = time.monotonic()
     duration = _probe_duration_seconds(media_path)
@@ -184,8 +199,15 @@ def transcribe_media_file(media_path: str, language: str | None = "ru") -> str:
             chunks.append((idx, start, chunk_path))
             idx += 1
             start += step
-        max_workers = max(1, min(CHUNK_TRANSCRIBE_CONCURRENCY, len(chunks)))
-        logger.info("Transcribing media chunks concurrently chunks=%s max_workers=%s", len(chunks), max_workers)
+        max_workers = _chunk_transcribe_workers(len(chunks))
+        logger.info(
+            "Transcribing media chunks concurrently chunks=%s max_workers=%s override=%s min=%s max=%s",
+            len(chunks),
+            max_workers,
+            CHUNK_TRANSCRIBE_CONCURRENCY or "-",
+            CHUNK_TRANSCRIBE_MIN_CONCURRENCY,
+            CHUNK_TRANSCRIBE_MAX_CONCURRENCY,
+        )
         indexed_parts: list[tuple[int, str]] = []
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = {

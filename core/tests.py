@@ -1341,6 +1341,29 @@ class AiServiceUnitTests(TestCase):
         self.assertLess(result.index("chunk_000.wav"), result.index("chunk_001.wav"))
         self.assertLess(result.index("chunk_001.wav"), result.index("chunk_002.wav"))
 
+    def test_chunk_transcribe_workers_adapts_to_limits_and_override(self):
+        from ai_service.tasks import transcribe
+
+        with patch.object(transcribe, "CHUNK_TRANSCRIBE_CONCURRENCY", None), \
+             patch.object(transcribe, "CHUNK_TRANSCRIBE_MIN_CONCURRENCY", 1), \
+             patch.object(transcribe, "CHUNK_TRANSCRIBE_MAX_CONCURRENCY", 4), \
+             patch("ai_service.tasks.transcribe.os.cpu_count", return_value=8):
+            self.assertEqual(transcribe._chunk_transcribe_workers(1), 1)
+            self.assertEqual(transcribe._chunk_transcribe_workers(3), 3)
+            self.assertEqual(transcribe._chunk_transcribe_workers(10), 4)
+
+        with patch.object(transcribe, "CHUNK_TRANSCRIBE_CONCURRENCY", None), \
+             patch.object(transcribe, "CHUNK_TRANSCRIBE_MIN_CONCURRENCY", 2), \
+             patch.object(transcribe, "CHUNK_TRANSCRIBE_MAX_CONCURRENCY", 4), \
+             patch("ai_service.tasks.transcribe.os.cpu_count", return_value=1):
+            self.assertEqual(transcribe._chunk_transcribe_workers(10), 2)
+
+        with patch.object(transcribe, "CHUNK_TRANSCRIBE_CONCURRENCY", 2), \
+             patch.object(transcribe, "CHUNK_TRANSCRIBE_MIN_CONCURRENCY", 1), \
+             patch.object(transcribe, "CHUNK_TRANSCRIBE_MAX_CONCURRENCY", 4), \
+             patch("ai_service.tasks.transcribe.os.cpu_count", return_value=8):
+            self.assertEqual(transcribe._chunk_transcribe_workers(10), 2)
+
     def test_diarized_transcription_passes_required_openai_options(self):
         from ai_service.tasks import transcribe
 
