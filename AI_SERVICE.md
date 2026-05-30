@@ -142,6 +142,9 @@ TELEGRAM_SOCKS5_PROXY=socks5:host:1080:user:password
 - `AI_DJANGO_BASE_URL`: публичный или приватный URL Django, например `https://app.example.org`.
 - `OPENAI_API_KEY` или `GPT_TOKEN`: OpenAI-токен, хранится на AI-сервере.
 - `TELEGRAM_SOCKS5_PROXY`: опциональный SOCKS5-прокси, также используется для OpenAI HTTP-трафика.
+- `OPENAI_TRANSCRIBE_CHUNK_MIN_CONCURRENCY`: минимальное число параллельных запросов транскрипции для длинных медиа, по умолчанию `1`.
+- `OPENAI_TRANSCRIBE_CHUNK_MAX_CONCURRENCY`: максимальное адаптивное число параллельных запросов транскрипции, по умолчанию `4`.
+- `OPENAI_TRANSCRIBE_CHUNK_CONCURRENCY`: опциональный фиксированный override; если задан, адаптивный min/max расчет отключается.
 
 Пример:
 
