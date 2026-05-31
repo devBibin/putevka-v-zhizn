@@ -40,6 +40,7 @@ from review_by_tutor.forms import MotivationLetterStaffForm, UserInfoStaffForm, 
     InterviewResultForm, TestRevisionForm
 from review_by_tutor.models import Interview, TestAssignment, InterviewPreparation, InterviewTemplate, InterviewResult, \
     TestTemplate, TestingInstruction
+from review_by_tutor.services.interview_xlsx import build_prefilled_interview_xlsx
 from review_by_tutor.services.staff_users import build_staff_users_queryset, get_staff_users_filters
 from review_by_tutor.utils.contact_form import handle_send_notification
 from review_by_tutor.utils.selection_stages import require_selection_step
@@ -1295,6 +1296,29 @@ def download_interview_template(request, user_id: int):
         template.file.open("rb"),
         as_attachment=True,
         filename=smart_str(filename),
+    )
+    return response
+
+
+@login_required
+@user_passes_test(_staff_check)
+def download_prefilled_interview_template(request, user_id: int):
+    user_obj = get_object_or_404(User, pk=user_id)
+    interview, _ = Interview.objects.get_or_create(user=user_obj)
+    result_obj, _ = InterviewResult.objects.get_or_create(interview=interview)
+
+    try:
+        payload = build_prefilled_interview_xlsx(user_obj, interview, result_obj)
+    except FileNotFoundError:
+        raise Http404("РЁР°Р±Р»РѕРЅ РЅРµ РЅР°Р№РґРµРЅ")
+
+    safe_name = _safe_letter_basename(user_obj)
+    filename = f"Interview_prefilled_{safe_name}_ID{user_obj.id}.xlsx"
+    response = FileResponse(
+        BytesIO(payload),
+        as_attachment=True,
+        filename=smart_str(filename),
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
     return response
 

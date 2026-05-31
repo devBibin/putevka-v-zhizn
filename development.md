@@ -74,3 +74,37 @@ http://127.0.0.1:8000
 - `Shadows/gpt_fill_form.py`
 
 Если нужен локальный запуск только сайта, используйте вариант без Docker.
+
+## Seed заполненных пользователей в Docker-БД
+
+Для локальной проверки страницы собеседования и выгрузки предзаполненного XLSX можно создать тестовых кандидатов
+с заполненными связанными моделями: анкета, мотивационное письмо, рубрика, тестирование, видеовизитка,
+собеседование и результат собеседования.
+
+Сначала поднимите контейнеры:
+
+```powershell
+docker compose up -d --build
+```
+
+Затем запустите сид:
+
+```powershell
+.\scripts\seed_container_db.ps1 -Count 5 -Staff
+```
+
+То же самое напрямую через Django management command:
+
+```powershell
+docker compose exec web python manage.py seed_interview_users --count 5 --staff
+```
+
+Команда идемпотентная: повторный запуск обновляет пользователей `seed_candidate_01`, `seed_candidate_02` и т.д.,
+а не создает дубли. Пароль по умолчанию для seed-пользователей: `seed12345`.
+
+Полезные параметры:
+
+- `--count 10` или `-Count 10` — сколько кандидатов создать/обновить.
+- `--prefix demo` или `-Prefix demo` — префикс username/email.
+- `--password pass12345` или `-Password pass12345` — пароль seed-пользователей.
+- `--staff` или `-Staff` — создать/обновить staff-пользователя `seed_interviewer`.
