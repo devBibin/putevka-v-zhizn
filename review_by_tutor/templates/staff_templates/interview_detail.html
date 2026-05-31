@@ -9,6 +9,10 @@
         <div class="d-flex align-items-center gap-2 mb-3">
             <h4 class="mb-0">Собеседование: {{ user_obj.get_full_name|default:user_obj.username }}</h4>
             <span class="badge text-bg-secondary">ID {{ user_obj.id }}</span>
+            <a href="{% url 'download_prefilled_interview_template' user_obj.id %}"
+               class="btn btn-sm btn-outline-success ms-auto">
+                Скачать предзаполненный шаблон
+            </a>
         </div>
 
         {% if messages %}
