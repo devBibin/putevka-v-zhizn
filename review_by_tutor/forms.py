@@ -368,6 +368,18 @@ class ScholarVideoDeadlineForm(forms.ModelForm):
         return self.cleaned_data.get("deadline_at") or None
 
 
+class ScholarVideoYandexPublicLinkForm(forms.Form):
+    yandex_public_url = forms.URLField(
+        label="Публичная ссылка Яндекс Диска",
+        required=True,
+        widget=forms.URLInput(attrs={
+            "class": "form-control",
+            "placeholder": "https://disk.yandex.ru/i/...",
+        }),
+        help_text="Укажите публичную ссылку на видеофайл или папку с одним видео.",
+    )
+
+
 class MotivationLetterRubricReviewStaffForm(forms.ModelForm):
     class Meta:
         model = MotivationLetterRubricReview

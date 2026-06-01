@@ -2,6 +2,7 @@ import mimetypes
 import re
 from datetime import timedelta
 from pathlib import Path, PurePosixPath
+from urllib.parse import unquote
 
 from django.conf import settings
 from django.contrib.auth.models import User
@@ -521,7 +522,11 @@ class ScholarVideo(models.Model):
     @staticmethod
     def _storage_name(remote_path: str, local_field) -> str:
         if remote_path:
-            remote_value = remote_path.replace("disk:/", "", 1).strip("/")
+            if remote_path.startswith("public:"):
+                _, _, remote_value = remote_path.partition("#")
+                remote_value = unquote(remote_value).strip("/")
+            else:
+                remote_value = remote_path.replace("disk:/", "", 1).strip("/")
             if remote_value:
                 return PurePosixPath(remote_value).name
 
