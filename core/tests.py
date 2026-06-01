@@ -739,6 +739,17 @@ class ScholarVideoViewHelperTests(IntegrationTestCase):
         with patch("scholar_form.views.get_download_url", side_effect=yandex_disk.YandexDiskError("failed")):
             self.assertIsNone(_resolve_file_url("disk:/bad.mp4", video.file))
 
+    def test_public_yandex_video_ref_resolves_download_url_and_name(self):
+        ref = yandex_disk.build_public_resource_ref("https://disk.yandex.ru/d/public", "/intro.webm")
+        video = ScholarVideo.objects.create(user=self.user, yandex_disk_path=ref)
+
+        with patch("scholar_form.services.yandex_disk.get_public_download_url", return_value="https://download"):
+            context = build_video_asset_context(video)
+
+        self.assertEqual(context["video_download_url"], "https://download")
+        self.assertEqual(context["video_name"], "intro.webm")
+        self.assertEqual(context["video_mime"], "video/webm")
+
     def test_rollback_uploaded_assets_deletes_new_paths_and_updates_status(self):
         deleted = []
         with patch("scholar_form.views.delete_resource", side_effect=lambda path, **kwargs: deleted.append(path)):
@@ -974,6 +985,23 @@ class StaffPageSmokeTests(IntegrationTestCase):
             {"action_deadline_clear": "1"},
         )
         self.assertRedirects(response, reverse("staff_video_detail", args=[self.candidate.id]))
+
+        with patch(
+            "review_by_tutor.views.get_public_resource_metadata",
+            return_value={"type": "file", "name": "visit.mp4", "mime_type": "video/mp4", "size": 100},
+        ), patch("review_by_tutor.views.get_public_download_url", return_value="https://download.example/video"), \
+             patch("review_by_tutor.views.requests.head", return_value=SimpleNamespace(status_code=200, headers={})):
+            response = self.client.post(
+                reverse("staff_video_detail", args=[self.candidate.id]),
+                {"action_video_link_save": "1", "yandex_public_url": "https://disk.yandex.ru/i/public"},
+            )
+        self.assertRedirects(
+            response,
+            reverse("staff_video_detail", args=[self.candidate.id]),
+            fetch_redirect_response=False,
+        )
+        self.candidate.scholar_video.refresh_from_db()
+        self.assertTrue(self.candidate.scholar_video.yandex_disk_path.startswith("public:"))
 
         doc = self.candidate.documents.first()
         response = self.client.post(

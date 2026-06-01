@@ -37,7 +37,7 @@ from review_by_tutor.forms import MotivationLetterStaffForm, UserInfoStaffForm, 
     DocumentStaffUploadForm, DocumentCommentForm, \
     DocumentStatusForm, InterviewForm, TestAssignmentCreateForm, TestAssignmentEditForm, TestResultForm, \
     LetterRevisionForm, MotivationLetterRubricReviewStaffForm, LetterDeadlineForm, ScholarVideoDeadlineForm, \
-    InterviewResultForm, TestRevisionForm
+    ScholarVideoYandexPublicLinkForm, InterviewResultForm, TestRevisionForm
 from review_by_tutor.models import Interview, TestAssignment, InterviewPreparation, InterviewTemplate, InterviewResult, \
     TestTemplate, TestingInstruction
 from review_by_tutor.services.interview_xlsx import build_prefilled_interview_xlsx
@@ -47,6 +47,7 @@ from review_by_tutor.utils.selection_stages import require_selection_step
 from scholar_form.models import UserInfo, ScholarVideo, StaffNote
 from scholar_form.services.yandex_disk import (
     YandexDiskError,
+    build_public_resource_ref,
     get_download_url,
     get_public_download_url,
     get_public_resource_metadata,
@@ -242,6 +243,54 @@ def _interview_video_download_href(interview: Interview) -> str:
             log_context={"interview_id": interview.pk, "user_id": interview.user_id},
         )
     raise Http404("Видео на Яндекс Диске не настроено")
+
+
+def _apply_scholar_video_public_link(video: ScholarVideo, source_value: str):
+    source_type, source_ref = _normalize_interview_video_source(source_value)
+    if source_type != "yandex_public_url":
+        raise YandexDiskError("Укажите публичную ссылку Яндекс Диска.")
+
+    metadata = get_public_resource_metadata(
+        source_ref,
+        log_context={"scholar_video_id": video.pk, "user_id": video.user_id},
+    )
+    public_path = ""
+    if metadata.get("type") == "dir":
+        child = _single_video_from_folder(metadata)
+        public_path = child.get("path") or child.get("name") or ""
+        metadata = child
+    elif metadata.get("type") != "file":
+        raise YandexDiskError("Укажите ссылку на видеофайл либо папку с одним видеофайлом.")
+
+    name = metadata.get("name") or "video"
+    mime = metadata.get("mime_type") or _guess_video_mime(name)
+    size = metadata.get("size")
+    _validate_video_metadata(name=name, mime=mime, size=size)
+
+    href = get_public_download_url(
+        source_ref,
+        public_path=public_path,
+        log_context={"scholar_video_id": video.pk, "user_id": video.user_id},
+    )
+    head = requests.head(href, allow_redirects=True, timeout=30)
+    if head.status_code >= 400:
+        probe = requests.get(href, headers={"Range": "bytes=0-0"}, stream=True, timeout=30)
+        probe.close()
+        if probe.status_code >= 400:
+            raise YandexDiskError("Не удалось проверить публичный видеофайл на Яндекс Диске.")
+
+    mime = mime or head.headers.get("Content-Type") or _guess_video_mime(name)
+    size_header = head.headers.get("Content-Length")
+    size = size or (int(size_header) if size_header and size_header.isdigit() else None)
+    _validate_video_metadata(name=name, mime=mime, size=size)
+
+    video.yandex_disk_path = build_public_resource_ref(source_ref, public_path)
+    video.yandex_disk_uploaded_at = timezone.now()
+    video.yandex_disk_error = ""
+    video.transcript_status = "PENDING"
+    video.transcript_error = ""
+    video.transcript_text = ""
+    video.file = None
 
 
 def _letter_display_name(user) -> str:
@@ -663,6 +712,7 @@ def staff_video_detail(request, user_id: int):
 
     staff_form = ScholarVideoStaffForm(instance=video) if video else None
     deadline_form = ScholarVideoDeadlineForm(instance=video)
+    public_link_form = ScholarVideoYandexPublicLinkForm()
 
     if request.method == "POST" and request.POST.get("action") == "send_notification":
         handle_send_notification(request, user_obj)
@@ -689,6 +739,32 @@ def staff_video_detail(request, user_id: int):
                 messages.info(request, "Дедлайн не задан — удалять нечего.")
             return redirect("staff_video_detail", user_id=user_id)
 
+        elif "action_video_link_save" in request.POST:
+            if not video:
+                video = ScholarVideo.objects.create(user=user_obj)
+            public_link_form = ScholarVideoYandexPublicLinkForm(request.POST)
+            if public_link_form.is_valid():
+                try:
+                    _apply_scholar_video_public_link(video, public_link_form.cleaned_data["yandex_public_url"])
+                except YandexDiskError as exc:
+                    public_link_form.add_error("yandex_public_url", str(exc))
+                    messages.error(request, str(exc))
+                else:
+                    video.save(update_fields=[
+                        "file",
+                        "yandex_disk_path",
+                        "yandex_disk_uploaded_at",
+                        "yandex_disk_error",
+                        "transcript_status",
+                        "transcript_error",
+                        "transcript_text",
+                        "updated_at",
+                    ])
+                    messages.success(request, "Видеовизитка из публичной ссылки Яндекс Диска сохранена.")
+                    return redirect("staff_video_detail", user_id=user_id)
+            else:
+                messages.error(request, "Укажите корректную публичную ссылку Яндекс Диска.")
+
         else:
             staff_form = ScholarVideoStaffForm(request.POST, instance=video)
             if staff_form.is_valid():
@@ -711,6 +787,7 @@ def staff_video_detail(request, user_id: int):
         "video": video,
         "form": staff_form,
         "deadline_form": deadline_form,
+        "public_link_form": public_link_form,
         "active": "my_video_page",
         "send_notification_form": send_notification_form,
         **asset_context,

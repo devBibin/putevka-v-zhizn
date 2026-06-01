@@ -3,6 +3,7 @@ import mimetypes
 import re
 import time
 from pathlib import Path, PurePosixPath
+from urllib.parse import quote, unquote
 
 import requests
 from django.conf import settings
@@ -24,10 +25,29 @@ RETRYABLE_API_STATUS_CODES = {408, 423, 429, 500, 502, 503, 504}
 RETRYABLE_UPLOAD_STATUS_CODES = RETRYABLE_API_STATUS_CODES | {409}
 INVALID_DISK_NAME_RE = re.compile(r'[\\/:*?"<>|]+')
 SPACE_RE = re.compile(r"\s+")
+PUBLIC_RESOURCE_PREFIX = "public:"
 
 
 class YandexDiskError(RuntimeError):
     pass
+
+
+def build_public_resource_ref(public_key: str, public_path: str = "") -> str:
+    return f"{PUBLIC_RESOURCE_PREFIX}{quote(public_key or '', safe='')}#{quote(public_path or '', safe='')}"
+
+
+def parse_public_resource_ref(value: str) -> tuple[str, str] | None:
+    raw = (value or "").strip()
+    if not raw.startswith(PUBLIC_RESOURCE_PREFIX):
+        return None
+
+    payload = raw[len(PUBLIC_RESOURCE_PREFIX):]
+    encoded_key, _, encoded_path = payload.partition("#")
+    public_key = unquote(encoded_key)
+    public_path = unquote(encoded_path)
+    if not public_key:
+        return None
+    return public_key, public_path
 
 
 class _ProgressReader:
@@ -305,6 +325,11 @@ def get_upload_url(path: str, *, log_context=None, retry_callback=None) -> str:
 
 
 def get_download_url(path: str, *, log_context=None) -> str:
+    public_ref = parse_public_resource_ref(path)
+    if public_ref:
+        public_key, public_path = public_ref
+        return get_public_download_url(public_key, public_path=public_path, log_context=log_context)
+
     response = _request(
         "GET",
         "/resources/download",
