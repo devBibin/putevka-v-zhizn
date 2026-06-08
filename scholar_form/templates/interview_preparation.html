@@ -6,20 +6,25 @@
 <div class="container py-4">
   <h1 class="mb-3">Подготовка к собеседованию</h1>
 
-  {% if prep %}
-    {% if prep.description %}
-      <p class="mb-3">{{ prep.description|linebreaks }}</p>
-    {% endif %}
+  {% if interview_instruction and interview_instruction.is_active %}
+    <div class="alert alert-info d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
+      <div>
+        <strong>{{ interview_instruction.title }}</strong><br>
+        {{ interview_instruction.text|linebreaksbr }}
+      </div>
 
-    <div class="ratio ratio-16x9">
-      <video controls>
-        <source src="{{ prep.video.url }}" type="video/mp4">
-        Ваш браузер не поддерживает видео.
-      </video>
+      {% if interview_instruction.url %}
+        <a href="{{ interview_instruction.url }}"
+           target="_blank"
+           rel="noopener"
+           class="btn btn-primary">
+          {{ interview_instruction.button_text }}
+        </a>
+      {% endif %}
     </div>
   {% else %}
     <div class="alert alert-info">
-      Материал пока не загружен.
+      Инструкция пока не добавлена.
     </div>
   {% endif %}
 </div>

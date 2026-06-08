@@ -66,6 +66,7 @@ class UserInfo(models.Model):
         ML = "ml", "Мотивационное письмо"
         VIDEO = "video", "Видеовизитка"
         INTERVIEW_PREP = "interview_prep", "Подготовка к собеседованию"
+        AFTER_INTERVIEW = "after_interview", "После собеседования"
 
     selection_step = models.CharField(
         max_length=32,
@@ -601,6 +602,30 @@ class VideoInstruction(models.Model):
     class Meta:
         verbose_name = "Инструкция к видеовизитке"
         verbose_name_plural = "Инструкция к видеовизитке"
+
+    def __str__(self):
+        return self.title
+
+    @classmethod
+    def get_current(cls):
+        obj = cls.objects.filter(is_active=True).order_by("-updated_at").first()
+        return obj
+
+
+class InterviewInstruction(models.Model):
+    is_active = models.BooleanField("Показывать плашку", default=True)
+
+    title = models.CharField("Заголовок", max_length=120, default="Инструкция к собеседованию")
+    text = models.TextField("Текст", blank=True, default="Перед собеседованием ознакомься с инструкцией.")
+    url = models.URLField("Ссылка на инструкцию", blank=True, default="", validators=[URLValidator()])
+
+    button_text = models.CharField("Текст кнопки", max_length=60, default="Открыть инструкцию")
+
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Инструкция к собеседованию"
+        verbose_name_plural = "Инструкция к собеседованию"
 
     def __str__(self):
         return self.title

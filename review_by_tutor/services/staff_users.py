@@ -219,6 +219,7 @@ def build_staff_users_queryset(request):
         When(user_info__selection_step="ml", then=Value(3)),
         When(user_info__selection_step="video", then=Value(4)),
         When(user_info__selection_step="interview_prep", then=Value(5)),
+        When(user_info__selection_step="after_interview", then=Value(6)),
         default=Value(99),
         output_field=IntegerField(),
     )

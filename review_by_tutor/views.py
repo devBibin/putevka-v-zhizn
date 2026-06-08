@@ -44,7 +44,7 @@ from review_by_tutor.services.interview_xlsx import build_prefilled_interview_xl
 from review_by_tutor.services.staff_users import build_staff_users_queryset, get_staff_users_filters
 from review_by_tutor.utils.contact_form import handle_send_notification
 from review_by_tutor.utils.selection_stages import require_selection_step
-from scholar_form.models import UserInfo, ScholarVideo, StaffNote
+from scholar_form.models import UserInfo, ScholarVideo, StaffNote, InterviewInstruction
 from scholar_form.services.yandex_disk import (
     YandexDiskError,
     get_download_url,
@@ -1494,14 +1494,12 @@ def testing_fill_result(request, pk):
 @require_selection_step(UserInfo.SelectionStep.INTERVIEW_PREP)
 @login_required
 def interview_preparation_view(request):
-    prep = (
-        InterviewPreparation.objects
-        .filter(is_active=True)
-        .order_by("-updated_at")
-        .first()
-    )
+    interview_instruction = InterviewInstruction.get_current()
 
-    return render(request, "interview_preparation.html", {"prep": prep, "active": "interview"})
+    return render(request, "interview_preparation.html", {
+        "active": "interview",
+        "interview_instruction": interview_instruction,
+    })
 
 
 @user_passes_test(_staff_check)
