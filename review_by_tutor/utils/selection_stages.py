@@ -14,6 +14,7 @@ STEP_ORDER = [
     UserInfo.SelectionStep.ML,
     UserInfo.SelectionStep.VIDEO,
     UserInfo.SelectionStep.INTERVIEW_PREP,
+    UserInfo.SelectionStep.AFTER_INTERVIEW,
 ]
 
 
