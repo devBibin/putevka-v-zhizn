@@ -6,7 +6,44 @@
 <div class="container py-4">
   <h1 class="mb-3">Подготовка к собеседованию</h1>
 
-  {% if interview_instruction and interview_instruction.is_active %}
+  {% if is_after_interview %}
+    <div class="alert alert-success mb-4">
+      <strong>Собеседование пройдено.</strong><br>
+      Теперь нужно дождаться результатов отбора. Мы сообщим о следующем шаге, когда решение будет готово.
+    </div>
+    <form method="post" class="card border-0 shadow-sm">
+      {% csrf_token %}
+      <div class="card-body">
+        <h2 class="h5 mb-3">Подтверждение информации</h2>
+
+        <div class="form-check mb-3">
+          <input class="form-check-input"
+                 type="checkbox"
+                 id="after_interview_parents_notified"
+                 name="after_interview_parents_notified"
+                 {% if user_info.after_interview_parents_notified %}checked disabled{% endif %}>
+          <label class="form-check-label" for="after_interview_parents_notified">
+            Я сообщил(-а) родителям/ законным представителям о том, что принимаю участие в отборе
+          </label>
+        </div>
+
+        <div class="form-check mb-4">
+          <input class="form-check-input"
+                 type="checkbox"
+                 id="after_interview_documents_ready"
+                 name="after_interview_documents_ready"
+                 {% if user_info.after_interview_documents_ready %}checked disabled{% endif %}>
+          <label class="form-check-label" for="after_interview_documents_ready">
+            Я готов(-а) предоставить документы для подтверждения анкетных данных, в случае моего прохождения в программу
+          </label>
+        </div>
+
+        {% if not user_info.after_interview_parents_notified or not user_info.after_interview_documents_ready %}
+          <button type="submit" class="btn btn-primary">Сохранить</button>
+        {% endif %}
+      </div>
+    </form>
+  {% elif interview_instruction and interview_instruction.is_active %}
     <div class="alert alert-info d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
       <div>
         <strong>{{ interview_instruction.title }}</strong><br>

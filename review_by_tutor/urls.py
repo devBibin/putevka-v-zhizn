@@ -35,6 +35,11 @@ urlpatterns = [
         views.download_prefilled_interview_template,
         name="download_prefilled_interview_template",
     ),
+    path(
+        "interview/<int:user_id>/template/uploaded/",
+        views.download_uploaded_interview_template,
+        name="download_uploaded_interview_template",
+    ),
 
     path("staff/notes/<int:user_id>/favorite/<int:note_id>/", views.staff_note_toggle_favorite,
          name="staff_note_toggle_favorite"),
