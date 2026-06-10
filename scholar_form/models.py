@@ -188,6 +188,15 @@ class UserInfo(models.Model):
         null=True
     )
 
+    after_interview_parents_notified = models.BooleanField(
+        default=False,
+        verbose_name="Я сообщил(-а) родителям/ законным представителям о том, что принимаю участие в отборе",
+    )
+    after_interview_documents_ready = models.BooleanField(
+        default=False,
+        verbose_name="Я готов(-а) предоставить документы для подтверждения анкетных данных, в случае моего прохождения в программу",
+    )
+
     created_at = models.DateTimeField(auto_now_add=True, verbose_name="Дата заполнения анкеты")
 
     tutor_summary = models.TextField(verbose_name="Заметки куратора", blank=True, null=True)

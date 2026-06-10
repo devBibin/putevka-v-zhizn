@@ -307,6 +307,12 @@ class Interview(models.Model):
         default=AiFillStatus.PENDING,
     )
     #TODO: удалить это поле
+    filled_template = models.FileField(
+        "Заполненный шаблон интервью",
+        upload_to="interview/filled_templates/",
+        blank=True,
+        null=True,
+    )
     filled_uploaded_at = models.DateTimeField(null=True, blank=True)
     ai_filled_at = models.DateTimeField(null=True, blank=True)
     ai_fill_error = models.TextField(blank=True)

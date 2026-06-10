@@ -286,6 +286,12 @@ class DocumentCommentForm(forms.ModelForm):
 
 
 class InterviewForm(forms.ModelForm):
+    filled_template = forms.FileField(
+        required=False,
+        label="Заполненный шаблон интервью",
+        widget=forms.ClearableFileInput(attrs={"class": "form-control", "accept": ".xlsx"}),
+    )
+
     class Meta:
         model = Interview
         fields = ["notes", "video", "video_yandex_disk_url"]

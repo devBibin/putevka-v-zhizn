@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from decimal import Decimal, InvalidOperation
 from io import BytesIO
 from pathlib import Path
 import re
 
 from django.conf import settings
+from django.db import models
+from django.utils.dateparse import parse_date, parse_datetime
 from django.utils import timezone
 from openpyxl import load_workbook
 from openpyxl.cell.cell import MergedCell
@@ -52,6 +55,16 @@ def _safe_set(ws, coord: str, value):
                 cell = ws.cell(merged.min_row, merged.min_col)
                 break
     cell.value = value or None
+
+
+def _safe_get(ws, coord: str):
+    cell = ws[coord]
+    if isinstance(cell, MergedCell):
+        for merged in ws.merged_cells.ranges:
+            if coord in merged:
+                cell = ws.cell(merged.min_row, merged.min_col)
+                break
+    return cell.value
 
 
 def _latest_completed_test(user):
@@ -210,8 +223,10 @@ def _build_application_values(user, interview, result) -> dict[str, str]:
             _field(rubric, "motivation"),
             _field(rubric, "help_criticality"),
         ]),
-        "Вопросы на собеседование после мотписьма": _field(rubric, "reviewer_comment"),
-        "Вопросы на собеседование от интервьюера": _join([_field(interview, "notes"), _field(video, "online_school_interview_questions"), _field(video, "schedule_interview_questions")]),
+        "Вопросы на собеседование после мотписьма": _field(letter, "admin_rating"),
+        "Вопросы на собеседование от интервьюера": "",
+        "Выбранные курсы из видеовизитки": _field(video, "online_school_selected_courses"),
+        "Отзыв по видеовизитке": _field(video, "review"),
     }
     return _add_value_aliases(values, {
         "Дата рождения": "Дата_рождения",
@@ -247,9 +262,9 @@ def _build_application_values(user, interview, result) -> dict[str, str]:
         "Родитель пенсионер (внутреннее)": "Родитель пенсионер / инвалид",
         "Дата получения мотивационного письма": "Дата получения мотивационного письма",
         "Результаты проверки (примеры ошибок)": "Оценка амбиций",
-        "Внутренняя заметка по мотивационному письму": "Оценка амбиций",
-        "Выбранные курсы и онлайн-школы": "Как_ты_планируешь_свою_подготовку_к_поступлению_на_следующий_год_",
-        "Внутренняя заметка по видеовизитке": "Вопросы на собеседование после мотписьма",
+        "Внутренняя заметка по мотивационному письму": "Вопросы на собеседование после мотписьма",
+        "Выбранные курсы и онлайн-школы": "Выбранные курсы из видеовизитки",
+        "Внутренняя заметка по видеовизитке": "Отзыв по видеовизитке",
     })
 
 
@@ -336,6 +351,14 @@ def _find_row_by_markers(ws, markers: tuple[str, ...], columns=("B", "C", "D", "
     return None
 
 
+def _first_value(ws, coords: tuple[str, ...]):
+    for coord in coords:
+        value = _safe_get(ws, coord)
+        if _text(value):
+            return value
+    return None
+
+
 def _write_interview_result_values(ws, result):
     used_rows: set[int] = set()
     found_fields: set[str] = set()
@@ -366,6 +389,153 @@ def _write_interview_result_values(ws, result):
         _safe_set(ws, "F256", _field(result, "interviewer_risks"))
         _safe_set(ws, "F257", _field(result, "interviewer_recommendations"))
         _safe_set(ws, "F258", _field(result, "interviewer_score"))
+
+
+def _normalize_for_model_field(field: models.Field, raw):
+    if raw is None:
+        return None
+    if isinstance(raw, str) and raw.strip() == "":
+        return None
+    if isinstance(field, models.BooleanField):
+        if isinstance(raw, bool):
+            return raw
+        text = str(raw).strip().lower()
+        if text in {"да", "yes", "y", "true", "1", "истина"}:
+            return True
+        if text in {"нет", "no", "n", "false", "0", "ложь"}:
+            return False
+        return None
+    if isinstance(field, (models.IntegerField, models.PositiveIntegerField, models.BigIntegerField, models.SmallIntegerField)):
+        if isinstance(raw, int):
+            return raw
+        text = str(raw).strip()
+        digits = "".join(ch for ch in text if ch.isdigit())
+        if not digits:
+            return None
+        return (-1 if text.startswith("-") else 1) * int(digits)
+    if isinstance(field, models.DecimalField):
+        if isinstance(raw, Decimal):
+            return raw
+        cleaned = "".join(ch for ch in str(raw).strip().replace(",", ".") if ch in "0123456789.-")
+        if cleaned in {"", "-", ".", "-."}:
+            return None
+        try:
+            return Decimal(cleaned)
+        except InvalidOperation:
+            return None
+    if isinstance(field, models.DateField) and not isinstance(field, models.DateTimeField):
+        if hasattr(raw, "date"):
+            return raw.date()
+        return parse_date(str(raw).strip())
+    if isinstance(field, models.DateTimeField):
+        if hasattr(raw, "tzinfo"):
+            return raw
+        return parse_datetime(str(raw).strip())
+    return str(raw).strip()
+
+
+def _interview_result_fields(result_obj) -> list[models.Field]:
+    skip = {"id", "pk", "interview", "created_at", "updated_at", "status"}
+    return [
+        field
+        for field in result_obj._meta.get_fields()
+        if getattr(field, "concrete", False)
+        and not getattr(field, "auto_created", False)
+        and field.name not in skip
+    ]
+
+
+def _parse_known_interview_result_values(ws) -> dict[str, object]:
+    values: dict[str, object] = {}
+    used_rows: set[int] = set()
+
+    for field_name, markers in INTERVIEW_RESULT_MARKERS.items():
+        row = _find_row_by_markers(ws, markers, columns=("B", "C"))
+        if row and row not in used_rows:
+            value = _first_value(ws, (f"D{row}", f"E{row}"))
+            if _text(value):
+                values[field_name] = value
+                used_rows.add(row)
+
+    for row, field_name in INTERVIEW_RESULT_ROWS.items():
+        if field_name in values or row > ws.max_row or row in used_rows:
+            continue
+        value = _first_value(ws, (f"D{row}", f"E{row}"))
+        if _text(value):
+            values[field_name] = value
+            used_rows.add(row)
+
+    summary_rows = {
+        field_name: _find_row_by_markers(ws, markers, columns=("C",))
+        for field_name, markers in INTERVIEW_SUMMARY_MARKERS.items()
+    }
+    if any(summary_rows.values()):
+        for field_name, row in summary_rows.items():
+            if row:
+                value = _first_value(ws, (f"F{row}", f"G{row}", f"D{row}", f"E{row}"))
+                if _text(value):
+                    values[field_name] = value
+    else:
+        for coord, field_name in (
+            ("F255", "interviewer_summary"),
+            ("F256", "interviewer_risks"),
+            ("F257", "interviewer_recommendations"),
+            ("F258", "interviewer_score"),
+        ):
+            value = _safe_get(ws, coord)
+            if _text(value):
+                values[field_name] = value
+
+    return values
+
+
+def _parse_verbose_interview_result_values(ws, result_obj) -> dict[str, object]:
+    fields_by_key = {
+        _label_key(getattr(field, "verbose_name", "") or field.name): field.name
+        for field in _interview_result_fields(result_obj)
+    }
+    values: dict[str, object] = {}
+
+    for row in range(1, ws.max_row + 1):
+        label_candidates = (
+            _text(_safe_get(ws, f"B{row}")),
+            _text(_safe_get(ws, f"C{row}")),
+            _text(_safe_get(ws, f"H{row}")),
+        )
+        for label in label_candidates:
+            field_name = fields_by_key.get(_label_key(label))
+            if not field_name or field_name in values:
+                continue
+            value = _first_value(ws, (f"D{row}", f"E{row}", f"F{row}", f"I{row}", f"H{row + 1}"))
+            if _text(value):
+                values[field_name] = value
+    return values
+
+
+def import_interview_result_xlsx(file_obj, result_obj) -> list[str]:
+    workbook = load_workbook(file_obj, data_only=True)
+    ws = workbook.active
+
+    raw_values = {
+        **_parse_verbose_interview_result_values(ws, result_obj),
+        **_parse_known_interview_result_values(ws),
+    }
+    fields = {field.name: field for field in _interview_result_fields(result_obj)}
+    updated_fields: list[str] = []
+
+    for field_name, raw_value in raw_values.items():
+        field = fields.get(field_name)
+        if not field:
+            continue
+        value = _normalize_for_model_field(field, raw_value)
+        if value is None:
+            continue
+        setattr(result_obj, field_name, value)
+        updated_fields.append(field_name)
+
+    if updated_fields:
+        result_obj.save(update_fields=updated_fields + ["updated_at"])
+    return updated_fields
 
 
 def build_prefilled_interview_xlsx(user, interview, result) -> bytes:

@@ -40,7 +40,7 @@ from review_by_tutor.forms import MotivationLetterStaffForm, UserInfoStaffForm, 
     InterviewResultForm, TestRevisionForm
 from review_by_tutor.models import Interview, TestAssignment, InterviewPreparation, InterviewTemplate, InterviewResult, \
     TestTemplate, TestingInstruction
-from review_by_tutor.services.interview_xlsx import build_prefilled_interview_xlsx
+from review_by_tutor.services.interview_xlsx import build_prefilled_interview_xlsx, import_interview_result_xlsx
 from review_by_tutor.services.staff_users import build_staff_users_queryset, get_staff_users_filters
 from review_by_tutor.utils.contact_form import handle_send_notification
 from review_by_tutor.utils.selection_stages import require_selection_step
@@ -1148,10 +1148,6 @@ def interview_detail(request, user_id: int):
                 obj = form.save(commit=False)
                 video_link = form.cleaned_data.get("video_yandex_disk_url", "")
 
-                if "filled_form" in request.FILES:
-                    obj.filled_uploaded_by = request.user
-                    obj.filled_uploaded_at = timezone.now()
-
                 if "video" in request.FILES:
                     obj.video_uploaded_by = request.user
                     obj.video_uploaded_at = timezone.now()
@@ -1195,6 +1191,56 @@ def interview_detail(request, user_id: int):
                 obj.save()
                 messages.success(request, "Файлы собеседования сохранены.")
                 return redirect("interview_detail", user_id=user_id)
+
+        elif action == "upload_interview_template":
+            uploaded_file = request.FILES.get("filled_template")
+            if not uploaded_file:
+                messages.error(request, "Выберите заполненный шаблон Excel.")
+                return redirect("interview_detail", user_id=user_id)
+            if not uploaded_file.name.lower().endswith(".xlsx"):
+                messages.error(request, "Загрузите файл формата .xlsx.")
+                return redirect("interview_detail", user_id=user_id)
+
+            try:
+                updated_fields = import_interview_result_xlsx(uploaded_file, result_obj)
+            except Exception as exc:
+                logger.warning(
+                    "Failed to import interview result xlsx user_id=%s interview_id=%s error=%s",
+                    user_id,
+                    interview.pk,
+                    exc,
+                )
+                messages.error(
+                    request,
+                    "Не удалось разобрать шаблон. Проверьте, что это заполненный .xlsx шаблон интервью.",
+                )
+                return redirect("interview_detail", user_id=user_id)
+
+            if not updated_fields:
+                messages.warning(request, "В шаблоне не найдены заполненные поля для импорта.")
+            else:
+                uploaded_file.seek(0)
+                interview.filled_template.save(uploaded_file.name, uploaded_file, save=False)
+                interview.filled_uploaded_at = timezone.now()
+                interview.save(update_fields=["filled_template", "filled_uploaded_at", "updated_at"])
+                messages.success(request, f"Импортировано полей: {len(updated_fields)}.")
+            return redirect("interview_detail", user_id=user_id)
+
+        elif action == "advance_selection_step":
+            user_info = getattr(user_obj, "user_info", None)
+            if user_info is None:
+                messages.error(request, "У участника не найдена анкета, этап отбора не изменён.")
+                return redirect("interview_detail", user_id=user_id)
+
+            current_step = user_info.selection_step
+            next_step = UserInfo.SelectionStep.AFTER_INTERVIEW
+            if current_step == next_step:
+                messages.info(request, "Участник уже находится на этапе «После собеседования».")
+            else:
+                user_info.selection_step = next_step
+                user_info.save(update_fields=["selection_step"])
+                messages.success(request, "Участник переведён на этап «После собеседования».")
+            return redirect("interview_detail", user_id=user_id)
 
         elif action == "save_interview_result":
             result_form = InterviewResultForm(request.POST, instance=result_obj)
@@ -1321,6 +1367,23 @@ def download_prefilled_interview_template(request, user_id: int):
         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
     return response
+
+
+@login_required
+@user_passes_test(_staff_check)
+def download_uploaded_interview_template(request, user_id: int):
+    user_obj = get_object_or_404(User, pk=user_id)
+    interview = get_object_or_404(Interview, user=user_obj)
+    if not interview.filled_template:
+        raise Http404("Загруженный шаблон интервью не найден")
+
+    filename = PurePosixPath(interview.filled_template.name).name or f"Interview_uploaded_ID{user_obj.id}.xlsx"
+    return FileResponse(
+        interview.filled_template.open("rb"),
+        as_attachment=True,
+        filename=smart_str(filename),
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
 
 
 
@@ -1495,10 +1558,32 @@ def testing_fill_result(request, pk):
 @login_required
 def interview_preparation_view(request):
     interview_instruction = InterviewInstruction.get_current()
+    user_info = getattr(request.user, "user_info", None)
+    is_after_interview = bool(
+        user_info and user_info.selection_step == UserInfo.SelectionStep.AFTER_INTERVIEW
+    )
+
+    if request.method == "POST" and is_after_interview:
+        user_info.after_interview_parents_notified = (
+            user_info.after_interview_parents_notified
+            or "after_interview_parents_notified" in request.POST
+        )
+        user_info.after_interview_documents_ready = (
+            user_info.after_interview_documents_ready
+            or "after_interview_documents_ready" in request.POST
+        )
+        user_info.save(update_fields=[
+            "after_interview_parents_notified",
+            "after_interview_documents_ready",
+        ])
+        messages.success(request, "Информация сохранена.")
+        return redirect("preparation")
 
     return render(request, "interview_preparation.html", {
         "active": "interview",
         "interview_instruction": interview_instruction,
+        "is_after_interview": is_after_interview,
+        "user_info": user_info,
     })
 
 
