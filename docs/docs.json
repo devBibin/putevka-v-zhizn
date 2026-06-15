@@ -1,0 +1,29 @@
+{
+  "$schema": "https://mintlify.com/docs.json",
+  "theme": "mint",
+  "name": "Путёвка в жизнь",
+  "colors": {
+    "primary": "#2563eb",
+    "light": "#3b82f6",
+    "dark": "#1d4ed8"
+  },
+  "navigation": {
+    "groups": [
+      {
+        "group": "Проект",
+        "pages": [
+          "index",
+          "quickstart",
+          "development"
+        ]
+      },
+      {
+        "group": "Сервисы",
+        "pages": [
+          "ai-service",
+          "deployment"
+        ]
+      }
+    ]
+  }
+}

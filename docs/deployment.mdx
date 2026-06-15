@@ -1,0 +1,64 @@
+---
+title: "Деплой"
+description: "GitHub Actions workflow, которые используются в проекте."
+---
+
+# Деплой
+
+В репозитории используются GitHub Actions для тестов, деплоя beta-сервера, деплоя AI-worker-а и публикации документации.
+
+## Тесты
+
+Workflow:
+
+```text
+.github/workflows/tests.yml
+```
+
+Workflow устанавливает Python-зависимости, запускает Django-тесты с coverage и загружает `coverage.xml` как artifact.
+
+## Beta-сервер
+
+Workflow:
+
+```text
+.github/workflows/deploy-beta.yml
+```
+
+Ветки, которые заканчиваются на `--beta`, деплоятся на beta-сервер. Workflow синхронизирует репозиторий по SSH и запускает стек через Docker Compose.
+
+Нужная конфигурация:
+
+- `BETA_DEPLOY_HOST`
+- `BETA_DEPLOY_USER`
+- `BETA_DEPLOY_SSH_KEY`
+- `BETA_DEPLOY_PATH`
+- опционально `BETA_DEPLOY_ENV_FILE`
+
+## AI-worker
+
+Workflow:
+
+```text
+.github/workflows/deploy-ai-service.yml
+```
+
+Этот workflow запускается вручную и деплоит AI-worker через `docker-compose.ai.yml`.
+
+## Документация
+
+Workflow:
+
+```text
+.github/workflows/deploy-docs.yml
+```
+
+Workflow документации собирает Mintlify-доку из `docs/`, экспортирует сайт и публикует результат в GitHub Pages.
+
+Локальный preview:
+
+```powershell
+npm i -g mint
+cd docs
+mint dev
+```
