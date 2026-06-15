@@ -1,0 +1,326 @@
+---
+title: "Ультимативный гайд запуска"
+description: "Полный локальный запуск проекта с Docker, Python, базой данных, админкой и тестовыми пользователями."
+---
+
+# Ультимативный гайд запуска
+
+Этот гайд рассчитан на запуск проекта с нуля на локальной машине. Основной рекомендуемый путь — Docker Compose, потому что он поднимает PostgreSQL и web-контейнер одинаково для всех разработчиков. Запуск напрямую через Python тоже описан ниже.
+
+## 1. Что должно быть установлено
+
+Проверь инструменты:
+
+```powershell
+git --version
+docker --version
+docker compose version
+```
+
+Для запуска без Docker дополнительно нужен Python. В Docker-сценарии Python внутри контейнера уже берется из `Dockerfile`.
+
+## 2. Подготовь `.env`
+
+В корне проекта должен быть файл `.env`. Минимальный локальный вариант:
+
+```dotenv
+DJANGO_SUPERUSER_USERNAME=admin
+DJANGO_SUPERUSER_EMAIL=admin@example.com
+DJANGO_SUPERUSER_PASSWORD=admin
+
+POSTGRES_DB=putevka
+POSTGRES_USER=putevka
+POSTGRES_PASSWORD=putevka
+POSTGRES_PORT=5433
+
+SECRET_KEY=local-dev-insecure-secret-key
+DEBUG=true
+ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0
+CSRF_TRUSTED_ORIGINS=http://localhost,http://127.0.0.1
+BASE_URL=http://127.0.0.1:8000
+
+TG_TOKEN_ADMIN=
+TG_TOKEN_USERS=
+TELEGRAM_STAFF_CHAT_IDS={}
+TELEGRAM_LOG_CHAT_ID=
+TG_BOT_USERS_USERNAME=
+
+YC_EMAIL_USER=
+YC_EMAIL_PASSWORD=
+DEFAULT_FROM_EMAIL=test@example.com
+
+YANDEX_DISK_OAUTH_TOKEN=
+YANDEX_DISK_VIDEO_FOLDER=Putevka/VideoBusinessCards
+YANDEX_DISK_TIMEOUT_SECONDS=60
+YANDEX_DISK_UPLOAD_TIMEOUT_SECONDS=900
+
+AI_SERVICE_TOKEN=local-ai-token
+AI_FILE_TOKEN_MAX_AGE=3600
+
+PUBLIC_KEY_CALL=
+CAMPAIGN_ID=
+ZVONOK_API_INITIATE_URL=
+ZVONOK_API_POLLING_URL=
+
+RUN_BACKGROUND_WORKERS=false
+DOZZLE_PORT=8080
+DOZZLE_LEVEL=info
+```
+
+Для локальной разработки токены Telegram, Yandex Disk, звонков и AI можно оставить пустыми, если ты не проверяешь соответствующие интеграции.
+
+## 3. Запуск через Docker Compose
+
+Из корня репозитория:
+
+```powershell
+docker compose up -d --build
+```
+
+Что произойдет:
+
+- соберется web-образ из `Dockerfile`;
+- поднимется PostgreSQL `15`;
+- web-контейнер дождется базу;
+- выполнятся `makemigrations`, `migrate`, `collectstatic`;
+- создастся superuser из переменных `DJANGO_SUPERUSER_*`;
+- запустится Django на `0.0.0.0:8000`.
+
+Проверь контейнеры:
+
+```powershell
+docker compose ps
+```
+
+Открой сайт:
+
+```text
+http://127.0.0.1:8000
+```
+
+Админка:
+
+```text
+http://127.0.0.1:8000/admin/
+```
+
+Логин и пароль из минимального `.env`:
+
+```text
+admin / admin
+```
+
+## 4. Логи и диагностика
+
+Логи web-контейнера:
+
+```powershell
+docker compose logs -f web
+```
+
+Логи базы:
+
+```powershell
+docker compose logs -f db
+```
+
+Dozzle доступен локально:
+
+```text
+http://127.0.0.1:8080
+```
+
+Если порт занят, поменяй `DOZZLE_PORT` в `.env`, например:
+
+```dotenv
+DOZZLE_PORT=8081
+```
+
+## 5. Миграции и Django-команды внутри контейнера
+
+Применить миграции вручную:
+
+```powershell
+docker compose exec web python manage.py migrate
+```
+
+Создать superuser вручную:
+
+```powershell
+docker compose exec web python manage.py createsuperuser
+```
+
+Открыть Django shell:
+
+```powershell
+docker compose exec web python manage.py shell
+```
+
+Запустить проверку проекта:
+
+```powershell
+docker compose exec web python manage.py check
+```
+
+## 6. Тестовые пользователи для staff-сценариев
+
+Чтобы создать заполненных кандидатов и staff-пользователя:
+
+```powershell
+.\scripts\seed_container_db.ps1 -Count 5 -Staff
+```
+
+Или напрямую:
+
+```powershell
+docker compose exec web python manage.py seed_interview_users --count 5 --staff
+```
+
+Команда обновляет существующих seed-пользователей и не плодит дубли. Пароль по умолчанию:
+
+```text
+seed12345
+```
+
+Полезные параметры:
+
+- `--count 10` — сколько кандидатов создать или обновить.
+- `--prefix demo` — префикс username и email.
+- `--password pass12345` — пароль seed-пользователей.
+- `--staff` — создать или обновить staff-пользователя `seed_interviewer`.
+
+## 7. Остановка и очистка
+
+Остановить контейнеры:
+
+```powershell
+docker compose stop
+```
+
+Остановить и удалить контейнеры:
+
+```powershell
+docker compose down
+```
+
+Полностью удалить локальную PostgreSQL-базу проекта:
+
+```powershell
+docker compose down -v
+```
+
+`down -v` удаляет volume `postgres_data`, поэтому все локальные данные в Docker-базе пропадут.
+
+## 8. Запуск без Docker
+
+Этот режим удобен, если нужно быстро поднять только Django-сайт на SQLite.
+
+Проверь виртуальное окружение:
+
+```powershell
+Test-Path .\.venv\Scripts\python.exe
+```
+
+Если окружения нет, создай его:
+
+```powershell
+python -m venv .venv
+```
+
+Установи зависимости:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install --upgrade pip
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+```
+
+Если `DATABASE_URL` не задан, Django использует `db.sqlite3` в корне репозитория.
+
+Проверь проект:
+
+```powershell
+.\.venv\Scripts\python.exe manage.py check
+```
+
+Примени миграции:
+
+```powershell
+.\.venv\Scripts\python.exe manage.py migrate
+```
+
+Запусти сервер:
+
+```powershell
+.\.venv\Scripts\python.exe manage.py runserver 127.0.0.1:8000
+```
+
+Открой:
+
+```text
+http://127.0.0.1:8000
+```
+
+## 9. Частые проблемы
+
+### Порт `8000` занят
+
+Запусти Django на другом порту:
+
+```powershell
+.\.venv\Scripts\python.exe manage.py runserver 127.0.0.1:8001
+```
+
+Для Docker поменяй проброс порта в `docker-compose.yml` или останови процесс, который уже использует `8000`.
+
+### PostgreSQL порт `5433` занят
+
+Поменяй порт в `.env`:
+
+```dotenv
+POSTGRES_PORT=5434
+```
+
+Затем перезапусти:
+
+```powershell
+docker compose up -d
+```
+
+### Ошибка с `.env`
+
+Проверь, что файл лежит в корне репозитория и содержит `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `SECRET_KEY`.
+
+### Не открывается админка
+
+Проверь, что миграции прошли и superuser создан:
+
+```powershell
+docker compose logs web
+docker compose exec web python manage.py createsuperuser
+```
+
+### Нужен чистый старт
+
+Для Docker:
+
+```powershell
+docker compose down -v
+docker compose up -d --build
+```
+
+Для SQLite:
+
+```powershell
+Remove-Item .\db.sqlite3
+.\.venv\Scripts\python.exe manage.py migrate
+```
+
+## 10. Как понять, что все работает
+
+Минимальный чеклист:
+
+- `docker compose ps` показывает `web` и `db` в рабочем состоянии.
+- `http://127.0.0.1:8000` открывает сайт.
+- `http://127.0.0.1:8000/admin/` открывает админку.
+- В админку можно зайти под `admin / admin`, если использовался минимальный `.env`.
+- `docker compose logs web` не показывает бесконечный цикл ошибок.

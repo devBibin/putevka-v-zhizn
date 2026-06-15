@@ -1,0 +1,78 @@
+---
+title: "Локальная разработка"
+description: "Краткий запуск Django-приложения локально через Python или Docker."
+---
+
+# Локальная разработка
+
+Проект можно запускать напрямую через Python или через Docker Compose. Подробный сценарий с проверками, `.env`, миграциями и частыми проблемами смотри на странице [Ультимативный гайд запуска](/quickstart).
+
+## Запуск через Python
+
+Проверь виртуальное окружение:
+
+```powershell
+Test-Path .\.venv\Scripts\python.exe
+```
+
+Установи зависимости:
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+```
+
+Проверь настройки Django:
+
+```powershell
+.\.venv\Scripts\python.exe manage.py check
+```
+
+Примени миграции:
+
+```powershell
+.\.venv\Scripts\python.exe manage.py migrate
+```
+
+Запусти сервер:
+
+```powershell
+.\.venv\Scripts\python.exe manage.py runserver 127.0.0.1:8000
+```
+
+Открой:
+
+```text
+http://127.0.0.1:8000
+```
+
+Если `DATABASE_URL` не задан, проект использует `db.sqlite3` в корне репозитория.
+
+## Запуск через Docker Compose
+
+Docker Compose поднимает PostgreSQL, web-контейнер и Dozzle:
+
+```powershell
+docker compose up -d --build
+```
+
+Приложение будет доступно по адресу:
+
+```text
+http://127.0.0.1:8000
+```
+
+## Тестовые пользователи
+
+Для проверки страниц интервью можно создать заполненных кандидатов:
+
+```powershell
+.\scripts\seed_container_db.ps1 -Count 5 -Staff
+```
+
+То же самое напрямую через Django-команду:
+
+```powershell
+docker compose exec web python manage.py seed_interview_users --count 5 --staff
+```
+
+Команда идемпотентная: повторный запуск обновляет `seed_candidate_01`, `seed_candidate_02` и так далее, а не создает дубли.
