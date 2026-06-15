@@ -13,7 +13,7 @@ from openpyxl import load_workbook
 from openpyxl.cell.cell import MergedCell
 
 from core.models import MotivationLetter
-from my_study.models import CourseSelection, UniversityPriority
+from my_study.models import UniversityPriority
 from review_by_tutor.models import InterviewTemplate, TestAssignment
 from scholar_form.models import ScholarVideo, UserInfo
 
@@ -32,8 +32,64 @@ def _join(items) -> str:
     return "\n".join(_text(item) for item in items if _text(item))
 
 
+def _labeled_value(label: str, value) -> str:
+    value_text = _text(value)
+    return f"{label}: {value_text}" if value_text else ""
+
+
+def _build_interview_extracts(rubric, video) -> str:
+    video_selected_courses = _field(video, "online_school_selected_courses") or _field(video, "online_school_course")
+    return _join([
+        _labeled_value("Мотписьмо - специальность", _field(rubric, "specialty")),
+        _labeled_value("Мотписьмо - предпочитаемые вузы", _field(rubric, "preferred_universities")),
+        _labeled_value("Мотписьмо - мотивация", _field(rubric, "motivation")),
+        _labeled_value("Мотписьмо - критичность помощи", _field(rubric, "help_criticality")),
+        _labeled_value("Видеовизитка - балл", _field(video, "score")),
+        _labeled_value("Видеовизитка - отзыв", _field(video, "review")),
+        _labeled_value("Видеовизитка - опыт онлайн-школ", _field(video, "online_school_prior_experience")),
+        _labeled_value("Видеовизитка - наблюдения по онлайн-школам", _field(video, "online_school_observations")),
+        _labeled_value("Видеовизитка - выбранные курсы", video_selected_courses),
+        _labeled_value("Видеовизитка - обоснование выбора курсов", _field(video, "online_school_choice_reason")),
+        _labeled_value("Видеовизитка - дополнительная помощь по курсам", _field(video, "online_school_extra_help")),
+        _labeled_value("Видеовизитка - использование материалов по курсам", _field(video, "online_school_used_materials")),
+        _labeled_value("Видеовизитка - вопросы по курсам", _field(video, "online_school_interview_questions")),
+        _labeled_value("Видеовизитка - школьный день", _field(video, "schedule_school_day")),
+        _labeled_value("Видеовизитка - домашняя работа", _field(video, "schedule_homework_time")),
+        _labeled_value("Видеовизитка - кружки/спорт/активности", _field(video, "schedule_activities_time")),
+        _labeled_value("Видеовизитка - подготовка к ЕГЭ/олимпиадам", _field(video, "schedule_exam_prep_time")),
+        _labeled_value("Видеовизитка - отдых", _field(video, "schedule_rest_time")),
+        _labeled_value("Видеовизитка - выходной день", _field(video, "schedule_weekend_day")),
+        _labeled_value("Видеовизитка - реалистичность графика", _field(video, "schedule_realistic_assessment")),
+        _labeled_value("Видеовизитка - дополнительная помощь по графику", _field(video, "schedule_extra_help")),
+        _labeled_value("Видеовизитка - использование материалов по графику", _field(video, "schedule_used_materials")),
+        _labeled_value("Видеовизитка - вопросы по графику", _field(video, "schedule_interview_questions")),
+    ])
+
+
+def _repair_mojibake(value: str) -> str:
+    try:
+        repaired = value.encode("cp1251").decode("utf-8")
+    except UnicodeError:
+        return value
+    return repaired if any("а" <= ch <= "я" or ch == "ё" for ch in repaired.lower()) else value
+
+
 def _label_key(value) -> str:
-    return re.sub(r"[^0-9a-zа-яё]+", "", _text(value).lower().replace("ё", "е"))
+    text = _repair_mojibake(_text(value)).lower().replace("ё", "е")
+    return re.sub(r"[^0-9a-zа-я]+", "", text)
+
+
+def _label_words(value) -> set[str]:
+    text = _repair_mojibake(_text(value)).lower().replace("ё", "е")
+    words = set(re.findall(r"[0-9a-zа-я]+", text))
+    stop_words = {
+        "есть", "если", "какие", "какой", "какая", "какую", "каким", "каких",
+        "почему", "когда", "куда", "куда", "тебя", "тебе", "ты", "твоей",
+        "твои", "свои", "свою", "свое", "свой", "ли", "или", "для", "при",
+        "наличии", "которые", "которым", "которых", "последние",
+        "фонд", "фонда", "программа", "программе", "программы",
+    }
+    return {word for word in words if len(word) >= 4 and word not in stop_words}
 
 
 def _field(obj, name: str) -> str:
@@ -102,12 +158,17 @@ def _add_value_aliases(values: dict[str, str], aliases: dict[str, str]) -> dict[
         "\u0412\u043e\u043f\u0440\u043e\u0441 8 (\u043a\u0440\u0438\u0442\u0438\u0447\u043d\u043e\u0441\u0442\u044c \u043f\u043e\u043c\u043e\u0449\u0438)": "\u0412\u043e\u043f\u0440\u043e\u0441 7 (\u043a\u0440\u0438\u0442\u0438\u0447\u043d\u043e\u0441\u0442\u044c \u043f\u043e\u043c\u043e\u0449\u0438)",
     }
     result = dict(values)
+    for label, value in values.items():
+        result.setdefault(_repair_mojibake(label), value)
+
     for label, source_label in aliases.items():
-        result[label] = values.get(source_label, "")
+        value = result.get(source_label, result.get(_repair_mojibake(source_label), ""))
+        result[label] = value
+        result.setdefault(_repair_mojibake(label), value)
     return result
 
 
-def _build_application_values(user, interview, result) -> dict[str, str]:
+def _build_application_values(user, interview, result=None) -> dict[str, str]:
     info = UserInfo.objects.filter(user=user).first()
     letter = MotivationLetter.objects.filter(user=user).first()
     rubric = getattr(letter, "rubric_review", None) if letter else None
@@ -122,11 +183,6 @@ def _build_application_values(user, interview, result) -> dict[str, str]:
         f"{u.priority}. {u.university}{', ' + u.city if u.city else ''}{' - ' + u.specialty if u.specialty else ''}"
         for u in UniversityPriority.objects.filter(user=user).order_by("priority")
     )
-    courses = _join(
-        f"{s.course.school.name}: {s.course.title} ({s.course.subject.name})"
-        for s in CourseSelection.objects.select_related("course__school", "course__subject").filter(user=user)
-    )
-
     full_name = _join([_field(info, "last_name"), _field(info, "first_name"), _field(info, "middle_name")])
     if not full_name:
         full_name = user.get_full_name() or user.username
@@ -161,7 +217,7 @@ def _build_application_values(user, interview, result) -> dict[str, str]:
         "Есть_какие-либо_иные_обстоятельства_о_которых_ты_хотел-a_бы_сообщить": _join([_field(info, "other_factors"), _field(info, "life_situation_notes")]),
         "Есть_ли_у_тебя_дома_компьютер_с_доступом_в_интернет": _field(info, "has_pc_with_internet"),
         "Кратко_опиши_свои_достижения_за_последние_два_года": _field(info, "achievements"),
-        "Как_ты_планируешь_свою_подготовку_к_поступлению_на_следующий_год_": _join([_field(info, "preparation_plan"), courses]),
+        "Как_ты_планируешь_свою_подготовку_к_поступлению_на_следующий_год_": _field(info, "preparation_plan"),
         "Какую_помощь_ты_ожидаешь_от_Фонда": _field(info, "foundation_help"),
         "Как_ты_узнал_о_программе": _field(info, "heard_about_program"),
         "Какую помощь ты хочешь получить от Фонда?": _field(info, "foundation_help"),
@@ -217,15 +273,10 @@ def _build_application_values(user, interview, result) -> dict[str, str]:
         "Категория": _field(info, "internal_study_profile"),
         "Оценка амбиций": _field(rubric, "justification"),
         "Результаты проверки (примеры ошибок)": _field(rubric, "justification"),
-        "Выписки из мотивационного письма": _join([
-            _field(rubric, "specialty"),
-            _field(rubric, "preferred_universities"),
-            _field(rubric, "motivation"),
-            _field(rubric, "help_criticality"),
-        ]),
+        "Выписки из мотивационного письма": _build_interview_extracts(rubric, video),
         "Вопросы на собеседование после мотписьма": _field(letter, "admin_rating"),
         "Вопросы на собеседование от интервьюера": "",
-        "Выбранные курсы из видеовизитки": _field(video, "online_school_selected_courses"),
+        "Выбранные курсы из видеовизитки": _field(video, "online_school_selected_courses") or _field(video, "online_school_course"),
         "Отзыв по видеовизитке": _field(video, "review"),
     }
     return _add_value_aliases(values, {
@@ -335,11 +386,84 @@ INTERVIEW_SUMMARY_MARKERS = {
     "interviewer_score": ("итоговая оценка",),
 }
 
+C_VALUE_MARKERS = (
+    (("школа кандидата", "номер"), "Наименование и номер школы"),
+    (("тип школы",), "Наименование и номер школы"),
+    (("как далеко школа",), "Город_область_регион"),
+    (("есть ли у школы специализация",), "Профиль_класса_при_наличии"),
+    (("какой профиль класса",), "Профиль_класса_при_наличии"),
+    (("по каким предметам", "егэ"), "Предметы_по_которым_планируешь_сдавать_ЕГЭ"),
+    (("поступать по егэ", "олимпиадам"), "Ты_планируешь_поступать_по_ЕГЭ_или_олимпиадам_"),
+    (("приоритет", "вуз"), "Список_наиболее_приоритетных_ВУЗов_в_которые_планируешь_поступать_не_более_5"),
+    (("специальност", "поступлен"), "Список_специальностей_которые_рассматриваешь_для_поступления"),
+    (("участв", "олимпиад"), "Планируешь_ли_ты_участвовать_в_олимпиадах"),
+    (("дополнительная поддержка", "фонд"), "Выбранные курсы из видеовизитки"),
+    (("какой поддержки", "фонд"), "Какую_помощь_ты_ожидаешь_от_Фонда"),
+    (("достижен", "рассказать"), "Кратко_опиши_свои_достижения_за_последние_два_года"),
+    (("достижен", "последние"), "Кратко_опиши_свои_достижения_за_последние_два_года"),
+    (("работа родителей", "доход"), "Среднемесячный_доход_на_1_члена_семьи_за_последние_12_месяцев_руб_"),
+    (("подготовк", "после школы"), "Как_ты_планируешь_свою_подготовку_к_поступлению_на_следующий_год_"),
+    (("материальное положение",), "Другое важное"),
+    (("компьютер", "интернет"), "Есть_ли_у_тебя_дома_компьютер_с_доступом_в_интернет"),
+    (("выписки", "мотписьм", "видеовизит"), "Выписки из мотивационного письма"),
+    (("мотивацион", "письм"), "Выписки из мотивационного письма"),
+    (("видеовизит",), "Отзыв по видеовизитке"),
+    (("выбранные", "курсы"), "Выбранные курсы из видеовизитки"),
+)
+
 
 def _application_value_coord(label: str, row: int) -> str:
     if _label_key(label) in {_label_key(item) for item in BELOW_VALUE_LABELS}:
         return f"H{row + 1}"
     return f"I{row}"
+
+
+def _value_for_c_label(label: str, values: dict[str, str], normalized_values: dict[str, str]) -> str:
+    raw_label = _text(label)
+    if raw_label.lstrip().startswith(('"', "'")):
+        return ""
+    label_key = _label_key(label)
+    if not label_key:
+        return ""
+    if label_key in normalized_values:
+        return normalized_values[label_key]
+
+    for markers, value_label in C_VALUE_MARKERS:
+        marker_keys = tuple(_label_key(marker) for marker in markers)
+        if all(marker in label_key for marker in marker_keys):
+            return normalized_values.get(_label_key(value_label), "")
+
+    label_words = _label_words(label)
+    if len(label_words) < 2:
+        return ""
+
+    best_score = 0
+    best_value = ""
+    for value_label, value in values.items():
+        value_text = _text(value)
+        if not value_text:
+            continue
+        value_words = _label_words(value_label)
+        if not value_words:
+            continue
+        overlap = label_words & value_words
+        if not overlap:
+            continue
+        direct_match = _label_key(value_label) in label_key or label_key in _label_key(value_label)
+        if len(overlap) < 2 and not direct_match:
+            continue
+        if "работа" in label_words and "работа" not in value_words and not direct_match:
+            continue
+        score = len(overlap) * 3
+        if direct_match:
+            score += 5
+        score -= max(len(value_words - label_words), 0)
+        if score > best_score:
+            best_score = score
+            best_value = value_text
+
+    return best_value if best_score >= 5 else ""
+    return ""
 
 
 def _find_row_by_markers(ws, markers: tuple[str, ...], columns=("B", "C", "D", "H")) -> int | None:
@@ -452,7 +576,7 @@ def _parse_known_interview_result_values(ws) -> dict[str, object]:
     for field_name, markers in INTERVIEW_RESULT_MARKERS.items():
         row = _find_row_by_markers(ws, markers, columns=("B", "C"))
         if row and row not in used_rows:
-            value = _first_value(ws, (f"D{row}", f"E{row}"))
+            value = _first_value(ws, (f"E{row}", f"D{row}"))
             if _text(value):
                 values[field_name] = value
                 used_rows.add(row)
@@ -460,7 +584,7 @@ def _parse_known_interview_result_values(ws) -> dict[str, object]:
     for row, field_name in INTERVIEW_RESULT_ROWS.items():
         if field_name in values or row > ws.max_row or row in used_rows:
             continue
-        value = _first_value(ws, (f"D{row}", f"E{row}"))
+        value = _first_value(ws, (f"E{row}", f"D{row}"))
         if _text(value):
             values[field_name] = value
             used_rows.add(row)
@@ -506,7 +630,7 @@ def _parse_verbose_interview_result_values(ws, result_obj) -> dict[str, object]:
             field_name = fields_by_key.get(_label_key(label))
             if not field_name or field_name in values:
                 continue
-            value = _first_value(ws, (f"D{row}", f"E{row}", f"F{row}", f"I{row}", f"H{row + 1}"))
+            value = _first_value(ws, (f"E{row}", f"D{row}", f"F{row}", f"I{row}", f"H{row + 1}"))
             if _text(value):
                 values[field_name] = value
     return values
@@ -538,7 +662,7 @@ def import_interview_result_xlsx(file_obj, result_obj) -> list[str]:
     return updated_fields
 
 
-def build_prefilled_interview_xlsx(user, interview, result) -> bytes:
+def build_prefilled_interview_xlsx(user, interview) -> bytes:
     workbook = load_workbook(_template_path())
     ws = workbook.active
 
@@ -546,15 +670,16 @@ def build_prefilled_interview_xlsx(user, interview, result) -> bytes:
     _safe_set(ws, "D8", "")
     _safe_set(ws, "D9", timezone.localdate().strftime("%d.%m.%Y"))
 
-    values = _build_application_values(user, interview, result)
+    values = _build_application_values(user, interview)
     normalized_values = {_label_key(label): value for label, value in values.items()}
     for row in range(1, ws.max_row + 1):
         label = _text(ws[f"H{row}"].value)
         if _label_key(label) in normalized_values:
             _safe_set(ws, _application_value_coord(label, row), normalized_values[_label_key(label)])
 
-    if result:
-        _write_interview_result_values(ws, result)
+        c_value = _value_for_c_label(ws[f"C{row}"].value, values, normalized_values)
+        if c_value and not _text(_safe_get(ws, f"D{row}")):
+            _safe_set(ws, f"D{row}", c_value)
 
     output = BytesIO()
     workbook.save(output)

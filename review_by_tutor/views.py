@@ -1351,10 +1351,9 @@ def download_interview_template(request, user_id: int):
 def download_prefilled_interview_template(request, user_id: int):
     user_obj = get_object_or_404(User, pk=user_id)
     interview, _ = Interview.objects.get_or_create(user=user_obj)
-    result_obj, _ = InterviewResult.objects.get_or_create(interview=interview)
 
     try:
-        payload = build_prefilled_interview_xlsx(user_obj, interview, result_obj)
+        payload = build_prefilled_interview_xlsx(user_obj, interview)
     except FileNotFoundError:
         raise Http404("РЁР°Р±Р»РѕРЅ РЅРµ РЅР°Р№РґРµРЅ")
 
