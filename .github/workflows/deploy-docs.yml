@@ -47,6 +47,62 @@ jobs:
           unzip -q mintlify-export.zip -d public
           touch public/.nojekyll
 
+      - name: Fix asset paths for project Pages
+        env:
+          BASE_PATH: /${{ github.event.repository.name }}
+        run: |
+          node <<'NODE'
+          const fs = require('fs');
+          const path = require('path');
+
+          const root = 'public';
+          const basePath = process.env.BASE_PATH.replace(/\/$/, '');
+          const extensions = new Set(['.html', '.css', '.js', '.json']);
+
+          function prefixUrl(url) {
+            if (!url.startsWith('/') || url.startsWith('//')) {
+              return url;
+            }
+
+            if (url === basePath || url.startsWith(`${basePath}/`)) {
+              return url;
+            }
+
+            return `${basePath}${url}`;
+          }
+
+          function rewrite(content) {
+            return content
+              .replace(/(href|src)=("|')(\/(?!\/)[^"']*)/gi, (_match, attr, quote, url) => `${attr}=${quote}${prefixUrl(url)}`)
+              .replace(/(href|src)=(&quot;)(\/(?!\/)[^&]*)/gi, (_match, attr, quote, url) => `${attr}=${quote}${prefixUrl(url)}`)
+              .replace(/url\(("|')?(\/(?!\/)[^"')]+)(\1)?\)/gi, (_match, quote = '', url, closeQuote = '') => `url(${quote}${prefixUrl(url)}${closeQuote})`)
+              .replace(/("|')(\/(?!\/|[a-z][a-z0-9+.-]*:)[^"']*)/gi, (_match, quote, url) => `${quote}${prefixUrl(url)}`)
+              .replace(/\\("|')(\/(?!\/|[a-z][a-z0-9+.-]*:)[^\\"']*)/gi, (_match, quote, url) => `\\${quote}${prefixUrl(url)}`);
+          }
+
+          function walk(directory) {
+            for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+              const filePath = path.join(directory, entry.name);
+              if (entry.isDirectory()) {
+                walk(filePath);
+                continue;
+              }
+
+              if (!extensions.has(path.extname(entry.name))) {
+                continue;
+              }
+
+              const before = fs.readFileSync(filePath, 'utf8');
+              const after = rewrite(before);
+              if (after !== before) {
+                fs.writeFileSync(filePath, after);
+              }
+            }
+          }
+
+          walk(root);
+          NODE
+
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
 
