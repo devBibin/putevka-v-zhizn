@@ -453,13 +453,6 @@ def staff_letter_detail(request, user_id: int):
 
                 letter.save(update_fields=["status", "updated_at"])
 
-                notify_participant(
-                    user,
-                    "Мотивационное письмо принято",
-                    "Твоё мотивационное письмо проверено и принято.",
-                    sender=request.user
-                )
-
                 messages.success(request, "Оценка/фидбэк сохранены.")
                 return redirect("staff_letter_detail", user_id=user_id)
             else:
