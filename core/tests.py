@@ -972,6 +972,23 @@ class StaffPageSmokeTests(IntegrationTestCase):
         self.candidate.motivation_letter.refresh_from_db()
         self.assertIsNotNone(self.candidate.motivation_letter.deadline_at)
 
+    def test_staff_letter_acceptance_does_not_notify_candidate(self):
+        response = self.client.post(
+            reverse("staff_letter_detail", args=[self.candidate.id]),
+            {
+                "admin_score": "65",
+                "admin_rating": "Accepted by staff",
+            },
+        )
+
+        self.assertRedirects(response, reverse("staff_letter_detail", args=[self.candidate.id]))
+        self.candidate.motivation_letter.refresh_from_db()
+        self.assertEqual(self.candidate.motivation_letter.status, MotivationLetter.Status.SUBMITTED)
+        self.assertEqual(self.candidate.motivation_letter.admin_score, 65)
+        self.assertEqual(self.candidate.motivation_letter.admin_rating, "Accepted by staff")
+        self.assertFalse(UserNotification.objects.filter(recipient=self.candidate).exists())
+        self.assertFalse(Notification.objects.exists())
+
     def test_staff_video_and_documents_post_actions(self):
         deadline = (timezone.now() + timezone.timedelta(days=3)).strftime("%Y-%m-%dT%H:%M")
         response = self.client.post(
