@@ -1,0 +1,206 @@
+name: Deploy QA
+
+on:
+  push:
+    branches:
+      - "**--qa"
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "Action to run"
+        required: true
+        default: deploy
+        type: choice
+        options:
+          - deploy
+          - stop
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: qa-server-deploy
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  deploy:
+    if: github.event_name == 'push' || github.event.inputs.action == 'deploy'
+    runs-on: ubuntu-latest
+    environment: qa
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Compute image tags
+        id: image
+        run: |
+          set -euo pipefail
+
+          image_name="$(printf '%s' "$IMAGE_NAME" | tr '[:upper:]' '[:lower:]')"
+          echo "sha_tag=$REGISTRY/$image_name:qa-${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          echo "latest_tag=$REGISTRY/$image_name:qa-latest" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push QA image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ steps.image.outputs.sha_tag }}
+            ${{ steps.image.outputs.latest_tag }}
+
+      - name: Ensure rsync is available
+        run: |
+          if ! command -v rsync >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y rsync
+          fi
+
+      - name: Configure SSH
+        env:
+          DEPLOY_HOST: ${{ secrets.QA_DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.QA_DEPLOY_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.QA_DEPLOY_SSH_KEY }}
+        run: |
+          set -euo pipefail
+
+          test -n "$DEPLOY_HOST"
+          test -n "$DEPLOY_USER"
+          test -n "$DEPLOY_SSH_KEY"
+
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/qa_deploy_key
+          chmod 600 ~/.ssh/qa_deploy_key
+          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+
+      - name: Ensure deploy directory exists
+        env:
+          DEPLOY_HOST: ${{ secrets.QA_DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.QA_DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.QA_DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+
+          test -n "$DEPLOY_PATH"
+
+          ssh -i ~/.ssh/qa_deploy_key "$DEPLOY_USER@$DEPLOY_HOST" \
+            "mkdir -p '$DEPLOY_PATH/deploy/qa' '$DEPLOY_PATH/media' '$DEPLOY_PATH/staticfiles' '$DEPLOY_PATH/logs'"
+
+      - name: Sync QA deploy files
+        env:
+          DEPLOY_HOST: ${{ secrets.QA_DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.QA_DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.QA_DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+
+          rsync -az \
+            -e "ssh -i ~/.ssh/qa_deploy_key" \
+            docker-compose.qa.yml "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/docker-compose.qa.yml"
+          rsync -az \
+            -e "ssh -i ~/.ssh/qa_deploy_key" \
+            deploy/qa/Caddyfile "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/deploy/qa/Caddyfile"
+
+      - name: Upload QA environment file
+        env:
+          DEPLOY_HOST: ${{ secrets.QA_DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.QA_DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.QA_DEPLOY_PATH }}
+          DEPLOY_ENV_FILE: ${{ secrets.QA_DEPLOY_ENV_FILE }}
+          DATABASE_URL: ${{ secrets.QA_DATABASE_URL }}
+          QA_DOMAIN: ${{ secrets.QA_DOMAIN }}
+          APP_IMAGE: ${{ steps.image.outputs.sha_tag }}
+        run: |
+          set -euo pipefail
+
+          test -n "$DATABASE_URL"
+          test -n "$QA_DOMAIN"
+          test -n "$APP_IMAGE"
+
+          {
+            if [ -n "${DEPLOY_ENV_FILE:-}" ]; then
+              printf '%s\n' "$DEPLOY_ENV_FILE"
+            fi
+            printf 'DATABASE_URL=%s\n' "$DATABASE_URL"
+            printf 'QA_DOMAIN=%s\n' "$QA_DOMAIN"
+            printf 'ALLOWED_HOSTS=%s\n' "$QA_DOMAIN"
+            printf 'CSRF_TRUSTED_ORIGINS=https://%s\n' "$QA_DOMAIN"
+            printf 'BASE_URL=https://%s\n' "$QA_DOMAIN"
+            printf 'APP_IMAGE=%s\n' "$APP_IMAGE"
+          } | ssh -i ~/.ssh/qa_deploy_key "$DEPLOY_USER@$DEPLOY_HOST" \
+            "umask 077 && cat > '$DEPLOY_PATH/.env'"
+
+      - name: Deploy QA stack
+        env:
+          DEPLOY_HOST: ${{ secrets.QA_DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.QA_DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.QA_DEPLOY_PATH }}
+          DEPLOY_BRANCH: ${{ github.ref_name }}
+          GHCR_USERNAME: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          printf '%s' "$GHCR_TOKEN" | ssh -i ~/.ssh/qa_deploy_key "$DEPLOY_USER@$DEPLOY_HOST" \
+            "docker login ghcr.io -u '$GHCR_USERNAME' --password-stdin"
+
+          ssh -i ~/.ssh/qa_deploy_key "$DEPLOY_USER@$DEPLOY_HOST" <<EOF
+          set -euo pipefail
+          cd '$DEPLOY_PATH'
+          echo "Deploying QA branch: $DEPLOY_BRANCH"
+          docker compose --env-file .env -f docker-compose.qa.yml pull
+          docker compose --env-file .env -f docker-compose.qa.yml up -d --remove-orphans
+          docker compose --env-file .env -f docker-compose.qa.yml ps
+          EOF
+
+  stop:
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'stop'
+    runs-on: ubuntu-latest
+    environment: qa
+
+    steps:
+      - name: Configure SSH
+        env:
+          DEPLOY_HOST: ${{ secrets.QA_DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.QA_DEPLOY_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.QA_DEPLOY_SSH_KEY }}
+        run: |
+          set -euo pipefail
+
+          test -n "$DEPLOY_HOST"
+          test -n "$DEPLOY_USER"
+          test -n "$DEPLOY_SSH_KEY"
+
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/qa_deploy_key
+          chmod 600 ~/.ssh/qa_deploy_key
+          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+
+      - name: Stop QA stack
+        env:
+          DEPLOY_HOST: ${{ secrets.QA_DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.QA_DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.QA_DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+
+          test -n "$DEPLOY_PATH"
+
+          ssh -i ~/.ssh/qa_deploy_key "$DEPLOY_USER@$DEPLOY_HOST" <<EOF
+          set -euo pipefail
+          cd '$DEPLOY_PATH'
+          docker compose --env-file .env -f docker-compose.qa.yml down --remove-orphans
+          EOF
