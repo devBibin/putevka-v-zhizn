@@ -168,8 +168,9 @@ class InterviewXlsxImportTests(TestCase):
         response = self.client.get(reverse("preparation"))
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Собеседование пройдено.")
-        self.assertContains(response, "дождаться результатов отбора")
+        self.assertContains(response, "Спасибо большое, что уделил(-а) время собеседованию!")
+        self.assertContains(response, "Объявить результаты отбора мы планируем ближе к концу августа.")
+        self.assertContains(response, "Я сообщил(-а) родителям/ законным представителям")
     def test_after_interview_candidate_can_save_checkboxes(self):
         user = get_user_model().objects.create_user(username="after-interview-checkboxes")
         user_info = UserInfo.objects.create(
