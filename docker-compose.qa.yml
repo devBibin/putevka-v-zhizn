@@ -1,0 +1,33 @@
+services:
+  web:
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+    image: ${APP_IMAGE}
+    volumes:
+      - ./media:/app/media
+      - ./staticfiles:/app/staticfiles
+      - ./logs:/app/logs
+    ports:
+      - "127.0.0.1:${WEB_PORT:-8000}:8000"
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      SECRET_KEY: ${SECRET_KEY:-local-dev-insecure-secret-key}
+      RUN_BACKGROUND_WORKERS: ${RUN_BACKGROUND_WORKERS:-false}
+    restart: unless-stopped
+
+  dozzle:
+    image: amir20/dozzle:latest
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      - "127.0.0.1:${DOZZLE_PORT:-8080}:8080"
+    environment:
+      DOZZLE_LEVEL: ${DOZZLE_LEVEL:-info}
+    restart: unless-stopped
+
+networks:
+  default:
+    name: ${QA_NETWORK_NAME:-putevka_qa}
