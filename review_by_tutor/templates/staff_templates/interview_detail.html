@@ -29,6 +29,46 @@
             {% endfor %}
         {% endif %}
 
+        {% if user_obj.user_info %}
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-white">
+                    <strong>Подтверждения после собеседования</strong>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-12 col-lg-6">
+                            <div class="border rounded p-3 h-100">
+                                <div class="d-flex align-items-start gap-2">
+                                    {% if user_obj.user_info.after_interview_parents_notified %}
+                                        <span class="badge text-bg-success mt-1">Отмечено</span>
+                                    {% else %}
+                                        <span class="badge text-bg-secondary mt-1">Не отмечено</span>
+                                    {% endif %}
+                                    <div>
+                                        Я сообщил(-а) родителям/ законным представителям о том, что принимаю участие в отборе
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-12 col-lg-6">
+                            <div class="border rounded p-3 h-100">
+                                <div class="d-flex align-items-start gap-2">
+                                    {% if user_obj.user_info.after_interview_documents_ready %}
+                                        <span class="badge text-bg-success mt-1">Отмечено</span>
+                                    {% else %}
+                                        <span class="badge text-bg-secondary mt-1">Не отмечено</span>
+                                    {% endif %}
+                                    <div>
+                                        Я готов(-а) предоставить документы для подтверждения анкетных данных, в случае моего прохождения в программу
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+
         <div class="card shadow-sm mb-4">
             <div class="card-header bg-white d-flex align-items-center justify-content-between">
                 <strong>Видео собеседования</strong>

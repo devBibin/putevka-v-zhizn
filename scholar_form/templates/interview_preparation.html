@@ -3,66 +3,139 @@
 {% block title %}Подготовка к собеседованию{% endblock %}
 
 {% block content %}
-<div class="container py-4">
-  <h1 class="mb-3">Подготовка к собеседованию</h1>
+    <div class="container py-4">
+        <h1 class="mb-3">Собеседование</h1>
 
-  {% if is_after_interview %}
-    <div class="alert alert-success mb-4">
-      <strong>Собеседование пройдено.</strong><br>
-      Теперь нужно дождаться результатов отбора. Мы сообщим о следующем шаге, когда решение будет готово.
-    </div>
-    <form method="post" class="card border-0 shadow-sm">
-      {% csrf_token %}
-      <div class="card-body">
-        <h2 class="h5 mb-3">Подтверждение информации</h2>
+        {% if is_after_interview %}
+            <form method="post" class="card border-0 shadow-sm mb-4">
+                {% csrf_token %}
+                <div class="card-body p-4">
+                    <h2 class="h5 mb-3">Пожалуйста, отметь информацию ниже</h2>
 
-        <div class="form-check mb-3">
-          <input class="form-check-input"
-                 type="checkbox"
-                 id="after_interview_parents_notified"
-                 name="after_interview_parents_notified"
-                 {% if user_info.after_interview_parents_notified %}checked disabled{% endif %}>
-          <label class="form-check-label" for="after_interview_parents_notified">
-            Я сообщил(-а) родителям/ законным представителям о том, что принимаю участие в отборе
-          </label>
-        </div>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input"
+                               type="checkbox"
+                               id="after_interview_parents_notified"
+                               name="after_interview_parents_notified"
+                               {% if user_info.after_interview_parents_notified %}checked disabled{% endif %}>
+                        <label class="form-check-label" for="after_interview_parents_notified">
+                            Я сообщил(-а) родителям/ законным представителям о том, что принимаю участие в отборе
+                        </label>
+                    </div>
 
-        <div class="form-check mb-4">
-          <input class="form-check-input"
-                 type="checkbox"
-                 id="after_interview_documents_ready"
-                 name="after_interview_documents_ready"
-                 {% if user_info.after_interview_documents_ready %}checked disabled{% endif %}>
-          <label class="form-check-label" for="after_interview_documents_ready">
-            Я готов(-а) предоставить документы для подтверждения анкетных данных, в случае моего прохождения в программу
-          </label>
-        </div>
+                    <div class="form-check mb-4">
+                        <input class="form-check-input"
+                               type="checkbox"
+                               id="after_interview_documents_ready"
+                               name="after_interview_documents_ready"
+                               {% if user_info.after_interview_documents_ready %}checked disabled{% endif %}>
+                        <label class="form-check-label" for="after_interview_documents_ready">
+                            Я готов(-а) предоставить документы для подтверждения анкетных данных, в случае моего
+                            прохождения в программу
+                        </label>
+                    </div>
 
-        {% if not user_info.after_interview_parents_notified or not user_info.after_interview_documents_ready %}
-          <button type="submit" class="btn btn-primary">Сохранить</button>
+                    {% if not user_info.after_interview_parents_notified or not user_info.after_interview_documents_ready %}
+                        <button type="submit" class="btn btn-primary">Сохранить</button>
+                    {% endif %}
+                </div>
+            </form>
+            <div class="card border-0 shadow-sm">
+                <div class="card-body p-4 p-md-5">
+                    <div class="mb-4">
+                        <p class="h5 mb-3">Дорогой друг!</p>
+                        <p class="mb-0">
+                            Спасибо большое, что уделил(-а) время собеседованию! Мы были рады познакомиться с тобой и
+                            узнать подробнее о твоих целях, амбициях и планах. Мы очень рады, что ты уже сейчас
+                            задумываешься о своем будущем и начинаешь активную подготовку к экзаменам. Надеемся, что наш
+                            разговор был также полезным для тебя и ты возьмешь себе на заметку советы и рекомендации,
+                            которые были озвучены на собеседовании.
+                        </p>
+                    </div>
+
+                    <div class="alert alert-info mb-4">
+                        Если на собеседовании тебе было предложено задание или появилась какая-то информация, о которой
+                        тебе бы хотелось сообщить, ты можешь отправить ее нам в течение двух недель после прохождения
+                        собеседования через раздел «Связь с Фондом» или на почту <a
+                            href="mailto:talents@putevka-v-zhizn.ru" class="alert-link">talents@putevka-v-zhizn.ru</a>.
+                    </div>
+
+                    <div class="alert alert-success mb-4">
+                        <strong>На текущий момент ты завершил(-а) все этапы отбора.</strong>
+                        <div class="mt-2">
+                            Осталось дождаться результатов. Мы свяжемся с тобой независимо от того, прошел(-а) ли ты в
+                            программу или нет. Объявить результаты отбора мы планируем ближе к концу августа. Актуальная
+                            информация будет размещаться в наших социальных сетях.
+                        </div>
+                    </div>
+
+                    <h2 class="h5 mb-3">Что будет после объявления финалистов?</h2>
+
+                    <div class="row g-3 mb-4">
+                        <div class="col-12 col-lg-6">
+                            <div class="border rounded-3 h-100 p-3">
+                                <h3 class="h6 mb-2">Если не прошел(-а)</h3>
+                                <p class="mb-0">
+                                    Мы стараемся поддержать всех ребят, которые прошли наш отбор и завершили
+                                    собеседование. Поэтому у тебя в любом случае будет возможность готовиться к
+                                    экзаменам бесплатно на онлайн-курсах «Умскула» и «100балльного репетитора» в рамках
+                                    их благотворительных программ. Подробнее расскажем после объявления результатов.
+                                </p>
+                            </div>
+                        </div>
+                        <div class="col-12 col-lg-6">
+                            <div class="border rounded-3 h-100 p-3">
+                                <h3 class="h6 mb-2">Если ты найдешь себя в списках победителей отбора</h3>
+                                <ul class="mb-0 ps-3">
+                                    <li>Мы попросим тебя подтвердить твои анкетные данные. Сейчас собирать какие-либо
+                                        документы не нужно.
+                                    </li>
+                                    <li>Но необходимо сообщить родителям/ законным представителям о твоем участии в
+                                        отборе, если они об этом не знают – позже потребуется их письменное согласие на
+                                        твое участие в программе, а также сведения о доходе.
+                                    </li>
+                                    <li>Также с каждым стипендиатом Фонд заключает договор пожертвования, для чего мы
+                                        запросим паспортные данные и банковские реквизиты (шаблон договора можно найти
+                                        на нашем сайте).
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="border-start border-4 border-primary ps-3">
+                        <p>
+                            Мы не передаем данные третьим лицам. Если твои родители/ законные представители сомневаются
+                            в благонадежности Фонда, мы предлагаем изучить документацию и отчетность на нашем сайте.
+                        </p>
+                        <p class="mb-0">
+                            При необходимости мы готовы организовать онлайн-конференцию с директором Фонда для твоих
+                            родителей/ законных представителей, чтобы ответить на все вопросы.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+        {% elif interview_instruction and interview_instruction.is_active %}
+            <div class="alert alert-info d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
+                <div>
+                    <strong>{{ interview_instruction.title }}</strong><br>
+                    {{ interview_instruction.text|linebreaksbr }}
+                </div>
+
+                {% if interview_instruction.url %}
+                    <a href="{{ interview_instruction.url }}"
+                       target="_blank"
+                       rel="noopener"
+                       class="btn btn-primary">
+                        {{ interview_instruction.button_text }}
+                    </a>
+                {% endif %}
+            </div>
+        {% else %}
+            <div class="alert alert-info">
+                Инструкция пока не добавлена.
+            </div>
         {% endif %}
-      </div>
-    </form>
-  {% elif interview_instruction and interview_instruction.is_active %}
-    <div class="alert alert-info d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
-      <div>
-        <strong>{{ interview_instruction.title }}</strong><br>
-        {{ interview_instruction.text|linebreaksbr }}
-      </div>
-
-      {% if interview_instruction.url %}
-        <a href="{{ interview_instruction.url }}"
-           target="_blank"
-           rel="noopener"
-           class="btn btn-primary">
-          {{ interview_instruction.button_text }}
-        </a>
-      {% endif %}
     </div>
-  {% else %}
-    <div class="alert alert-info">
-      Инструкция пока не добавлена.
-    </div>
-  {% endif %}
-</div>
 {% endblock %}
