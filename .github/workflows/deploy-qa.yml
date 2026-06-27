@@ -97,9 +97,9 @@ jobs:
           test -n "$DEPLOY_PATH"
 
           ssh -i ~/.ssh/qa_deploy_key "$DEPLOY_USER@$DEPLOY_HOST" \
-            "mkdir -p '$DEPLOY_PATH'"
+            "mkdir -p '$DEPLOY_PATH/deploy/qa' '$DEPLOY_PATH/media' '$DEPLOY_PATH/staticfiles' '$DEPLOY_PATH/logs'"
 
-      - name: Sync QA compose file
+      - name: Sync QA deploy files
         env:
           DEPLOY_HOST: ${{ secrets.QA_DEPLOY_HOST }}
           DEPLOY_USER: ${{ secrets.QA_DEPLOY_USER }}
@@ -110,6 +110,9 @@ jobs:
           rsync -az \
             -e "ssh -i ~/.ssh/qa_deploy_key" \
             docker-compose.qa.yml "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/docker-compose.qa.yml"
+          rsync -az \
+            -e "ssh -i ~/.ssh/qa_deploy_key" \
+            deploy/qa/Caddyfile "$DEPLOY_USER@$DEPLOY_HOST:$DEPLOY_PATH/deploy/qa/Caddyfile"
 
       - name: Upload QA environment file
         env:
@@ -118,11 +121,13 @@ jobs:
           DEPLOY_PATH: ${{ secrets.QA_DEPLOY_PATH }}
           DEPLOY_ENV_FILE: ${{ secrets.QA_DEPLOY_ENV_FILE }}
           DATABASE_URL: ${{ secrets.QA_DATABASE_URL }}
+          QA_DOMAIN: ${{ secrets.QA_DOMAIN }}
           APP_IMAGE: ${{ steps.image.outputs.sha_tag }}
         run: |
           set -euo pipefail
 
           test -n "$DATABASE_URL"
+          test -n "$QA_DOMAIN"
           test -n "$APP_IMAGE"
 
           {
@@ -130,6 +135,10 @@ jobs:
               printf '%s\n' "$DEPLOY_ENV_FILE"
             fi
             printf 'DATABASE_URL=%s\n' "$DATABASE_URL"
+            printf 'QA_DOMAIN=%s\n' "$QA_DOMAIN"
+            printf 'ALLOWED_HOSTS=%s\n' "$QA_DOMAIN"
+            printf 'CSRF_TRUSTED_ORIGINS=https://%s\n' "$QA_DOMAIN"
+            printf 'BASE_URL=https://%s\n' "$QA_DOMAIN"
             printf 'APP_IMAGE=%s\n' "$APP_IMAGE"
           } | ssh -i ~/.ssh/qa_deploy_key "$DEPLOY_USER@$DEPLOY_HOST" \
             "umask 077 && cat > '$DEPLOY_PATH/.env'"

@@ -1,0 +1,4 @@
+{$QA_DOMAIN} {
+	encode zstd gzip
+	reverse_proxy web:8000
+}
