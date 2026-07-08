@@ -123,12 +123,26 @@ docker compose version
 sudo usermod -aG docker USER
 ```
 
-После этого нужно перелогиниться под этим пользователем и проверить:
+Вместо `USER` укажи значение из GitHub secret `QA_DEPLOY_USER`. Например, если `QA_DEPLOY_USER=deploy`:
+
+```bash
+sudo usermod -aG docker deploy
+```
+
+После изменения групп нужно завершить старую SSH-сессию и зайти заново. Самый надёжный вариант — перезагрузить сервер:
+
+```bash
+sudo reboot
+```
+
+После перезахода проверь Docker именно под deploy-пользователем, без `sudo`:
 
 ```bash
 docker ps
 docker compose version
 ```
+
+Если `docker ps` падает с ошибкой доступа к `/var/run/docker.sock`, GitHub Actions тоже не сможет выполнить deploy.
 
 Открой входящие порты:
 
@@ -555,6 +569,28 @@ curl -I https://qa.example.com
 - проверь, что публичный ключ добавлен в `~/.ssh/authorized_keys`;
 - проверь, что сервер доступен по `22/tcp`;
 - проверь, что `QA_DEPLOY_USER` может выполнить `docker ps`.
+
+Если workflow падает с ошибкой Docker socket:
+
+```text
+permission denied while trying to connect to the Docker daemon socket
+```
+
+Это значит, что SSH-пользователь из `QA_DEPLOY_USER` не имеет прав на Docker. Добавь его в группу `docker`:
+
+```bash
+sudo usermod -aG docker QA_DEPLOY_USER
+sudo reboot
+```
+
+После перезагрузки зайди на сервер под этим же пользователем и проверь:
+
+```bash
+docker ps
+docker compose version
+```
+
+Команды должны работать без `sudo`. После этого перезапусти workflow `Deploy QA`.
 
 Если workflow падает на `docker compose pull`:
 

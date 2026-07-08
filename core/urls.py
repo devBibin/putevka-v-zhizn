@@ -16,7 +16,6 @@ urlpatterns = [
     path('register/skip-telegram/', views.skip_telegram, name='skip_telegram'),
     path('register/verify-phone/', views.verify_phone_if_needed, name='verify_phone_if_needed'),
     path('register/complete/', views.finish_registration, name='finish_registration'),
-    path('bot/<str:bot_token>/', views.webhook, name='bot'),
 
     path('register/wait-for-call/', views.wait_for_phone_call, name='wait_for_phone_call'),
     path('check-call-status/', views.check_phone_call_status, name='check_phone_call_status'),

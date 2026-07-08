@@ -37,7 +37,6 @@ from django.db import transaction
 from .forms import SendNotificationForm
 from .models import UserNotification, Notification
 
-from .bot import webhook
 from .services.email_service import send_email_message, send_email_verification_code
 from .services.zvonok_service import initiate_zvonok_verification, poll_zvonok_status
 from django.db import transaction

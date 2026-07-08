@@ -8,17 +8,9 @@ import config
 from core.bot import send_tg_notification_to_user
 from core.models import UserNotification
 from core.services.email_service import send_email_to_user
-from core.telegram_proxy import create_telegram_bot
+from core.telegram_tasks import enqueue_admin_message
 from .models import Document
 
-TG_TOKEN_ADMIN = config.TG_TOKEN_ADMIN
-
-try:
-    bot_admin = create_telegram_bot(TG_TOKEN_ADMIN)
-except:
-    bot_admin = None
-
-TG_TOKEN_USERS = config.TG_TOKEN_USERS
 TELEGRAM_CHAT_IDS = config.TELEGRAM_STAFF_CHAT_IDS
 
 BASE_URL = config.BASE_URL
@@ -28,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 @receiver(post_save, sender=Document)
 def notify_telegram_on_document_upload(sender, instance, created, **kwargs):
-    if created and bot_admin:
+    if created:
         document_url = f"/documents/view/{instance.pk}/"
 
         message_text = (
@@ -41,7 +33,7 @@ def notify_telegram_on_document_upload(sender, instance, created, **kwargs):
 
         for username, chat_id in TELEGRAM_CHAT_IDS.items():
             try:
-                bot_admin.send_message(chat_id, message_text)
+                enqueue_admin_message(chat_id, message_text)
                 logger.info(f"Уведомление отправлено пользователю {username} (staff) ({chat_id})")
             except Exception as e:
                 logger.error(f"Ошибка при отправке уведомления Telegram пользователю (staff) {username}: {e}")
@@ -49,7 +41,7 @@ def notify_telegram_on_document_upload(sender, instance, created, **kwargs):
 
 @receiver(post_save, sender=Document)
 def notify_telegram_on_documents_attached(sender, instance, created, **kwargs):
-    if not created and bot_admin:
+    if not created:
         document_url = f"/documents/view/{instance.pk}/"
 
         attached_docs_names = [
@@ -67,7 +59,7 @@ def notify_telegram_on_documents_attached(sender, instance, created, **kwargs):
 
         for username, chat_id in TELEGRAM_CHAT_IDS.items():
             try:
-                bot_admin.send_message(chat_id, message_text)
+                enqueue_admin_message(chat_id, message_text)
                 logger.info(f"Telegram уведомление о прикреплении документов отправлено {username} ({chat_id})")
             except Exception as e:
                 logger.error(f"Ошибка при отправке Telegram уведомления о прикреплении документов {username}: {e}")

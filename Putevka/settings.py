@@ -31,6 +31,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv("SECRET_KEY", "local-dev-insecure-secret-key")
 AI_SERVICE_TOKEN = os.getenv("AI_SERVICE_TOKEN", "")
 AI_FILE_TOKEN_MAX_AGE = int(os.getenv("AI_FILE_TOKEN_MAX_AGE", "3600"))
+TELEGRAM_SERVICE_TOKEN = os.getenv("TELEGRAM_SERVICE_TOKEN", "")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv("DEBUG", "true").lower() in {"1", "true", "yes", "on"}
@@ -283,11 +284,11 @@ LOGGING = {
         'telegram_errors': {
             'level': 'ERROR',
             'class': 'Putevka.utils.telegram_logging_handler.TelegramHandler',
-            'token': config.TG_TOKEN_ADMIN,
+            'token': "",
             'chat_id': config.TELEGRAM_LOG_CHAT_ID,
             'formatter': 'standard',
             'filters': ['user_info_filter'],
-        } if config.TG_TOKEN_ADMIN and config.TELEGRAM_STAFF_CHAT_IDS else {
+        } if config.TELEGRAM_LOG_CHAT_ID else {
             "class": "logging.NullHandler",
             "level": "ERROR",
         },

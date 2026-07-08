@@ -11,16 +11,10 @@ from core.bot import send_tg_notification_to_user
 from core.models import MotivationLetter
 from core.ai_tasks import enqueue_motivation_letter_review
 from core.services.email_service import send_email_to_user
-from core.telegram_proxy import create_telegram_bot
+from core.telegram_tasks import enqueue_admin_message
 from scholar_form.models import UserInfo, UserPersonalData
 
 TELEGRAM_STAFF_CHAT_IDS = config.TELEGRAM_STAFF_CHAT_IDS
-TG_TOKEN = config.TG_TOKEN_ADMIN
-
-try:
-    bot = create_telegram_bot(TG_TOKEN)
-except:
-    bot = None
 
 import config as app_config
 
@@ -39,7 +33,7 @@ def notify_telegram_on_motivation_letter_save(sender, instance, created, **kwarg
     if getattr(instance, "_skip_tg_notify", False):
         return
 
-    if not created and bot and instance.status == 'submitted':
+    if not created and instance.status == 'submitted':
         admin_url = f"{BASE_URL}/admin/core/motivationletter/{instance.pk}/change/"
 
         message_text = (
@@ -53,7 +47,7 @@ def notify_telegram_on_motivation_letter_save(sender, instance, created, **kwarg
 
         for username, chat_id in TELEGRAM_CHAT_IDS.items():
             try:
-                bot.send_message(chat_id, message_text)
+                enqueue_admin_message(chat_id, message_text)
                 logger.info(f"Telegram уведомление о MotivationLetter отправлено {username} ({chat_id})")
             except Exception as e:
                 logger.warning(f"Ошибка при отправке Telegram уведомления о MotivationLetter {username}: {e}")

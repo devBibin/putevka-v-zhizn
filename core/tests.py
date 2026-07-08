@@ -26,6 +26,8 @@ from core.models import (
     MotivationLetterRubricReview,
     Notification,
     RegistrationPersonalData,
+    TelegramAccount,
+    TelegramMessageTask,
     UserNotification,
 )
 from documents.ctx_builders import base_user_context, merge_context
@@ -91,7 +93,6 @@ class IntegrationTestCase(TestCase):
         super().setUp()
         self._external_patches = [
             patch("Putevka.utils.telegram_logging_handler.TelegramHandler.emit", return_value=None),
-            patch("documents.signals.bot_admin", None),
             patch("documents.signals.send_tg_notification_to_user"),
             patch("documents.signals.send_email_to_user"),
         ]
@@ -179,6 +180,158 @@ class RegistrationFlowTests(IntegrationTestCase):
 
         response = self.client.get(reverse("index"))
         self.assertEqual(response.status_code, 200)
+
+
+class TelegramServiceTests(IntegrationTestCase):
+    @override_settings(TELEGRAM_SERVICE_TOKEN="secret")
+    def test_enqueue_helper_creates_pending_message_with_markup(self):
+        from core.telegram_tasks import enqueue_user_message, inline_keyboard_markup
+
+        task = enqueue_user_message(
+            "12345",
+            "Hello",
+            reply_markup=inline_keyboard_markup("Open", "https://example.com"),
+        )
+
+        self.assertEqual(task.status, TelegramMessageTask.Status.PENDING)
+        self.assertEqual(task.bot_kind, TelegramMessageTask.BotKind.USERS)
+        self.assertEqual(task.chat_id, "12345")
+        self.assertEqual(task.reply_markup["type"], "inline_keyboard")
+
+    @override_settings(TELEGRAM_SERVICE_TOKEN="secret")
+    def test_internal_telegram_api_requires_bearer_token(self):
+        response = self.client.post("/internal/telegram/messages/claim/", data="{}", content_type="application/json")
+        self.assertEqual(response.status_code, 403)
+
+        response = self.client.post(
+            "/internal/telegram/messages/claim/",
+            data="{}",
+            content_type="application/json",
+            HTTP_AUTHORIZATION="Bearer wrong",
+        )
+        self.assertEqual(response.status_code, 403)
+
+        response = self.client.post(
+            "/internal/telegram/messages/claim/",
+            data='{"worker_id": "test"}',
+            content_type="application/json",
+            HTTP_AUTHORIZATION="Bearer secret",
+        )
+        self.assertEqual(response.status_code, 204)
+
+    @override_settings(TELEGRAM_SERVICE_TOKEN="secret")
+    def test_internal_telegram_claim_complete_and_fail(self):
+        first = TelegramMessageTask.objects.create(
+            bot_kind=TelegramMessageTask.BotKind.USERS,
+            chat_id="100",
+            text="First",
+        )
+        second = TelegramMessageTask.objects.create(
+            bot_kind=TelegramMessageTask.BotKind.ADMIN,
+            chat_id="200",
+            text="Second",
+        )
+
+        response = self.client.post(
+            "/internal/telegram/messages/claim/",
+            data='{"worker_id": "worker-1", "lease_seconds": 60}',
+            content_type="application/json",
+            HTTP_AUTHORIZATION="Bearer secret",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["message"]["id"], str(first.pk))
+
+        response = self.client.post(
+            "/internal/telegram/messages/claim/",
+            data='{"worker_id": "worker-2", "lease_seconds": 60}',
+            content_type="application/json",
+            HTTP_AUTHORIZATION="Bearer secret",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["message"]["id"], str(second.pk))
+
+        response = self.client.post(
+            f"/internal/telegram/messages/{first.pk}/complete/",
+            data='{"worker_id": "worker-1"}',
+            content_type="application/json",
+            HTTP_AUTHORIZATION="Bearer secret",
+        )
+        self.assertEqual(response.status_code, 200)
+        first.refresh_from_db()
+        self.assertEqual(first.status, TelegramMessageTask.Status.SENT)
+        self.assertIsNotNone(first.sent_at)
+
+        response = self.client.post(
+            f"/internal/telegram/messages/{second.pk}/fail/",
+            data='{"worker_id": "worker-2", "error": "timeout", "retryable": true}',
+            content_type="application/json",
+            HTTP_AUTHORIZATION="Bearer secret",
+        )
+        self.assertEqual(response.status_code, 200)
+        second.refresh_from_db()
+        self.assertEqual(second.status, TelegramMessageTask.Status.RETRY)
+        self.assertEqual(second.error, "timeout")
+
+    @override_settings(TELEGRAM_SERVICE_TOKEN="secret")
+    def test_registration_bot_update_queues_contact_request_and_finishes_activation(self):
+        user = User.objects.create_user(username="tg-user@example.com", email="tg-user@example.com", password="StrongPass123!")
+        UserInfo.objects.create(user=user, email=user.email)
+        account = TelegramAccount.objects.create(user=user)
+        RegistrationPersonalData.objects.create(
+            user=user,
+            email=user.email,
+            password=user.password,
+            email_verified=True,
+            telegram_account=account,
+            current_step="telegram_connection",
+        )
+
+        start_update = {
+            "update_id": 1,
+            "message": {
+                "message_id": 1,
+                "text": f"/start activate_{account.activation_token}",
+                "chat": {"id": 777},
+                "from": {"id": 777, "username": "candidate", "first_name": "Candidate", "language_code": "ru"},
+            },
+        }
+        response = self.client.post(
+            "/internal/telegram/updates/",
+            data=json.dumps(start_update),
+            content_type="application/json",
+            HTTP_AUTHORIZATION="Bearer secret",
+        )
+        self.assertEqual(response.status_code, 200)
+        account.refresh_from_db()
+        self.assertEqual(account.telegram_id, "777")
+        request_task = TelegramMessageTask.objects.latest("created_at")
+        self.assertEqual(request_task.reply_markup["type"], "reply_keyboard")
+
+        contact_update = {
+            "update_id": 2,
+            "message": {
+                "message_id": 2,
+                "chat": {"id": 777},
+                "from": {"id": 777, "username": "candidate", "first_name": "Candidate", "language_code": "ru"},
+                "contact": {"phone_number": "+79000000001", "user_id": 777},
+            },
+        }
+        response = self.client.post(
+            "/internal/telegram/updates/",
+            data=json.dumps(contact_update),
+            content_type="application/json",
+            HTTP_AUTHORIZATION="Bearer secret",
+        )
+        self.assertEqual(response.status_code, 200)
+        account.refresh_from_db()
+        user.refresh_from_db()
+        attempt = user.registrationpersonaldata
+        attempt.refresh_from_db()
+        self.assertTrue(account.telegram_verified)
+        self.assertTrue(user.is_active)
+        self.assertTrue(attempt.phone_verified)
+        self.assertEqual(attempt.current_step, "finish")
+        self.assertTrue(TelegramMessageTask.objects.filter(reply_markup__type="reply_keyboard_remove").exists())
 
 
 class CandidateApplicationFlowTests(IntegrationTestCase):
