@@ -3,7 +3,7 @@
 {% block content %}
     <div class="container py-4">
         <div class="d-flex align-items-center mb-3">
-            <h4 class="mb-0">Тестирование (пользователь ID {{ target_user_id }})</h4>
+            <h2 class="mb-0">Тестирование: {{ user_obj.get_full_name|default:user_obj.username }}</h2>
             <a class="btn btn-sm btn-primary ms-auto" href="{% url 'staff_testing_create' %}?user_id={{ user_obj.id }}">Назначить
                 тест</a>
         </div>
@@ -36,7 +36,7 @@
                 </span>
 
                                     <span class="small text-muted">
-                    Пользователь: {{ t.user_id }}
+                    ID пользователя: {{ t.user_id }}
                     • Назначено: {{ t.assigned_at|date:"d.m.Y H:i" }}
                                         {% if t.due_at %} • Дедлайн: {{ t.due_at|date:"d.m.Y H:i" }}{% endif %}
                 </span>

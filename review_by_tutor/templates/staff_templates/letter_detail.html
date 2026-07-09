@@ -1,12 +1,12 @@
 {% extends 'staff_templates/base.html' %}
 {% load widget_tweaks %}
 
-{% block title %}Письмо соискателя — модерация{% endblock %}
+{% block title %}Письмо кандидата — модерация{% endblock %}
 
 {% block content %}
     <div class="container py-4">
         <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
-            <h1 class="mb-0 me-auto">Письмо: {{ user_obj.get_full_name|default:user_obj.username }}</h1>
+            <h2 class="mb-0 me-auto">Письмо: {{ user_obj.get_full_name|default:user_obj.username }}</h2>
             {% if letter %}
                 <form method="post" class="m-0">
                     {% csrf_token %}
@@ -70,7 +70,7 @@
                             {% endif %}
 
                             <div class="form-text">
-                                Соискатель увидит дедлайн (если ты его показываешь в кабинете). Можно оставить
+                                Кандидат увидит дедлайн (если ты его показываешь в кабинете). Можно оставить
                                 пустым — дедлайна не будет.
                             </div>
                         </div>
@@ -181,7 +181,7 @@
                                 {% if revision_form.revision_comment.errors %}
                                     <div class="text-danger small mt-1">{{ revision_form.revision_comment.errors }}</div>
                                 {% endif %}
-                                <div class="form-text">Соискатель увидит этот комментарий и сможет отредактировать
+                                <div class="form-text">Кандидат увидит этот комментарий и сможет отредактировать
                                     письмо.
                                 </div>
                             </div>
@@ -242,11 +242,7 @@
                 {% if rubric_review %}
                     <div class="card shadow-sm mb-4">
                         <div class="card-header d-flex align-items-center">
-                            <div class="fw-semibold">Редактирование рубрики</div>
-                            <div class="ms-auto small text-muted">
-                                {{ rubric_review.model_name|default:"—" }}
-                                • {{ rubric_review.schema_version|default:"—" }}
-                            </div>
+                            <div class="fw-semibold">Оценка куратора</div>
                         </div>
 
                         <div class="card-body">

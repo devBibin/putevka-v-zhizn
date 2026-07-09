@@ -57,7 +57,7 @@ class StaffNote(models.Model):
 
 
 class UserInfo(models.Model):
-    GENDERS = [('MAN', 'Мужчина'), ('WOMAN', 'Женщина')]
+    GENDERS = [('MAN', 'Мужской'), ('WOMAN', 'Женский')]
     STATUSES = [('CANDIDATE', 'Кандидат'), ('ALTERNATIVE', 'Альтернативный трек'), ('FINAL STAGE', 'Финалист'), ('SCHOLAR', 'Участник'),
                 ('ALUMNUS', 'Выпускник')]
 
@@ -209,7 +209,7 @@ class UserInfo(models.Model):
         null=True,
         blank=True,
         validators=[MinValueValidator(1), MaxValueValidator(100)],
-        help_text="Например: 4.57 или 8.92 (зависит от шкалы в школе).",
+        help_text="Например: 4.57 или 8.92.",
     )
 
     class FamilyMaterialStatus(models.TextChoices):
@@ -245,46 +245,46 @@ class UserInfo(models.Model):
         choices=InternalStudyProfile.choices,
         blank=True,
         null=True,
-        verbose_name="Учебный профиль (внутренний)",
+        verbose_name="Учебный профиль",
         help_text="Стафф-поле. Используется в сводке.",
         db_index=True,
     )
 
     is_large_family = models.BooleanField(
         default=False,
-        verbose_name="Многодетность (внутреннее)",
+        verbose_name="Многодетность",
     )
     is_single_parent_family = models.BooleanField(
         default=False,
-        verbose_name="Неполная семья (внутреннее)",
+        verbose_name="Неполная семья",
     )
     has_candidate_disability = models.BooleanField(
         default=False,
-        verbose_name="Инвалидность кандидата (внутреннее)",
+        verbose_name="Инвалидность кандидата",
     )
     is_orphan_or_under_guardianship = models.BooleanField(
         default=False,
-        verbose_name="Сирота / под опекой (внутреннее)",
+        verbose_name="Сирота / под опекой",
     )
     has_breadwinner_loss = models.BooleanField(
         default=False,
-        verbose_name="Потеря кормильца (внутреннее)",
+        verbose_name="Потеря кормильца",
     )
     has_relative_disability = models.BooleanField(
         default=False,
-        verbose_name="Инвалидность близкого (внутреннее)",
+        verbose_name="Инвалидность близкого",
     )
     is_parent_pensioner = models.BooleanField(
         default=False,
-        verbose_name="Родитель пенсионер (внутреннее)",
+        verbose_name="Родитель пенсионер",
     )
     is_parent_in_svo = models.BooleanField(
         default=False,
-        verbose_name="Родитель на СВО (внутреннее)",
+        verbose_name="Родитель на СВО",
     )
     has_alumni_sibling = models.BooleanField(
         default=False,
-        verbose_name="Сиблинг выпускника (внутреннее)",
+        verbose_name="Сиблинг выпускника",
     )
 
     class SettlementType(models.TextChoices):
@@ -297,15 +297,15 @@ class UserInfo(models.Model):
         choices=SettlementType.choices,
         blank=True,
         null=True,
-        verbose_name="Тип населённого пункта (внутреннее)",
+        verbose_name="Тип населённого пункта",
         db_index=True,
     )
 
     life_situation_notes = models.TextField(
         blank=True,
         null=True,
-        verbose_name="Особенность жизненной ситуации (внутреннее)",
-        help_text="Коротко: что важно учесть при рассмотрении анкеты.",
+        verbose_name="Особенность жизненной ситуации",
+        help_text="Что важно учесть при рассмотрении анкеты.",
     )
 
     @property

@@ -60,7 +60,7 @@ class StaffScholarDossierView(TemplateView):
         status_form = StatusChangeForm(instance=uinfo)
         profile_form = ProfileChangeForm(instance=uinfo)
 
-        questionnaire_done = bool(getattr(uinfo, "is_done", False))
+        questionnaire_done = uinfo.form_status == UserInfo.FormStatus.SUBMITTED if uinfo else False
 
         video_exists = video is not None
         video_needs_review = bool(

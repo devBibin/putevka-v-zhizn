@@ -158,7 +158,7 @@ class ScholarVideoStaffForm(forms.ModelForm):
             "review": forms.Textarea(attrs={
                 "rows": 8,
                 "class": "form-control",
-                "placeholder": "Фидбэк/отзыв куратора по видеовизитке"
+                "placeholder": "Комментарий куратора по видеовизитке"
             }),
             "score": forms.NumberInput(attrs={
                 "class": "form-control",
@@ -186,7 +186,7 @@ class ScholarVideoStaffForm(forms.ModelForm):
             "schedule_interview_questions": forms.Textarea(attrs={"rows": 3, "class": "form-control"}),
         }
         labels = {
-            "review": "Отзыв",
+            "review": "Комментарии",
             "score": "Оценка в баллах",
             "transcript_text": "Транскрипция видеовизитки",
             "online_school_prior_experience": "Выбор онлайн-школ: занимался ли раньше и где",
@@ -219,7 +219,7 @@ class DocumentModerationForm(forms.ModelForm):
         }
         labels = {
             "status": "Статус",
-            "only_staff_comment": "Комментарий только для сотрудников"
+            "only_staff_comment": "Комментарий только для персонала"
         }
 
 
@@ -255,7 +255,7 @@ class DocumentStaffUploadForm(forms.ModelForm):
             "file": "Файл",
             "caption": "Подпись",
             "status": "Статус",
-            "only_staff_comment": "Комментарий только для сотрудников",
+            "only_staff_comment": "Комментарий только для персонала",
         }
 
     file = forms.FileField(widget=forms.ClearableFileInput(attrs={"class": "form-control"}))
@@ -343,7 +343,7 @@ class TestResultForm(forms.ModelForm):
 
 class LetterRevisionForm(forms.Form):
     revision_comment = forms.CharField(
-        label="Комментарий для соискателя",
+        label="Комментарий для кандидата",
         widget=forms.Textarea(attrs={"rows": 4}),
         required=True
     )
