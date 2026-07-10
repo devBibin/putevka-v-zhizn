@@ -5,7 +5,7 @@
 
 {% block content %}
     <div class="container py-4">
-        <h1 class="mb-3">Анкета: {{ user_obj.get_full_name|default:user_obj.username }}</h1>
+        <h2 class="mb-3">Анкета: {{ user_obj.get_full_name|default:user_obj.username }}</h2>
 
         {% if messages %}
             {% for message in messages %}
@@ -150,7 +150,7 @@
                                     {% if form.planned_exams.errors %}
                                         <div class="text-danger small mt-1">{{ form.planned_exams.errors }}</div>
                                     {% endif %}
-                                    <div class="form-text">Можно выбрать несколько. Есть поиск.</div>
+                                        <div class="form-text">Можно выбрать несколько</div>
                                 </div>
 
                                 <div class="col-12">
@@ -420,7 +420,7 @@
                                     {% if form.internal_study_profile.errors %}
                                         <div class="text-danger small mt-1">{{ form.internal_study_profile.errors }}</div>
                                     {% endif %}
-                                    <div class="form-text">Это поле пойдёт в сводку как “учебный профиль”.</div>
+                                    <div class="form-text">Значение поля отразится в сводке</div>
                                 </div>
 
                                 <div class="col-12">
@@ -563,7 +563,7 @@
 
 
                     <div class="card shadow-sm mb-4">
-                        <div class="card-header">Фидбэк куратора</div>
+                        <div class="card-header">Обратная связь от куратора</div>
                         <div class="card-body">
                             <div class="mb-3">
                                 <label class="form-label">{{ form.tutor_summary.label }}</label>

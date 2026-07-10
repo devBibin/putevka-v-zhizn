@@ -6,10 +6,7 @@
 <div class="container py-4">
   <div class="d-flex justify-content-between align-items-center mb-3">
     <div>
-      <h4 class="mb-1">Шаблоны документов</h4>
-      <div class="text-muted small">
-        Пользователь: {{ user_obj.get_full_name|default:user_obj.username }}
-      </div>
+      <h2 class="mb-1">Шаблоны документов: {{ user_obj.get_full_name|default:user_obj.username }}</h2>
     </div>
   </div>
 
