@@ -11,8 +11,6 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY config.py .
-COPY core/__init__.py ./core/__init__.py
-COPY core/telegram_proxy.py ./core/telegram_proxy.py
 COPY telegram_service ./telegram_service
 
 CMD ["python", "-m", "telegram_service.worker"]

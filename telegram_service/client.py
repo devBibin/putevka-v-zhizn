@@ -17,6 +17,8 @@ class DjangoTelegramClient:
         self.session = requests.Session()
         if token:
             self.session.headers.update({"Authorization": f"Bearer {token}"})
+        else:
+            logger.warning("TELEGRAM_SERVICE_TOKEN is not set; Django internal Telegram API will return 403")
 
     def _url(self, path: str) -> str:
         return urljoin(self.base_url, path.lstrip("/"))

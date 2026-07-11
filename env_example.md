@@ -19,7 +19,6 @@ TG_TOKEN_USERS= # Telegram bot token for users
 TELEGRAM_STAFF_CHAT_IDS='{"developer": 000000000}' # JSON with staff chat ids
 TELEGRAM_LOG_CHAT_ID= # Telegram chat id for logs
 TG_BOT_USERS_USERNAME= # Telegram username for the users bot
-TELEGRAM_SOCKS5_PROXY= # Optional SOCKS5 proxy for Telegram Bot API, examples: socks5h://user:pass@host:1080 or socks5:host:port:pass
 TELEGRAM_SERVICE_TOKEN= # Общий секрет для внутреннего Telegram API Django
 TELEGRAM_DJANGO_BASE_URL= # Для telegram-service, например http://web:8000 или https://example.com
 TELEGRAM_WORKER_ID=telegram-worker-local-1
@@ -35,7 +34,7 @@ BASE_URL= # Base app URL, for example https://example.com
 # GPT
 
 GPT_TOKEN= # Deprecated for web: OpenAI token should live in the AI worker env. Kept as fallback.
-OPENAI_PROXY= # Deprecated: OpenAI workers reuse TELEGRAM_SOCKS5_PROXY.
+OPENAI_PROXY= # Deprecated.
 AI_SERVICE_TOKEN= # Shared secret for Django internal AI API. Must match .env.ai.local.
 AI_FILE_TOKEN_MAX_AGE=3600
 

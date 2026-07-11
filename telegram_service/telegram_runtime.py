@@ -4,8 +4,6 @@ from typing import Any
 
 import telebot
 
-from core.telegram_proxy import configure_telegram_proxy
-
 
 logger = logging.getLogger(__name__)
 
@@ -13,7 +11,6 @@ logger = logging.getLogger(__name__)
 def create_bot(token: str | None, *, parse_mode: str | None = None) -> telebot.TeleBot | None:
     if not token:
         return None
-    configure_telegram_proxy()
     return telebot.TeleBot(token, parse_mode=parse_mode)
 
 

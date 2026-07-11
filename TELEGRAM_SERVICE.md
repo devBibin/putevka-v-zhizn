@@ -23,17 +23,13 @@ Authorization: Bearer TELEGRAM_SERVICE_TOKEN
 docker compose up -d --build
 ```
 
-Создай `.env.telegram.local`:
+Создай локальный env-файл из шаблона:
 
-```dotenv
-TELEGRAM_SERVICE_TOKEN=тот_же_секрет_что_в_env_Django
-TELEGRAM_DJANGO_BASE_URL=http://web:8000
-TG_TOKEN_USERS=токен_пользовательского_бота
-TG_TOKEN_ADMIN=токен_админского_бота
-TG_TOKEN_MAIL=токен_бота_для_обратной_связи
-TG_CHAT_ID_MAIL=чат_для_обратной_связи
-TELEGRAM_SOCKS5_PROXY=
+```powershell
+Copy-Item .env.telegram.example .env.telegram.local
 ```
+
+Заполни `.env.telegram.local`. Значение `TELEGRAM_SERVICE_TOKEN` должно совпадать с `TELEGRAM_SERVICE_TOKEN` в `.env` Django.
 
 Запусти Telegram-воркер:
 
@@ -90,13 +86,12 @@ TG_TOKEN_USERS=токен_пользовательского_бота
 TG_TOKEN_ADMIN=токен_админского_бота
 TG_TOKEN_MAIL=токен_бота_для_обратной_связи
 TG_CHAT_ID_MAIL=чат_для_обратной_связи
-TELEGRAM_SOCKS5_PROXY=
 LOG_LEVEL=INFO
 ```
 
 Workflow запускается:
 
-- автоматически при push в `master`, если изменились файлы Telegram-сервиса, compose-файл, workflow, `requirements.txt`, `config.py` или `core/telegram_proxy.py`;
+- автоматически при push в `master`, если изменились файлы Telegram-сервиса, compose-файл, workflow, `requirements.txt`, `config.py` или `TELEGRAM_SERVICE.md`;
 - вручную через `workflow_dispatch` в GitHub Actions.
 
 На сервере workflow:

@@ -11,6 +11,7 @@ __pycache__/
 *.DS_Store
 .env
 .env.ai.local
+.env.telegram.local
 
 # Virtual environments
 venv/

@@ -7,7 +7,6 @@ on:
     paths:
       - ".github/workflows/deploy-telegram-service.yml"
       - "telegram_service/**"
-      - "core/telegram_proxy.py"
       - "docker-compose.telegram.yml"
       - "requirements.txt"
       - "config.py"
@@ -94,9 +93,6 @@ jobs:
 
           rsync -az --delete \
             --include 'telegram_service/***' \
-            --include 'core/' \
-            --include 'core/__init__.py' \
-            --include 'core/telegram_proxy.py' \
             --include 'requirements.txt' \
             --include 'config.py' \
             --include 'docker-compose.telegram.yml' \

@@ -31,7 +31,13 @@ def _json_body(request) -> dict:
 
 
 def _forbidden(request):
-    logger.warning("Forbidden Telegram API request path=%s remote=%s", request.path, request.META.get("REMOTE_ADDR"))
+    logger.warning(
+        "Forbidden Telegram API request path=%s remote=%s token_configured=%s auth_header_present=%s",
+        request.path,
+        request.META.get("REMOTE_ADDR"),
+        bool(getattr(settings, "TELEGRAM_SERVICE_TOKEN", "") or ""),
+        bool(request.headers.get("Authorization", "")),
+    )
     return JsonResponse({"error": "forbidden"}, status=403)
 
 
