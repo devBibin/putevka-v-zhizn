@@ -18,7 +18,6 @@ RUN pip install --no-cache-dir \
     -vv
 
 #COPY .env .
-COPY telegram_bot_polling.py .
 COPY Shadows/notification_worker.py .
 
 COPY . .

@@ -8,7 +8,7 @@ from django.urls import reverse
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 
-from core.models import AiTask, TelegramAccount, RegistrationPersonalData, MotivationLetterInstruction
+from core.models import AiTask, TelegramAccount, RegistrationPersonalData, MotivationLetterInstruction, TelegramMessageTask
 from review_by_tutor.models import InterviewTemplate
 from scholar_form.admin import UserPersonalDataInline
 from scholar_form.forms import UserInfoForm
@@ -19,6 +19,14 @@ from django import forms
 from core.models import Notification, UserNotification
 from core.models import MotivationLetter
 from documents.admin import DocumentInline
+
+
+@admin.register(TelegramMessageTask)
+class TelegramMessageTaskAdmin(admin.ModelAdmin):
+    list_display = ("id", "bot_kind", "chat_id", "status", "attempts", "created_at", "sent_at")
+    list_filter = ("bot_kind", "status", "created_at", "sent_at")
+    search_fields = ("chat_id", "text", "error")
+    readonly_fields = ("id", "created_at", "updated_at", "sent_at", "attempts", "locked_by", "locked_until", "error")
 
 
 class UserInfoInline(admin.StackedInline):

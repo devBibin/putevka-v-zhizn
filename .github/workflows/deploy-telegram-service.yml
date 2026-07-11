@@ -1,0 +1,132 @@
+name: Deploy Telegram Service
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - ".github/workflows/deploy-telegram-service.yml"
+      - "telegram_service/**"
+      - "docker-compose.telegram.yml"
+      - "requirements.txt"
+      - "config.py"
+      - "TELEGRAM_SERVICE.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: telegram-service-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Ensure rsync is available
+        run: |
+          set -euo pipefail
+          if ! command -v rsync >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y rsync
+          fi
+
+      - name: Configure SSH
+        env:
+          DEPLOY_HOST: ${{ vars.AI_DEPLOY_HOST || secrets.AI_DEPLOY_HOST }}
+          DEPLOY_USER: ${{ vars.AI_DEPLOY_USER || secrets.AI_DEPLOY_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.AI_DEPLOY_SSH_KEY }}
+        run: |
+          set -euo pipefail
+
+          test -n "$DEPLOY_HOST"
+          test -n "$DEPLOY_USER"
+          test -n "$DEPLOY_SSH_KEY"
+
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/telegram_deploy_key
+          chmod 600 ~/.ssh/telegram_deploy_key
+          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+
+      - name: Resolve deploy path
+        env:
+          TELEGRAM_DEPLOY_PATH: ${{ vars.TELEGRAM_DEPLOY_PATH || secrets.TELEGRAM_DEPLOY_PATH }}
+          AI_DEPLOY_PATH: ${{ vars.AI_DEPLOY_PATH || secrets.AI_DEPLOY_PATH }}
+        run: |
+          set -euo pipefail
+
+          if [ -n "${TELEGRAM_DEPLOY_PATH:-}" ]; then
+            deploy_path="$TELEGRAM_DEPLOY_PATH"
+          else
+            test -n "$AI_DEPLOY_PATH"
+            deploy_path="${AI_DEPLOY_PATH%/}/telegram-service"
+          fi
+
+          if [ -n "${AI_DEPLOY_PATH:-}" ] && [ "${deploy_path%/}" = "${AI_DEPLOY_PATH%/}" ]; then
+            echo "TELEGRAM_DEPLOY_PATH must not be equal to AI_DEPLOY_PATH because rsync --delete is used." >&2
+            exit 1
+          fi
+
+          printf 'TELEGRAM_RESOLVED_DEPLOY_PATH=%s\n' "$deploy_path" >> "$GITHUB_ENV"
+
+      - name: Ensure deploy directory exists
+        env:
+          DEPLOY_HOST: ${{ vars.AI_DEPLOY_HOST || secrets.AI_DEPLOY_HOST }}
+          DEPLOY_USER: ${{ vars.AI_DEPLOY_USER || secrets.AI_DEPLOY_USER }}
+        run: |
+          set -euo pipefail
+
+          ssh -i ~/.ssh/telegram_deploy_key "$DEPLOY_USER@$DEPLOY_HOST" \
+            "mkdir -p '$TELEGRAM_RESOLVED_DEPLOY_PATH'"
+
+      - name: Sync Telegram service files
+        env:
+          DEPLOY_HOST: ${{ vars.AI_DEPLOY_HOST || secrets.AI_DEPLOY_HOST }}
+          DEPLOY_USER: ${{ vars.AI_DEPLOY_USER || secrets.AI_DEPLOY_USER }}
+        run: |
+          set -euo pipefail
+
+          rsync -az --delete \
+            --include 'telegram_service/***' \
+            --include 'requirements.txt' \
+            --include 'config.py' \
+            --include 'docker-compose.telegram.yml' \
+            --include 'TELEGRAM_SERVICE.md' \
+            --exclude '*' \
+            -e "ssh -i ~/.ssh/telegram_deploy_key" \
+            ./ "$DEPLOY_USER@$DEPLOY_HOST:$TELEGRAM_RESOLVED_DEPLOY_PATH/"
+
+      - name: Upload Telegram environment file
+        env:
+          DEPLOY_HOST: ${{ vars.AI_DEPLOY_HOST || secrets.AI_DEPLOY_HOST }}
+          DEPLOY_USER: ${{ vars.AI_DEPLOY_USER || secrets.AI_DEPLOY_USER }}
+          DEPLOY_ENV_FILE: ${{ secrets.TELEGRAM_DEPLOY_ENV_FILE }}
+        run: |
+          set -euo pipefail
+          test -n "$DEPLOY_ENV_FILE"
+
+          printf '%s' "$DEPLOY_ENV_FILE" | \
+            ssh -i ~/.ssh/telegram_deploy_key "$DEPLOY_USER@$DEPLOY_HOST" \
+            "umask 077 && cat > '$TELEGRAM_RESOLVED_DEPLOY_PATH/.env.telegram.local'"
+
+      - name: Deploy Telegram service
+        env:
+          DEPLOY_HOST: ${{ vars.AI_DEPLOY_HOST || secrets.AI_DEPLOY_HOST }}
+          DEPLOY_USER: ${{ vars.AI_DEPLOY_USER || secrets.AI_DEPLOY_USER }}
+          DEPLOY_BRANCH: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          ssh -i ~/.ssh/telegram_deploy_key "$DEPLOY_USER@$DEPLOY_HOST" <<EOF
+          set -euo pipefail
+          cd '$TELEGRAM_RESOLVED_DEPLOY_PATH'
+          echo "Deploying Telegram service from branch: $DEPLOY_BRANCH"
+          docker network inspect putevka_app >/dev/null 2>&1 || docker network create putevka_app
+          docker compose --env-file .env.telegram.local -f docker-compose.telegram.yml up -d --build --remove-orphans
+          docker compose --env-file .env.telegram.local -f docker-compose.telegram.yml ps
+          EOF

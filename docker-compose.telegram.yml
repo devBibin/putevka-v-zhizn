@@ -1,0 +1,21 @@
+services:
+  telegram-service:
+    build:
+      context: .
+      dockerfile: telegram_service/Dockerfile
+    env_file:
+      - path: .env.telegram.local
+        required: false
+    environment:
+      TELEGRAM_DJANGO_BASE_URL: ${TELEGRAM_DJANGO_BASE_URL:-http://web:8000}
+      TELEGRAM_WORKER_ID: ${TELEGRAM_WORKER_ID:-telegram-worker-local-1}
+      TELEGRAM_WORKER_POLLING_INTERVAL: ${TELEGRAM_WORKER_POLLING_INTERVAL:-5}
+      TELEGRAM_WORKER_LEASE_SECONDS: ${TELEGRAM_WORKER_LEASE_SECONDS:-120}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    networks:
+      - putevka_app
+    restart: unless-stopped
+
+networks:
+  putevka_app:
+    external: true

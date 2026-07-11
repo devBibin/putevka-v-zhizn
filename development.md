@@ -67,11 +67,12 @@ http://127.0.0.1:8000
 запуске фоновые процессы стартуют всегда:
 
 - `Shadows/notification_worker.py`
-- `telegram_bot_polling.py`
 - `Shadows/gpt_reviewer.py`
 - `Shadows/gpt_transcriber.py`
 - `Shadows/gpt_transcriber_video.py`
 - `Shadows/gpt_fill_form.py`
+
+Опрос Telegram-бота вынесен в отдельный `telegram_service`; см. `TELEGRAM_SERVICE.md`.
 
 Если нужен локальный запуск только сайта, используйте вариант без Docker.
 

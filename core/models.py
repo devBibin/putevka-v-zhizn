@@ -676,6 +676,50 @@ class AiTask(models.Model):
         return f"{self.task_type} #{self.pk} {self.status}"
 
 
+class TelegramMessageTask(models.Model):
+    class BotKind(models.TextChoices):
+        USERS = "users", "Users bot"
+        ADMIN = "admin", "Admin bot"
+        MAIL = "mail", "Mail bot"
+
+    class Status(models.TextChoices):
+        PENDING = "PENDING", "Pending"
+        PROCESSING = "PROCESSING", "Processing"
+        SENT = "SENT", "Sent"
+        FAILED = "FAILED", "Failed"
+        RETRY = "RETRY", "Retry"
+        CANCELLED = "CANCELLED", "Cancelled"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    bot_kind = models.CharField(max_length=16, choices=BotKind.choices, db_index=True)
+    chat_id = models.CharField(max_length=64, db_index=True)
+    text = models.TextField()
+    reply_markup = models.JSONField(null=True, blank=True)
+    parse_mode = models.CharField(max_length=16, blank=True, default="HTML")
+    disable_web_page_preview = models.BooleanField(default=True)
+
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.PENDING, db_index=True)
+    attempts = models.PositiveIntegerField(default=0)
+    max_attempts = models.PositiveIntegerField(default=3)
+    locked_by = models.CharField(max_length=128, blank=True, default="")
+    locked_until = models.DateTimeField(null=True, blank=True, db_index=True)
+    sent_at = models.DateTimeField(null=True, blank=True)
+    error = models.TextField(blank=True, default="")
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Telegram message task"
+        verbose_name_plural = "Telegram message tasks"
+        indexes = [
+            models.Index(fields=["status", "locked_until", "created_at"]),
+            models.Index(fields=["bot_kind", "chat_id", "created_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.bot_kind} -> {self.chat_id} {self.status}"
+
+
 class Notification(models.Model):
     message = models.TextField(verbose_name='Сообщение')
 
