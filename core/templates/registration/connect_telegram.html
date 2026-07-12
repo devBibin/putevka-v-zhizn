@@ -36,7 +36,11 @@
 
     <div class="text-center">
         <p class="text-muted">Нет Telegram или не хотите его использовать?</p>
-        <a href="{% url 'skip_telegram' %}" class="btn btn-outline-primary">Пропустить Telegram и подтвердить номер по
-            звонку</a>
+        <form method="post" action="{% url 'skip_telegram' %}">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-outline-primary">
+                Пропустить Telegram и подтвердить номер по звонку
+            </button>
+        </form>
     </div>
 {% endblock %}

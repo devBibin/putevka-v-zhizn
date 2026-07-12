@@ -261,13 +261,59 @@ def connect_telegram(request):
     })
 
 
+@login_required
+@ensure_registration_gate('protected')
+@require_http_methods(["GET", "POST"])
+def connect_telegram_after_registration(request):
+    telegram_account, _ = TelegramAccount.objects.get_or_create(user=request.user)
+
+    if telegram_account.telegram_id:
+        return render(request, 'core/connect_telegram_account.html', {
+            'telegram_account': telegram_account,
+            'is_connected': True,
+            'active': 'personal_info',
+        })
+
+    if not telegram_account.activation_token:
+        telegram_account.activation_token = uuid.uuid4()
+        telegram_account.save(update_fields=['activation_token'])
+
+    bot_username = config.TG_BOT_USERS_USERNAME
+    telegram_bot_link = f"https://t.me/{bot_username}?start=activate_{telegram_account.activation_token}"
+
+    if request.method == 'POST':
+        telegram_account.refresh_from_db()
+        if telegram_account.telegram_id:
+            messages.success(request, 'Telegram успешно привязан.')
+            return redirect(reverse('personal_info'))
+
+        return render(request, 'core/connect_telegram_account.html', {
+            'telegram_account': telegram_account,
+            'telegram_bot_link': telegram_bot_link,
+            'is_connected': False,
+            'error_message': 'Сначала откройте бота по ссылке, нажмите Start и поделитесь номером телефона.',
+            'active': 'personal_info',
+        })
+
+    return render(request, 'core/connect_telegram_account.html', {
+        'telegram_account': telegram_account,
+        'telegram_bot_link': telegram_bot_link,
+        'is_connected': False,
+        'active': 'personal_info',
+    })
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
 def skip_telegram(request):
     attempt = request.user.registrationpersonaldata
-    if not attempt.email_verified:
-        return redirect(reverse('register_initial'))
+    if attempt.current_step == 'phone_verification_needed':
+        return redirect(reverse('verify_phone_if_needed'))
+    if attempt.current_step != 'telegram_connection':
+        return redirect(reverse('redirect_to_current_step'))
 
     attempt.current_step = 'phone_verification_needed'
-    attempt.save()
+    attempt.save(update_fields=['current_step'])
     return redirect(reverse('verify_phone_if_needed'))
 
 

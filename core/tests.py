@@ -160,7 +160,7 @@ class RegistrationFlowTests(IntegrationTestCase):
         self.assertTrue(attempt.email_verified)
         self.assertEqual(attempt.current_step, "telegram_connection")
 
-        response = self.client.get(reverse("skip_telegram"))
+        response = self.client.post(reverse("skip_telegram"))
         self.assertRedirects(response, reverse("verify_phone_if_needed"))
 
         with patch("core.views.initiate_zvonok_verification", return_value={"ok": True}):
@@ -332,6 +332,152 @@ class TelegramServiceTests(IntegrationTestCase):
         self.assertTrue(attempt.phone_verified)
         self.assertEqual(attempt.current_step, "finish")
         self.assertTrue(TelegramMessageTask.objects.filter(reply_markup__type="reply_keyboard_remove").exists())
+
+    @override_settings(TELEGRAM_SERVICE_TOKEN="secret")
+    def test_registration_can_switch_to_phone_after_starting_telegram_bot(self):
+        user = User.objects.create_user(username="tg-switch@example.com", email="tg-switch@example.com", password="StrongPass123!")
+        UserInfo.objects.create(user=user, email=user.email)
+        account = TelegramAccount.objects.create(user=user)
+        RegistrationPersonalData.objects.create(
+            user=user,
+            email=user.email,
+            password=user.password,
+            email_verified=True,
+            telegram_account=account,
+            current_step="telegram_connection",
+        )
+        self.client.force_login(user)
+
+        start_update = {
+            "update_id": 3,
+            "message": {
+                "message_id": 3,
+                "text": f"/start activate_{account.activation_token}",
+                "chat": {"id": 778},
+                "from": {"id": 778, "username": "switcher", "first_name": "Switcher", "language_code": "ru"},
+            },
+        }
+        response = self.client.post(
+            "/internal/telegram/updates/",
+            data=json.dumps(start_update),
+            content_type="application/json",
+            HTTP_AUTHORIZATION="Bearer secret",
+        )
+        self.assertEqual(response.status_code, 200)
+        account.refresh_from_db()
+        self.assertEqual(account.telegram_id, "778")
+        self.assertFalse(account.telegram_verified)
+
+        response = self.client.post(reverse("skip_telegram"))
+        self.assertRedirects(response, reverse("verify_phone_if_needed"))
+        attempt = user.registrationpersonaldata
+        attempt.refresh_from_db()
+        self.assertEqual(attempt.current_step, "phone_verification_needed")
+
+        response = self.client.post(reverse("skip_telegram"))
+        self.assertRedirects(response, reverse("verify_phone_if_needed"))
+
+    def test_registration_can_switch_to_phone_from_telegram_step_even_if_email_flag_is_false(self):
+        user = User.objects.create_user(username="tg-email-flag@example.com", email="tg-email-flag@example.com", password="StrongPass123!")
+        UserInfo.objects.create(user=user, email=user.email)
+        account = TelegramAccount.objects.create(user=user)
+        RegistrationPersonalData.objects.create(
+            user=user,
+            email=user.email,
+            password=user.password,
+            email_verified=False,
+            telegram_account=account,
+            current_step="telegram_connection",
+        )
+        self.client.force_login(user)
+
+        response = self.client.post(reverse("skip_telegram"))
+        self.assertRedirects(response, reverse("verify_phone_if_needed"))
+        attempt = user.registrationpersonaldata
+        attempt.refresh_from_db()
+        self.assertEqual(attempt.current_step, "phone_verification_needed")
+
+    def test_finished_user_without_telegram_id_can_open_connect_page(self):
+        user = self.create_finished_candidate(username="late-tg@example.com")
+        TelegramAccount.objects.create(user=user, telegram_verified=True, activation_token=None)
+        self.client.force_login(user)
+
+        with patch("config.TG_BOT_USERS_USERNAME", "test_bot"):
+            response = self.client.get(reverse("connect_telegram_after_registration"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "https://t.me/test_bot?start=activate_")
+        account = user.telegram_account
+        account.refresh_from_db()
+        self.assertIsNotNone(account.activation_token)
+
+        response = self.client.get(reverse("personal_info"))
+        self.assertContains(response, "Не привязан")
+        self.assertContains(response, reverse("connect_telegram_after_registration"))
+
+    def test_finished_user_connect_page_post_requires_bot_activation(self):
+        user = self.create_finished_candidate(username="late-tg-post@example.com")
+        TelegramAccount.objects.create(user=user, telegram_verified=True, activation_token=None)
+        self.client.force_login(user)
+
+        with patch("config.TG_BOT_USERS_USERNAME", "test_bot"):
+            response = self.client.post(reverse("connect_telegram_after_registration"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Сначала откройте бота по ссылке")
+
+    @override_settings(TELEGRAM_SERVICE_TOKEN="secret")
+    def test_finished_user_can_link_telegram_without_resetting_step_or_overwriting_phone(self):
+        user = self.create_finished_candidate(username="late-tg-bot@example.com")
+        user.user_info.phone = "+79000000000"
+        user.user_info.save(update_fields=["phone"])
+        account = TelegramAccount.objects.create(user=user, telegram_verified=True)
+        self.client.force_login(user)
+
+        start_update = {
+            "update_id": 10,
+            "message": {
+                "message_id": 10,
+                "text": f"/start activate_{account.activation_token}",
+                "chat": {"id": 888},
+                "from": {"id": 888, "username": "latecandidate", "first_name": "Late", "language_code": "ru"},
+            },
+        }
+        response = self.client.post(
+            "/internal/telegram/updates/",
+            data=json.dumps(start_update),
+            content_type="application/json",
+            HTTP_AUTHORIZATION="Bearer secret",
+        )
+        self.assertEqual(response.status_code, 200)
+        account.refresh_from_db()
+        self.assertEqual(account.telegram_id, "888")
+
+        contact_update = {
+            "update_id": 11,
+            "message": {
+                "message_id": 11,
+                "chat": {"id": 888},
+                "from": {"id": 888, "username": "latecandidate", "first_name": "Late", "language_code": "ru"},
+                "contact": {"phone_number": "+79999999999", "user_id": 888},
+            },
+        }
+        response = self.client.post(
+            "/internal/telegram/updates/",
+            data=json.dumps(contact_update),
+            content_type="application/json",
+            HTTP_AUTHORIZATION="Bearer secret",
+        )
+        self.assertEqual(response.status_code, 200)
+
+        account.refresh_from_db()
+        attempt = user.registrationpersonaldata
+        attempt.refresh_from_db()
+        user.user_info.refresh_from_db()
+        self.assertTrue(account.telegram_verified)
+        self.assertIsNone(account.activation_token)
+        self.assertEqual(attempt.current_step, "finish")
+        self.assertEqual(user.user_info.phone, "+79000000000")
 
 
 class CandidateApplicationFlowTests(IntegrationTestCase):

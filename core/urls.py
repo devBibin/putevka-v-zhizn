@@ -22,6 +22,7 @@ urlpatterns = [
     path('redirect-registration/', redirect_to_current_step, name='redirect_to_current_step'),
     path('change_phone_number/', views.change_phone_number, name='change_phone_number'),
     path('return_telegram_connection/', views.return_to_telegram_connection, name='return_telegram_connection'),
+    path('telegram/connect/', views.connect_telegram_after_registration, name='connect_telegram_after_registration'),
 
     path('accounts/login/', auth_views.LoginView.as_view(
         template_name='registration/login.html'
