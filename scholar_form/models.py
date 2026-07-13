@@ -209,7 +209,7 @@ class UserInfo(models.Model):
         null=True,
         blank=True,
         validators=[MinValueValidator(1), MaxValueValidator(100)],
-        help_text="Например: 4.57 или 8.92.",
+        help_text="Например: 4.57 или 8.92 (зависит от шкалы в школе)",
     )
 
     class FamilyMaterialStatus(models.TextChoices):

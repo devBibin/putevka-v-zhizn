@@ -61,6 +61,7 @@ INSTALLED_APPS = [
     'my_study',
     'review_by_tutor',
     'subscriber',
+
 ]
 
 MIDDLEWARE = [
