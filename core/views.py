@@ -267,40 +267,19 @@ def connect_telegram(request):
 def connect_telegram_after_registration(request):
     telegram_account, _ = TelegramAccount.objects.get_or_create(user=request.user)
 
-    if telegram_account.telegram_id:
-        return render(request, 'core/connect_telegram_account.html', {
-            'telegram_account': telegram_account,
-            'is_connected': True,
-            'active': 'personal_info',
-        })
+    if request.method == "GET":
+        return redirect(reverse('personal_info'))
 
     if not telegram_account.activation_token:
         telegram_account.activation_token = uuid.uuid4()
         telegram_account.save(update_fields=['activation_token'])
 
-    bot_username = config.TG_BOT_USERS_USERNAME
-    telegram_bot_link = f"https://t.me/{bot_username}?start=activate_{telegram_account.activation_token}"
-
-    if request.method == 'POST':
-        telegram_account.refresh_from_db()
-        if telegram_account.telegram_id:
-            messages.success(request, 'Telegram успешно привязан.')
-            return redirect(reverse('personal_info'))
-
-        return render(request, 'core/connect_telegram_account.html', {
-            'telegram_account': telegram_account,
-            'telegram_bot_link': telegram_bot_link,
-            'is_connected': False,
-            'error_message': 'Сначала откройте бота по ссылке, нажмите Start и поделитесь номером телефона.',
-            'active': 'personal_info',
-        })
-
-    return render(request, 'core/connect_telegram_account.html', {
-        'telegram_account': telegram_account,
-        'telegram_bot_link': telegram_bot_link,
-        'is_connected': False,
-        'active': 'personal_info',
-    })
+    telegram_account.refresh_from_db()
+    if telegram_account.telegram_id:
+        messages.success(request, 'Мессенджер привязан.')
+    else:
+        messages.warning(request, 'Сначала нажмите «Привязать», запустите бота и поделитесь номером телефона.')
+    return redirect(reverse('personal_info'))
 
 
 @login_required

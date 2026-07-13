@@ -60,21 +60,29 @@
                         <div class="d-flex align-items-start gap-3">
                             <i class="bi bi-telegram text-primary fs-4"></i>
                             <div class="flex-grow-1">
-                                <h6 class="mb-1">Telegram</h6>
-                                {% if user.telegram_account.telegram_id %}
+                                <h6 class="mb-1">Мессенджер</h6>
+                                {% if telegram_account.telegram_id %}
                                     <div class="text-success small mb-1">Привязан</div>
                                     <div class="text-muted small">
-                                        {% if user.telegram_account.username %}
-                                            @{{ user.telegram_account.username }}
+                                        {% if telegram_account.username %}
+                                            @{{ telegram_account.username }}
                                         {% else %}
-                                            {{ user.telegram_account.first_name|default:"Аккаунт" }}
+                                            {{ telegram_account.first_name|default:"Аккаунт" }}
                                         {% endif %}
                                     </div>
                                 {% else %}
                                     <div class="text-muted small mb-3">Не привязан</div>
-                                    <a href="{% url 'connect_telegram_after_registration' %}" class="btn btn-sm btn-outline-primary">
-                                        Привязать
-                                    </a>
+                                    <div class="d-flex flex-wrap gap-2">
+                                        <a href="{{ telegram_bot_link }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                            Привязать
+                                        </a>
+                                        <form method="post" action="{% url 'connect_telegram_after_registration' %}">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-sm btn-light border">
+                                                Проверить
+                                            </button>
+                                        </form>
+                                    </div>
                                 {% endif %}
                             </div>
                         </div>

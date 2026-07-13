@@ -397,23 +397,26 @@ class TelegramServiceTests(IntegrationTestCase):
         attempt.refresh_from_db()
         self.assertEqual(attempt.current_step, "phone_verification_needed")
 
-    def test_finished_user_without_telegram_id_can_open_connect_page(self):
+    def test_finished_user_without_telegram_id_can_link_from_profile(self):
         user = self.create_finished_candidate(username="late-tg@example.com")
         TelegramAccount.objects.create(user=user, telegram_verified=True, activation_token=None)
         self.client.force_login(user)
 
         with patch("config.TG_BOT_USERS_USERNAME", "test_bot"):
-            response = self.client.get(reverse("connect_telegram_after_registration"))
+            response = self.client.get(reverse("personal_info"))
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "https://t.me/test_bot?start=activate_")
         account = user.telegram_account
         account.refresh_from_db()
         self.assertIsNotNone(account.activation_token)
-
-        response = self.client.get(reverse("personal_info"))
         self.assertContains(response, "Не привязан")
+        self.assertContains(response, "Привязать")
+        self.assertContains(response, "Проверить")
         self.assertContains(response, reverse("connect_telegram_after_registration"))
+
+        response = self.client.get(reverse("connect_telegram_after_registration"))
+        self.assertRedirects(response, reverse("personal_info"))
 
     def test_finished_user_connect_page_post_requires_bot_activation(self):
         user = self.create_finished_candidate(username="late-tg-post@example.com")
@@ -423,8 +426,11 @@ class TelegramServiceTests(IntegrationTestCase):
         with patch("config.TG_BOT_USERS_USERNAME", "test_bot"):
             response = self.client.post(reverse("connect_telegram_after_registration"))
 
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Сначала откройте бота по ссылке")
+        self.assertRedirects(response, reverse("personal_info"))
+        account = user.telegram_account
+        account.refresh_from_db()
+        self.assertIsNone(account.telegram_id)
+        self.assertIsNotNone(account.activation_token)
 
     @override_settings(TELEGRAM_SERVICE_TOKEN="secret")
     def test_finished_user_can_link_telegram_without_resetting_step_or_overwriting_phone(self):
