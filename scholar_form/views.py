@@ -1,8 +1,10 @@
 import logging
 import mimetypes
 import time
+import uuid
 from pathlib import Path
 
+import config
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.cache import cache
@@ -13,6 +15,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_GET, require_POST
 
 from core.decorators import ensure_registration_gate
+from core.models import TelegramAccount
 from review_by_tutor.models import TestAssignment
 from review_by_tutor.utils.selection_stages import require_selection_step
 from scholar_form.forms import ScholarVideoForm, UserPersonalDataForm, UserProfileForm
@@ -423,6 +426,14 @@ def _upload_scholar_video_assets(obj, form, *, upload_id=""):
 def personal_info(request):
     profile, _ = UserInfo.objects.get_or_create(user=request.user)
     personal_data, _ = UserPersonalData.objects.get_or_create(user=request.user)
+    telegram_account, _ = TelegramAccount.objects.get_or_create(user=request.user)
+
+    telegram_bot_link = None
+    if not telegram_account.telegram_id:
+        if not telegram_account.activation_token:
+            telegram_account.activation_token = uuid.uuid4()
+            telegram_account.save(update_fields=["activation_token"])
+        telegram_bot_link = f"https://t.me/{config.TG_BOT_USERS_USERNAME}?start=activate_{telegram_account.activation_token}"
 
     planned_exams_qs = profile.planned_exams.all()
     planned_exams_labels = [str(x) for x in planned_exams_qs]
@@ -447,6 +458,8 @@ def personal_info(request):
             "personal_form": personal_form,
             "active": "personal_info",
             "profile": profile,
+            "telegram_account": telegram_account,
+            "telegram_bot_link": telegram_bot_link,
             "planned_exams_labels": planned_exams_labels,
         },
     )

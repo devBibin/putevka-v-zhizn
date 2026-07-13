@@ -261,13 +261,38 @@ def connect_telegram(request):
     })
 
 
+@login_required
+@ensure_registration_gate('protected')
+@require_http_methods(["GET", "POST"])
+def connect_telegram_after_registration(request):
+    telegram_account, _ = TelegramAccount.objects.get_or_create(user=request.user)
+
+    if request.method == "GET":
+        return redirect(reverse('personal_info'))
+
+    if not telegram_account.activation_token:
+        telegram_account.activation_token = uuid.uuid4()
+        telegram_account.save(update_fields=['activation_token'])
+
+    telegram_account.refresh_from_db()
+    if telegram_account.telegram_id:
+        messages.success(request, 'Мессенджер привязан.')
+    else:
+        messages.warning(request, 'Сначала нажмите «Привязать», запустите бота и поделитесь номером телефона.')
+    return redirect(reverse('personal_info'))
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
 def skip_telegram(request):
     attempt = request.user.registrationpersonaldata
-    if not attempt.email_verified:
-        return redirect(reverse('register_initial'))
+    if attempt.current_step == 'phone_verification_needed':
+        return redirect(reverse('verify_phone_if_needed'))
+    if attempt.current_step != 'telegram_connection':
+        return redirect(reverse('redirect_to_current_step'))
 
     attempt.current_step = 'phone_verification_needed'
-    attempt.save()
+    attempt.save(update_fields=['current_step'])
     return redirect(reverse('verify_phone_if_needed'))
 
 

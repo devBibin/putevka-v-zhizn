@@ -67,7 +67,7 @@ def handle_start(message: dict[str, Any]) -> None:
     try:
         telegram_account = TelegramAccount.objects.get(activation_token=activation_token_str)
 
-        if telegram_account.telegram_verified:
+        if telegram_account.telegram_verified and telegram_account.telegram_id:
             send_message_to_user(
                 chat_id,
                 "Ваш аккаунт Telegram уже привязан и веб-аккаунт активирован!",
@@ -117,7 +117,6 @@ def handle_contact(message: dict[str, Any]) -> None:
     try:
         telegram_account = TelegramAccount.objects.get(
             telegram_id=telegram_id,
-            telegram_verified=False,
             activation_token__isnull=False,
         )
 
@@ -132,20 +131,27 @@ def handle_contact(message: dict[str, Any]) -> None:
         telegram_account.user.save()
 
         attempt = RegistrationPersonalData.objects.filter(user=telegram_account.user).first()
-        user = UserInfo.objects.filter(phone=phone).first()
+        user_info = getattr(telegram_account.user, "user_info", None)
+        existing_phone_owner = UserInfo.objects.filter(phone=phone).exclude(user=telegram_account.user).first()
 
-        if user:
+        if existing_phone_owner:
             send_message_to_user(chat_id, "Этот номер телефона уже зарегистрирован.")
             return
 
         if attempt:
-            attempt.phone = phone
-            if hasattr(attempt.user, "user_info"):
-                attempt.user.user_info.phone = phone
-                attempt.user.user_info.save()
+            update_fields = ["phone_verified"]
+            if not attempt.phone:
+                attempt.phone = phone
+                update_fields.append("phone")
             attempt.phone_verified = True
-            attempt.current_step = "finish"
-            attempt.save()
+            if attempt.current_step != "finish":
+                attempt.current_step = "finish"
+                update_fields.append("current_step")
+            attempt.save(update_fields=update_fields)
+
+        if user_info and (not user_info.phone or user_info.phone == phone):
+            user_info.phone = phone
+            user_info.save(update_fields=["phone"])
 
         send_message_to_user(
             chat_id,
