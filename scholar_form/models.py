@@ -245,46 +245,46 @@ class UserInfo(models.Model):
         choices=InternalStudyProfile.choices,
         blank=True,
         null=True,
-        verbose_name="Учебный профиль",
+        verbose_name="Учебный профиль (внутренний)",
         help_text="Стафф-поле. Используется в сводке.",
         db_index=True,
     )
 
     is_large_family = models.BooleanField(
         default=False,
-        verbose_name="Многодетность",
+        verbose_name="Многодетность (внутреннее)",
     )
     is_single_parent_family = models.BooleanField(
         default=False,
-        verbose_name="Неполная семья",
+        verbose_name="Неполная семья (внутреннее)",
     )
     has_candidate_disability = models.BooleanField(
         default=False,
-        verbose_name="Инвалидность кандидата",
+        verbose_name="Инвалидность кандидата (внутреннее)",
     )
     is_orphan_or_under_guardianship = models.BooleanField(
         default=False,
-        verbose_name="Сирота / под опекой",
+        verbose_name="Сирота / под опекой (внутреннее)",
     )
     has_breadwinner_loss = models.BooleanField(
         default=False,
-        verbose_name="Потеря кормильца",
+        verbose_name="Потеря кормильца (внутреннее)",
     )
     has_relative_disability = models.BooleanField(
         default=False,
-        verbose_name="Инвалидность близкого",
+        verbose_name="Инвалидность близкого (внутреннее)",
     )
     is_parent_pensioner = models.BooleanField(
         default=False,
-        verbose_name="Родитель пенсионер",
+        verbose_name="Родитель пенсионер (внутреннее)",
     )
     is_parent_in_svo = models.BooleanField(
         default=False,
-        verbose_name="Родитель на СВО",
+        verbose_name="Родитель на СВО (внутреннее)",
     )
     has_alumni_sibling = models.BooleanField(
         default=False,
-        verbose_name="Сиблинг выпускника",
+        verbose_name="Сиблинг выпускника (внутреннее)",
     )
 
     class SettlementType(models.TextChoices):
@@ -297,14 +297,14 @@ class UserInfo(models.Model):
         choices=SettlementType.choices,
         blank=True,
         null=True,
-        verbose_name="Тип населённого пункта",
+        verbose_name="Тип населённого пункта (внутреннее)",
         db_index=True,
     )
 
     life_situation_notes = models.TextField(
         blank=True,
         null=True,
-        verbose_name="Особенность жизненной ситуации",
+        verbose_name="Особенность жизненной ситуации (внутреннее)",
         help_text="Что важно учесть при рассмотрении анкеты.",
     )
 
