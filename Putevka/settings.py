@@ -60,7 +60,6 @@ INSTALLED_APPS = [
     'widget_tweaks',
     'my_study',
     'review_by_tutor',
-    'subscriber',
 ]
 
 MIDDLEWARE = [
@@ -325,11 +324,6 @@ LOGGING = {
             'propagate': False,
         },
         'my_study': {
-            'handlers': ['console', 'file_info', 'file_error', 'telegram_errors'],
-            'level': APP_LOG_LEVEL,
-            'propagate': False,
-        },
-        'subscriber': {
             'handlers': ['console', 'file_info', 'file_error', 'telegram_errors'],
             'level': APP_LOG_LEVEL,
             'propagate': False,
