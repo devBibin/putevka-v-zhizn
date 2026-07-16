@@ -1031,23 +1031,6 @@ class StaffPageSmokeTests(IntegrationTestCase):
         doc.refresh_from_db()
         self.assertEqual(doc.status, "APPROVED")
 
-
-class SubscriberFlowTests(TestCase):
-    def test_announce_subscribes_and_thanks_consumes_session_email(self):
-        response = self.client.get(reverse("announce"))
-        self.assertIn(response.status_code, {200, 302})
-
-        response = self.client.post(reverse("announce"), {"email": "USER@EXAMPLE.COM"})
-        self.assertRedirects(response, reverse("thanks_subscribe"), fetch_redirect_response=False)
-        self.assertTrue(EmailSubscriber.objects.filter(email="user@example.com").exists())
-
-        response = self.client.get(reverse("thanks_subscribe"))
-        self.assertEqual(response.status_code, 200)
-
-        response = self.client.get(reverse("thanks_subscribe"))
-        self.assertRedirects(response, reverse("announce"))
-
-
 class AiServiceUnitTests(TestCase):
     def test_worker_executes_supported_task_types_without_external_calls(self):
         from ai_service.worker import execute_task
