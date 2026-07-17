@@ -13,7 +13,7 @@ __pycache__/
 .env.ai.local
 
 # Virtual environments
-venv/
+.venv/
 env/
 
 # Django static and media files
