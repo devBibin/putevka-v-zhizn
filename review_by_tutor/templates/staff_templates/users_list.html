@@ -571,7 +571,7 @@
                         if (updateCount() === 0) {
                             e.preventDefault();
                             e.stopPropagation();
-                            alert('Отметьте хотя бы одного пользователя.');
+                            showAlert('Отметьте хотя бы одного пользователя.', 'warning');
                         }
                     }
 
@@ -598,7 +598,7 @@
                             if (updateCount() === 0) {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                alert('Отметьте хотя бы одного пользователя.');
+                                showAlert('Отметьте хотя бы одного пользователя.', 'warning');
                             }
                         });
                     }
@@ -609,13 +609,13 @@
                             if (updateCount() === 0) {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                alert('Отметьте хотя бы одного пользователя.');
+                                showAlert('Отметьте хотя бы одного пользователя.', 'warning');
                                 return;
                             }
                             if (!messageText.value.trim()) {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                alert('Введите текст сообщения.');
+                                showAlert('Введите текст сообщения.', 'warning');
                             }
                         });
                     }
@@ -715,10 +715,10 @@
                                 saveSelected(selected);
                                 restoreChecksOnPage();
 
-                                alert("Выбрано пользователей: " + selected.size);
+                                showAlert("Выбрано пользователей: " + selected.size, 'info');
                             } catch (err) {
                                 console.error(err);
-                                alert("Не удалось выбрать всех по фильтру.");
+                                showAlert("Не удалось выбрать всех по фильтру.", 'danger');
                             } finally {
                                 selectAllFilteredBtn.disabled = false;
                                 selectAllFilteredBtn.textContent = oldText;
@@ -739,7 +739,7 @@
                         if (updateCount() === 0) {
                             e.preventDefault();
                             e.stopPropagation();
-                            alert('Отметьте хотя бы одного пользователя.');
+                            showAlert('Отметьте хотя бы одного пользователя.', 'warning');
                             return false;
                         }
                         return true;
@@ -783,7 +783,7 @@
                             if (!messageText.value.trim()) {
                                 e.preventDefault();
                                 e.stopPropagation();
-                                alert('Введите текст сообщения.');
+                                showAlert('Введите текст сообщения.', 'warning');
                                 return;
                             }
                             injectAllSelectedHiddenInputs();

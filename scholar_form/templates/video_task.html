@@ -481,7 +481,7 @@
                     const fileName = (f.name || '').toLowerCase();
                     const okType = allowedTypes.includes(f.type) || allowedExt.some((ext) => fileName.endsWith(ext));
                     if (!okType) {
-                        alert('Поддерживаются только MP4, WebM и MOV.');
+                        showAlert('Поддерживаются только MP4, WebM и MOV.', 'warning');
                         fileInput.value = '';
                         previewWrap.classList.add('d-none');
                         preview.src = '';
@@ -489,7 +489,7 @@
                     }
 
                     if (f.size > MAX_VIDEO_SIZE) {
-                        alert(`Файл ${toMB(f.size)} МБ больше лимита 200 МБ.`);
+                        showAlert(`Файл ${toMB(f.size)} МБ больше лимита 200 МБ.`, 'warning');
                         fileInput.value = '';
                         previewWrap.classList.add('d-none');
                         preview.src = '';
@@ -510,11 +510,11 @@
                     const scheduleFile = scheduleInput ? scheduleInput.files[0] : null;
 
                     if (videoFile && videoFile.size > MAX_VIDEO_SIZE) {
-                        alert('Файл видео превышает 200 МБ.');
+                        showAlert('Файл видео превышает 200 МБ.', 'warning');
                         return;
                     }
                     if (scheduleFile && scheduleFile.size > MAX_SCHEDULE_SIZE) {
-                        alert('Файл графика превышает 20 МБ.');
+                        showAlert('Файл графика превышает 20 МБ.', 'warning');
                         return;
                     }
 
@@ -571,7 +571,7 @@
                         setProgress(100, 'Загрузка завершена');
                         window.location.reload();
                     } catch (error) {
-                        alert(error.message || 'Ошибка загрузки. Попробуй ещё раз.');
+                        showAlert(error.message || 'Ошибка загрузки. Попробуй ещё раз.', 'danger');
                         resetProgress();
                     } finally {
                         if (submitButton) {
