@@ -27,8 +27,11 @@ class Document(models.Model):
     ]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='documents')
-    file = models.FileField(upload_to=upload_to_path)
+    file = models.FileField(upload_to=upload_to_path, blank=True)
     user_file_name = models.CharField(max_length=100, null=True, blank=True)
+    yandex_disk_path = models.CharField(max_length=1024, blank=True, default="")
+    yandex_disk_uploaded_at = models.DateTimeField(blank=True, null=True)
+    yandex_disk_error = models.TextField(blank=True, default="")
     caption = models.CharField(max_length=255, blank=False)
     uploaded_at = models.DateTimeField(auto_now_add=True)
     is_deleted = models.BooleanField(default=False)
@@ -54,7 +57,7 @@ class Document(models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return self.file.name
+        return self.user_file_name or self.file.name or self.yandex_disk_path
 
 
 class DocTemplate(models.Model):

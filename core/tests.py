@@ -13,6 +13,7 @@ from unittest.mock import Mock, patch
 from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
+from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import RequestFactory
 from django.test import TestCase, override_settings
@@ -95,6 +96,8 @@ class IntegrationTestCase(TestCase):
             patch("Putevka.utils.telegram_logging_handler.TelegramHandler.emit", return_value=None),
             patch("documents.signals.send_tg_notification_to_user"),
             patch("documents.signals.send_email_to_user"),
+            patch("documents.views.upload_file_to_yandex_disk", return_value=None),
+            patch("review_by_tutor.views.upload_file_to_yandex_disk", return_value=None),
         ]
         for external_patch in self._external_patches:
             external_patch.start()
@@ -598,11 +601,18 @@ class YandexDiskServiceTests(IntegrationTestCase):
             video_path = yandex_disk.build_video_disk_path(user, "intro.mov", unique_suffix="v1")
             schedule_path = yandex_disk.build_schedule_disk_path(user, "schedule", unique_suffix="v2")
 
+        with override_settings(YANDEX_DISK_DOCUMENTS_FOLDER="Админка/документы"):
+            document_path = yandex_disk.build_document_disk_path(user, "passport.PDF", unique_suffix="v3")
+
         self.assertTrue(video_path.startswith("disk:/Root Folder/"))
         self.assertIn(f"Petrov Bad Name Ivan ({user.id})", video_path)
         self.assertTrue(video_path.endswith(".mov"))
         self.assertTrue(schedule_path.endswith(".pdf"))
         self.assertNotIn(":", video_path.replace("disk:", "", 1))
+        self.assertTrue(document_path.startswith("disk:/Админка/документы/"))
+        self.assertIn(f"Petrov Bad Name Ivan ({user.id})", document_path)
+        self.assertIn("Документ", document_path)
+        self.assertTrue(document_path.endswith(".pdf"))
 
     def test_progress_reader_reports_initial_and_incremental_progress(self):
         progress = []
@@ -676,6 +686,90 @@ class YandexDiskServiceTests(IntegrationTestCase):
 
 
 class DocumentHelperTests(IntegrationTestCase):
+    def test_candidate_document_upload_is_stored_on_yandex_disk_only(self):
+        cache.clear()
+        user = self.create_finished_candidate("document-upload@example.com")
+        self.client.force_login(user)
+        uploaded = SimpleUploadedFile("passport.txt", b"passport", content_type="text/plain")
+
+        with patch("documents.forms.magic.from_buffer", return_value="text/plain", create=True):
+            response = self.client.post(
+                reverse("documents_dashboard"),
+                {"form_type": "general_document_form", "caption": "Passport", "file": uploaded},
+                REMOTE_ADDR="127.0.0.11",
+            )
+
+        self.assertRedirects(response, reverse("documents_dashboard"))
+        document = Document.objects.get(user=user)
+        self.assertEqual(document.user_file_name, "passport.txt")
+        self.assertFalse(document.file.name)
+        self.assertTrue(document.yandex_disk_path.startswith("disk:/Админка/документы/"))
+        self.assertIsNotNone(document.yandex_disk_uploaded_at)
+
+    def test_candidate_document_upload_failure_does_not_create_record(self):
+        cache.clear()
+        user = self.create_finished_candidate("document-failure@example.com")
+        self.client.force_login(user)
+        uploaded = SimpleUploadedFile("passport.txt", b"passport", content_type="text/plain")
+
+        with (
+            patch("documents.forms.magic.from_buffer", return_value="text/plain", create=True),
+            patch(
+                "documents.views.upload_file_to_yandex_disk",
+                side_effect=yandex_disk.YandexDiskError("failed"),
+            ),
+        ):
+            response = self.client.post(
+                reverse("documents_dashboard"),
+                {"form_type": "general_document_form", "caption": "Passport", "file": uploaded},
+                REMOTE_ADDR="127.0.0.12",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Document.objects.filter(user=user).exists())
+
+    def test_yandex_document_download_checks_access_and_redirects(self):
+        owner = self.create_finished_candidate("document-owner@example.com")
+        outsider = self.create_finished_candidate("document-outsider@example.com")
+        document = Document.objects.create(
+            user=owner,
+            caption="Passport",
+            user_file_name="passport.pdf",
+            yandex_disk_path="disk:/Админка/документы/passport.pdf",
+        )
+
+        self.client.force_login(owner)
+        with patch("documents.views.get_download_url", return_value="https://download.example/passport"):
+            response = self.client.get(reverse("serve_document", args=[document.id]))
+        self.assertRedirects(response, "https://download.example/passport", fetch_redirect_response=False)
+
+        self.client.force_login(outsider)
+        response = self.client.get(reverse("serve_document", args=[document.id]))
+        self.assertEqual(response.status_code, 404)
+
+    def test_staff_document_upload_is_stored_on_yandex_disk_only(self):
+        candidate = self.create_finished_candidate("staff-document-target@example.com")
+        staff = User.objects.create_user("document-staff@example.com", password="StrongPass123!", is_staff=True)
+        self.client.force_login(staff)
+        uploaded = SimpleUploadedFile("agreement.pdf", b"pdf", content_type="application/pdf")
+
+        response = self.client.post(
+            reverse("staff_documents_detail", args=[candidate.id]),
+            {
+                "form_type": "upload_staff_document",
+                "caption": "Agreement",
+                "status": "PENDING_SIGNATURE",
+                "only_staff_comment": "",
+                "file": uploaded,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        document = Document.objects.get(user=candidate, uploaded_by_staff=True)
+        self.assertFalse(document.file.name)
+        self.assertEqual(document.user_file_name, "agreement.pdf")
+        self.assertTrue(document.yandex_disk_path.startswith("disk:/Админка/документы/"))
+
     def test_base_user_context_prefers_personal_data_and_formats_nested_fields(self):
         from scholar_form.models import UserPersonalData
 
@@ -2144,9 +2238,9 @@ class DocumentAndStudyPageFlowTests(IntegrationTestCase):
         self.assertRedirects(response, reverse("documents_dashboard"))
         document = Document.objects.get(user=self.user)
 
-        response = self.client.get(reverse("serve_document", args=[document.id]))
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response["Content-Type"], "text/plain")
+        with patch("documents.views.get_download_url", return_value="https://download.example/statement"):
+            response = self.client.get(reverse("serve_document", args=[document.id]))
+        self.assertRedirects(response, "https://download.example/statement", fetch_redirect_response=False)
 
         stranger = self.create_finished_candidate("stranger@example.com")
         self.client.force_login(stranger)

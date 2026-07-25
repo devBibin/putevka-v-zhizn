@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 YANDEX_DISK_API_BASE = "https://cloud-api.yandex.net/v1/disk"
 DEFAULT_VIDEO_FOLDER = "Путевка/Видеовизитки"
+DEFAULT_DOCUMENTS_FOLDER = "Админка/документы"
 DEFAULT_TIMEOUT_SECONDS = 60
 DEFAULT_UPLOAD_TIMEOUT_SECONDS = 900
 DEFAULT_API_RETRIES = 3
@@ -694,6 +695,16 @@ def build_schedule_disk_path(user_or_id, file_name: str, unique_suffix: str = ""
         str(timezone.localdate().year),
         _candidate_folder_name(user_or_id),
         _dated_candidate_filename("График занятий", user_or_id, ext, unique_suffix=unique_suffix),
+    )
+
+
+def build_document_disk_path(user_or_id, file_name: str, unique_suffix: str = "") -> str:
+    ext = _clean_extension(file_name, ".bin")
+    return _join_disk_path(
+        _setting("YANDEX_DISK_DOCUMENTS_FOLDER", DEFAULT_DOCUMENTS_FOLDER) or DEFAULT_DOCUMENTS_FOLDER,
+        str(timezone.localdate().year),
+        _candidate_folder_name(user_or_id),
+        _dated_candidate_filename("Документ", user_or_id, ext, unique_suffix=unique_suffix),
     )
 
 

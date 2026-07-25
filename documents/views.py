@@ -2,6 +2,7 @@ import datetime
 import logging
 import mimetypes
 import os
+import uuid
 
 from django.contrib import messages
 from django.contrib.auth import get_user_model
@@ -9,6 +10,7 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.http import Http404, FileResponse, HttpResponse
 from django.shortcuts import get_object_or_404
 from django.shortcuts import render, redirect
+from django.utils import timezone
 
 from core.decorators import ensure_registration_gate
 from review_by_tutor.utils.contact_form import handle_send_notification
@@ -18,6 +20,12 @@ from .decorators import rate_limit_uploads
 from .forms import DocumentUploadForm, AttachDocumentsForm, build_params_form
 from .models import Document, DocTemplate
 from .services import render_docx_bytes
+from scholar_form.services.yandex_disk import (
+    YandexDiskError,
+    build_document_disk_path,
+    get_download_url,
+    upload_file_to_yandex_disk,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +36,18 @@ User = get_user_model()
 def serve_document(request, document_id):
     document = get_object_or_404(Document, pk=document_id)
     if request.user == document.user or request.user.is_staff:
+        if document.yandex_disk_path:
+            try:
+                return redirect(get_download_url(
+                    document.yandex_disk_path,
+                    log_context={"user_id": document.user_id, "document_id": document.pk},
+                ))
+            except YandexDiskError as exc:
+                logger.warning("Не удалось получить документ с Яндекс Диска document_id=%s: %s", document.pk, exc)
+                raise Http404("Документ временно недоступен.") from exc
+
+        if not document.file:
+            raise Http404("Документ не найден.")
         file_path = document.file.path
 
         if not os.path.exists(file_path):
@@ -77,10 +97,30 @@ def documents_dashboard(request):
             if form.is_valid():
                 document = form.save(commit=False)
                 document.user = request.user
-                document.save()
-                messages.success(request, 'Документ успешно загружен!')
-                logger.info(f'{request.user.username} загрузил файл {document.file.name}')
-                return redirect('documents_dashboard')
+                uploaded_file = form.cleaned_data["file"]
+                disk_path = build_document_disk_path(
+                    request.user, uploaded_file.name, unique_suffix=uuid.uuid4().hex[:8]
+                )
+                try:
+                    upload_file_to_yandex_disk(
+                        uploaded_file=uploaded_file,
+                        disk_path=disk_path,
+                        log_context={"user_id": request.user.id, "asset": "document"},
+                    )
+                except YandexDiskError as exc:
+                    logger.warning("Ошибка загрузки документа на Яндекс Диск user_id=%s: %s", request.user.id, exc)
+                    messages.error(request, "Не удалось загрузить документ на Яндекс Диск. Попробуйте ещё раз.")
+                    document_upload_form = form
+                else:
+                    document.user_file_name = uploaded_file.name
+                    document.file = ""
+                    document.yandex_disk_path = disk_path
+                    document.yandex_disk_uploaded_at = timezone.now()
+                    document.yandex_disk_error = ""
+                    document.save()
+                    messages.success(request, 'Документ успешно загружен!')
+                    logger.info('%s загрузил файл %s на Яндекс Диск', request.user.username, document.user_file_name)
+                    return redirect('documents_dashboard')
             else:
                 logger.info(f'Неверное заполнение формы загрузки документа')
                 messages.error(request, 'Ошибка при загрузке общего документа. Пожалуйста, проверьте форму.')
@@ -133,7 +173,7 @@ def delete_document(request, document_id):
     document.is_deleted = True
     document.save()
     messages.success(request, 'Документ успешно удален.')
-    logger.info(f'Файл {document.file.name} помечен как удалённый')
+    logger.info('Файл %s помечен как удалённый', document.user_file_name or document.file.name)
     return redirect('documents_dashboard')
 
 

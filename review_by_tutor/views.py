@@ -1,5 +1,6 @@
 import logging
 import mimetypes
+import uuid
 from pathlib import PurePosixPath
 from io import BytesIO
 from urllib.parse import unquote, urlparse
@@ -47,11 +48,13 @@ from review_by_tutor.utils.selection_stages import require_selection_step
 from scholar_form.models import UserInfo, ScholarVideo, StaffNote, InterviewInstruction
 from scholar_form.services.yandex_disk import (
     YandexDiskError,
+    build_document_disk_path,
     build_public_resource_ref,
     get_download_url,
     get_public_download_url,
     get_public_resource_metadata,
     get_resource_metadata,
+    upload_file_to_yandex_disk,
 )
 from scholar_form.views import build_video_asset_context
 
@@ -833,8 +836,27 @@ def staff_documents_detail(request, user_id: int):
                 new_doc.user = user_obj
                 new_doc.uploaded_by_staff = True
                 new_doc._ignore_lock_validation = True
-                new_doc.save()
-                messages.success(request, "Документ загружен.")
+                uploaded_file = upload_form.cleaned_data["file"]
+                disk_path = build_document_disk_path(
+                    user_obj, uploaded_file.name, unique_suffix=uuid.uuid4().hex[:8]
+                )
+                try:
+                    upload_file_to_yandex_disk(
+                        uploaded_file=uploaded_file,
+                        disk_path=disk_path,
+                        log_context={"user_id": user_obj.id, "asset": "staff_document"},
+                    )
+                except YandexDiskError as exc:
+                    logger.warning("Ошибка загрузки документа сотрудником user_id=%s: %s", user_obj.id, exc)
+                    messages.error(request, "Не удалось загрузить документ на Яндекс Диск. Попробуйте ещё раз.")
+                else:
+                    new_doc.user_file_name = uploaded_file.name
+                    new_doc.file = ""
+                    new_doc.yandex_disk_path = disk_path
+                    new_doc.yandex_disk_uploaded_at = timezone.now()
+                    new_doc.yandex_disk_error = ""
+                    new_doc.save()
+                    messages.success(request, "Документ загружен.")
             else:
                 messages.error(request, "Не удалось загрузить документ. Проверьте форму.")
         else:

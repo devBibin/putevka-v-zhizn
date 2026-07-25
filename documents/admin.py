@@ -23,7 +23,7 @@ class DocumentAdmin(admin.ModelAdmin):
             links = []
             for doc in obj.related_documents.all():
                 admin_url = reverse('serve_document', args=[doc.pk])
-                link_text = doc.caption or doc.user_file_name or doc.file.name
+                link_text = doc.caption or doc.user_file_name or doc.file.name or doc.yandex_disk_path
                 links.append(f'<a href="{admin_url}" target="_blank">{link_text}</a>')
             return format_html("<br>".join(links))
         return "Нет прикрепленных документов"
@@ -57,7 +57,7 @@ class DocumentInline(admin.TabularInline):
             links = []
             for doc in obj.related_documents.all():
                 admin_url = reverse('serve_document', args=[doc.pk])
-                link_text = doc.caption or doc.user_file_name or doc.file.name
+                link_text = doc.caption or doc.user_file_name or doc.file.name or doc.yandex_disk_path
                 links.append(f'<a href="{admin_url}" target="_blank">{link_text}</a>')
             return format_html("<br>".join(links))
         return "Нет прикрепленных документов"
