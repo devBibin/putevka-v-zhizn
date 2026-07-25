@@ -230,6 +230,22 @@
                                 <option value="0" {% if curator_need == "0" %}selected{% endif %}>Нет</option>
                             </select>
                         </div>
+
+                        <div class="col-md-4">
+                            <label class="form-label d-block">Регистрация</label>
+                            <input type="hidden" name="registration_confirmed" value="0">
+                            <div class="form-check mt-2">
+                                <input class="form-check-input"
+                                       type="checkbox"
+                                       name="registration_confirmed"
+                                       value="1"
+                                       id="registrationConfirmedCheckbox"
+                                       {% if registration_confirmed == "1" %}checked{% endif %}>
+                                <label class="form-check-label" for="registrationConfirmedCheckbox">
+                                    Только подтверждённые
+                                </label>
+                            </div>
+                        </div>
                     </div>
                 </details>
             </div>
