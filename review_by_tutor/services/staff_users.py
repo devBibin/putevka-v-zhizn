@@ -20,6 +20,7 @@ def build_staff_users_queryset(request):
     q = (request.GET.get("q") or "").strip()
 
     show_staff = (request.GET.get("show_staff") or "").strip()
+    registration_confirmed = (request.GET.get("registration_confirmed", "1") or "").strip()
 
     school = (request.GET.get("school") or "").strip()
     course = (request.GET.get("course") or "").strip()
@@ -55,6 +56,9 @@ def build_staff_users_queryset(request):
 
     if show_staff != "1":
         qs = qs.filter(is_staff=False)
+
+    if registration_confirmed == "1":
+        qs = qs.filter(registrationpersonaldata__current_step="finish")
 
     if profiles_selected:
         qs = qs.filter(
@@ -308,6 +312,7 @@ def build_staff_users_queryset(request):
 def get_staff_users_filters(request):
     q = (request.GET.get("q") or "").strip()
     show_staff = (request.GET.get("show_staff") or "").strip()
+    registration_confirmed = (request.GET.get("registration_confirmed", "1") or "").strip()
     school = (request.GET.get("school") or "").strip()
     course = (request.GET.get("course") or "").strip()
     form_status = (request.GET.get("form_status") or "").strip()
@@ -333,5 +338,6 @@ def get_staff_users_filters(request):
         "letter_status": letter_status,
         "favorite_letter": favorite_letter,
         "sort": sort,
-        "show_staff": show_staff
+        "show_staff": show_staff,
+        "registration_confirmed": registration_confirmed,
     }

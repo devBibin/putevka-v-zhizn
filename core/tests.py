@@ -950,12 +950,37 @@ class StaffUsersServiceTests(IntegrationTestCase):
         self.assertEqual(filters["show_staff"], "1")
 
     def test_build_staff_users_queryset_can_include_staff_when_requested(self):
-        request = self.request({"show_staff": "1", "sort": "user"})
+        request = self.request({"show_staff": "1", "registration_confirmed": "0", "sort": "user"})
 
         usernames = {user.username for user in build_staff_users_queryset(request)}
 
         self.assertIn("staff-visible", usernames)
         self.assertIn(self.candidate.username, usernames)
+
+    def test_confirmed_registrations_filter_is_enabled_by_default(self):
+        unconfirmed = User.objects.create_user(
+            "unconfirmed-user",
+            email="unconfirmed@example.com",
+            password="StrongPass123!",
+        )
+        RegistrationPersonalData.objects.create(
+            user=unconfirmed,
+            email=unconfirmed.email,
+            password=unconfirmed.password,
+            email_verified=True,
+            current_step="phone_verification_needed",
+        )
+
+        default_users = {user.username for user in build_staff_users_queryset(self.request({}))}
+        unfiltered_users = {
+            user.username
+            for user in build_staff_users_queryset(self.request({"registration_confirmed": "0"}))
+        }
+
+        self.assertIn(self.candidate.username, default_users)
+        self.assertNotIn(unconfirmed.username, default_users)
+        self.assertIn(unconfirmed.username, unfiltered_users)
+        self.assertEqual(get_staff_users_filters(self.request({}))["registration_confirmed"], "1")
 
 
 class ScholarVideoViewHelperTests(IntegrationTestCase):
