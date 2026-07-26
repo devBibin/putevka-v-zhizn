@@ -58,6 +58,7 @@ from scholar_form.views import (
     _validate_direct_upload_meta,
     build_video_asset_context,
 )
+
 from subscriber.models import EmailSubscriber
 from scholar_form.services import yandex_disk
 
@@ -69,6 +70,7 @@ settings.MIGRATION_MODULES = {
     "review_by_tutor": None,
     "scholar_form": None,
     "subscriber": None,
+
 }
 
 

@@ -192,9 +192,7 @@
                                 {% if uinfo.life_situation_notes %}
                                     <hr>
                                     <div class="small text-muted mb-1">Комментарий</div>
-                                    <div class="small" style="white-space: pre-wrap;">
-                                        {{ uinfo.life_situation_notes }}
-                                    </div>
+                                    <div class="small" style="white-space: pre-wrap;">{{ uinfo.life_situation_notes }}</div>
                                 {% endif %}
 
                             {% else %}
@@ -235,7 +233,7 @@
                                     {% if summary.questionnaire_done %}
                                         <div class="fw-semibold text-success">Отправлена</div>
                                     {% else %}
-                                        <div class="fw-semibold text-warning">Не отправлена</div>
+                                        <div class="fw-semibold text-muted">Не отправлена</div>
                                     {% endif %}
                                 </div>
                             </div>
@@ -269,16 +267,16 @@
                                     <div class="small text-muted">Мотивационное письмо</div>
                                     {% if summary.ml_exists %}
                                         {% if summary.ml_needs_review %}
-                                            Ждёт оценки
+                                            <div class="fw-semibold text-warning">Ждёт оценки</div>
                                         {% elif user_obj.motivation_letter.status == "revision" %}
-                                            На дописывании
+                                            <div class="fw-semibold text-warning">На дописывании</div>
                                         {% elif user_obj.motivation_letter.status == "draft" %}
-                                            Черновик
+                                            <div class="fw-semibold text-warning">Черновик</div>
                                         {% else %}
-                                            Есть (оценено/принято)
+                                            <div class="fw-semibold text-success">Есть (оценено/принято)</div>
                                         {% endif %}
                                     {% else %}
-                                        Нет
+                                        <div class="fw-semibold text-muted">Нет</div>
                                     {% endif %}
                                 </div>
                             </div>

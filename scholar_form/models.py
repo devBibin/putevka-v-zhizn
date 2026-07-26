@@ -57,7 +57,7 @@ class StaffNote(models.Model):
 
 
 class UserInfo(models.Model):
-    GENDERS = [('MAN', 'Мужчина'), ('WOMAN', 'Женщина')]
+    GENDERS = [('MAN', 'Мужской'), ('WOMAN', 'Женский')]
     STATUSES = [('CANDIDATE', 'Кандидат'), ('ALTERNATIVE', 'Альтернативный трек'), ('FINAL STAGE', 'Финалист'), ('SCHOLAR', 'Участник'),
                 ('ALUMNUS', 'Выпускник')]
 
@@ -209,7 +209,7 @@ class UserInfo(models.Model):
         null=True,
         blank=True,
         validators=[MinValueValidator(1), MaxValueValidator(100)],
-        help_text="Например: 4.57 или 8.92 (зависит от шкалы в школе).",
+        help_text="Например: 4.57 или 8.92 (зависит от шкалы в школе)",
     )
 
     class FamilyMaterialStatus(models.TextChoices):
@@ -305,7 +305,7 @@ class UserInfo(models.Model):
         blank=True,
         null=True,
         verbose_name="Особенность жизненной ситуации (внутреннее)",
-        help_text="Коротко: что важно учесть при рассмотрении анкеты.",
+        help_text="Что важно учесть при рассмотрении анкеты.",
     )
 
     @property

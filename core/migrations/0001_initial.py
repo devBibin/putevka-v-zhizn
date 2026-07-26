@@ -45,7 +45,7 @@ class Migration(migrations.Migration):
                 ('is_favorite', models.BooleanField(db_index=True, default=False, verbose_name='Избранное письмо')),
                 ('admin_score', models.PositiveSmallIntegerField(blank=True, help_text='Введите значение от 0 до 70', null=True, validators=[django.core.validators.MinValueValidator(0), django.core.validators.MaxValueValidator(70)], verbose_name='Итоговый балл')),
                 ('admin_rating', models.TextField(blank=True, null=True, verbose_name='Оценка администратора')),
-                ('revision_comment', models.TextField(blank=True, null=True, verbose_name='Комментарий на доработку (видит соискатель)')),
+                ('revision_comment', models.TextField(blank=True, null=True, verbose_name='Комментарий на доработку (видит кандидат)')),
                 ('revision_requested_at', models.DateTimeField(blank=True, db_index=True, null=True, verbose_name='Отправлено на доработку в')),
                 ('status', models.CharField(choices=[('draft', 'Черновик'), ('submitted', 'Отправлено'), ('revision', 'На дописывании')], db_index=True, default='draft', max_length=10, verbose_name='Статус')),
                 ('submitted_at', models.DateTimeField(blank=True, db_index=True, null=True, verbose_name='Отправлено в')),

@@ -2,12 +2,12 @@
 {% load widget_tweaks %}
 {% load form_extras %}
 
-{% block title %}Собеседование — {{ user_obj.get_full_name|default:user_obj.username }}{% endblock %}
+{% block title %}Собеседование — модерация{% endblock %}
 
 {% block content %}
     <div class="container py-4">
         <div class="d-flex align-items-center gap-2 mb-3">
-            <h4 class="mb-0">Собеседование: {{ user_obj.get_full_name|default:user_obj.username }}</h4>
+            <h3 class="mb-0">Собеседование: {{ user_obj.get_full_name|default:user_obj.username }}</h3>
             <span class="badge text-bg-secondary">ID {{ user_obj.id }}</span>
             {% if user_obj.user_info %}
                 <span class="badge text-bg-light text-dark">{{ user_obj.user_info.get_selection_step_display }}</span>
@@ -157,7 +157,7 @@
 
         <div class="card shadow-sm">
             <div class="card-header bg-white">
-                <strong>Заметки интервьюера + загрузка заполненного шаблона</strong>
+                <strong>Заметки куратора и загрузка заполненного шаблона</strong>
             </div>
             <div class="card-body">
                 <form id="interview-form" method="post" enctype="multipart/form-data">

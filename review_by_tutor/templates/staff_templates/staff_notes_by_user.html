@@ -2,7 +2,7 @@
 {% extends "staff_templates/base.html" %}
 
 {% block title %}
-    Заметки стаффа — {{ user_obj.get_full_name|default:user_obj.username }}
+    Заметки куратора
 {% endblock %}
 
 {% block content %}
@@ -10,10 +10,10 @@
     <div class="container py-4">
 
         <div class="d-flex align-items-center justify-content-between mb-3">
-            <h1 class="h4 mb-0">
-                Заметки стаффа •
+            <h2 class="h4 mb-0">
+                Заметки куратора:
                 <span class="fw-semibold">{{ user_obj.get_full_name|default:user_obj.username }}</span>
-            </h1>
+            </h2>
             <span class="text-muted small">Всего заметок: {{ total_count }}</span>
         </div>
 
@@ -26,7 +26,7 @@
                     <div class="mb-2">
                         <label class="form-label">Текст записи</label>
                         <textarea name="text" rows="4" class="form-control"
-                                  placeholder="Добавить служебную заметку…"
+                                  placeholder="Добавить заметку…"
                                   required></textarea>
                     </div>
                     <button class="btn btn-primary">Сохранить</button>
