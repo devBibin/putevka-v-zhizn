@@ -4,7 +4,7 @@
 
 {% block content %}
     <div class="container py-4">
-        <h1 class="mb-4">Учёба: {{ user_obj.get_full_name|default:user_obj.username }}</h1>
+        <h2 class="mb-4">Учёба: {{ user_obj.get_full_name|default:user_obj.username }}</h2>
 
         {# --- Выбранные курсы --- #}
         <div class="card mb-4">
@@ -37,7 +37,7 @@
                                     <td>{{ s.course.school.name }}</td>
                                     <td>{{ s.course.subject.name }}</td>
                                     <td class="text-break">{{ s.motivation|default:"—" }}</td>
-                                    <td>{{ s.need_tutor }}</td>
+                                    <td>{% if s.need_tutor %}Да{% else %}Нет{% endif %}</td>
                                     <td class="text-end">
                                         <span class="small text-muted">{{ s.created_at|date:"d.m.Y H:i" }}</span>
                                     </td>

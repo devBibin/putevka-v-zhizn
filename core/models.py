@@ -215,7 +215,7 @@ class MotivationLetter(models.Model):
 
     revision_comment = models.TextField(
         null=True, blank=True,
-        verbose_name="Комментарий на доработку (видит соискатель)"
+        verbose_name="Комментарий на доработку (видит кандидат)"
     )
     revision_requested_at = models.DateTimeField(
         null=True, blank=True,
@@ -517,7 +517,7 @@ class MotivationLetterRubricReview(models.Model):
     justification = models.TextField(
         blank=True,
         default="",
-        verbose_name="Пояснение эксперта",
+        verbose_name="Пояснение куратора",
     )
 
     class Meta:
