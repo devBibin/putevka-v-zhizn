@@ -16,12 +16,100 @@
     {% endif %}
 
     <div class="container">
-        <!-- Загрузка документа -->
+        <!-- Настраиваемые слоты документов -->
+        <div class="row justify-content-center">
+            <div class="col-12 col-md-8 mb-4">
+                <h2 class="h6 fw-semibold mb-3">Основные документы</h2>
+                <div class="row g-3">
+                    {% for document_type in document_types %}
+                        <div class="col-12">
+                            <div class="card shadow-sm">
+                                <div class="card-body">
+                                    <div class="d-flex justify-content-between align-items-start gap-3 mb-2">
+                                        <div>
+                                            <h3 class="h6 mb-1">{{ document_type.name }}</h3>
+                                            {% if document_type.description %}
+                                                <div class="small text-body-secondary">{{ document_type.description }}</div>
+                                            {% endif %}
+                                        </div>
+                                        <span class="badge text-bg-light">{{ document_type.user_slot_documents|length }} файл(ов)</span>
+                                    </div>
+
+                                    {% if document_type.user_slot_documents %}
+                                        <ul class="list-group list-group-flush mb-3">
+                                            {% for doc in document_type.user_slot_documents %}
+                                                <li class="list-group-item px-0 d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-2">
+                                                    <div class="min-w-0">
+                                                        <a href="{% url 'serve_document' doc.pk %}" target="_blank" class="link-body-emphasis text-break">
+                                                            {{ doc.slot_label|default:doc.user_file_name|default:doc.caption }}
+                                                        </a>
+                                                        {% if doc.slot_label %}<div class="small text-body-secondary text-break">{{ doc.user_file_name }}</div>{% endif %}
+                                                        <div class="small text-body-secondary">{{ doc.uploaded_at|date:"d.m.Y H:i" }} · {{ doc.get_status_display }}</div>
+                                                    </div>
+                                                    <form action="{% url 'delete_document' doc.pk %}" method="post"
+                                                          onsubmit="return confirm('Удалить этот файл?');">
+                                                        {% csrf_token %}
+                                                        <button type="submit" class="btn btn-outline-danger btn-sm">Удалить</button>
+                                                    </form>
+                                                </li>
+                                            {% endfor %}
+                                        </ul>
+                                    {% endif %}
+
+                                    <form method="post" enctype="multipart/form-data" class="slot-upload-form row g-2 align-items-end">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="form_type" value="slot_document_form">
+                                        <input type="hidden" name="document_type_id" value="{{ document_type.pk }}">
+                                        <div class="col-12 col-lg-5">
+                                            <label for="slot-file-{{ document_type.pk }}" class="form-label small">Добавить файл</label>
+                                            <input type="file" name="file" id="slot-file-{{ document_type.pk }}" class="form-control"
+                                                   accept="application/pdf,application/msword,text/plain,image/jpeg,image/png" required>
+                                        </div>
+                                        <div class="col-12 col-lg-5">
+                                            <label for="slot-label-{{ document_type.pk }}" class="form-label small">Что находится в файле <span class="text-muted">(необязательно)</span></label>
+                                            <input type="text" name="slot_label" id="slot-label-{{ document_type.pk }}" class="form-control"
+                                                   maxlength="100" placeholder="Например: страница регистрации">
+                                        </div>
+                                        <div class="col-12 col-lg-2"><button type="submit" class="btn btn-outline-primary btn-sm w-100">Загрузить</button></div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    {% empty %}
+                        <div class="col-12"><div class="alert alert-secondary mb-0">Слоты документов пока не настроены.</div></div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        {% if archived_slot_documents %}
+            <div class="row justify-content-center">
+                <div class="col-12 col-md-8 mb-4">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-body"><h2 class="h6 m-0">Архивные документы</h2></div>
+                        <ul class="list-group list-group-flush">
+                            {% for doc in archived_slot_documents %}
+                                <li class="list-group-item d-flex justify-content-between gap-2">
+                                    <a href="{% url 'serve_document' doc.pk %}" target="_blank" class="text-break">
+                                        {{ doc.document_type.name }} — {{ doc.user_file_name }}
+                                    </a>
+                                    <form action="{% url 'delete_document' doc.pk %}" method="post">
+                                        {% csrf_token %}<button class="btn btn-outline-danger btn-sm" type="submit">Удалить</button>
+                                    </form>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- Свободная загрузка документа -->
         <div class="row justify-content-center">
             <div class="col-12 col-md-8 mb-4">
                 <div class="card shadow-sm">
                     <div class="d-flex align-items-center border-bottom bg-body p-3">
-                        <h2 class="h6 m-0 fw-semibold text-body">Загрузить документ</h2>
+                        <h2 class="h6 m-0 fw-semibold text-body">Другие документы</h2>
                     </div>
                     <div class="p-3">
                         <form method="post" enctype="multipart/form-data" id="generalDocumentForm" class="gy-3">
@@ -116,7 +204,7 @@
                                                     <input type="hidden" name="form_type" value="attach_documents_form">
                                                     <input type="hidden" name="target_document_id" value="{{ doc.pk }}">
 
-                                                    {% if user_documents %}
+                                                    {% if has_user_documents %}
                                                         <div class="mb-2">
                                                             {{ attach_documents_form.documents_to_attach.label_tag }}
                                                             <div class="d-flex flex-column gap-1 mt-1">

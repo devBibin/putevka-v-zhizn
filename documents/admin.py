@@ -2,14 +2,27 @@ from django.contrib import admin
 from django.urls import reverse
 from django.utils.html import format_html
 
-from .models import Document, DocTemplate
+from .models import Document, DocumentType, DocTemplate
+
+
+@admin.register(DocumentType)
+class DocumentTypeAdmin(admin.ModelAdmin):
+    list_display = ('name', 'sort_order', 'is_active', 'documents_count')
+    list_editable = ('sort_order', 'is_active')
+    list_filter = ('is_active',)
+    search_fields = ('name', 'description')
+    ordering = ('sort_order', 'name')
+
+    @admin.display(description="Документов")
+    def documents_count(self, obj):
+        return obj.documents.count()
 
 
 @admin.register(Document)
 class DocumentAdmin(admin.ModelAdmin):
-    list_display = ('caption', 'user', 'uploaded_at', 'status', 'is_deleted', 'only_staff_comment', 'uploaded_by_staff',
+    list_display = ('caption', 'document_type', 'slot_label', 'user', 'uploaded_at', 'status', 'is_deleted', 'only_staff_comment', 'uploaded_by_staff',
                     'display_related_documents')
-    list_filter = ('uploaded_at', 'user', 'status', 'is_deleted', 'uploaded_by_staff')
+    list_filter = ('uploaded_at', 'document_type', 'user', 'status', 'is_deleted', 'uploaded_by_staff')
     search_fields = ('caption', 'user__username', 'status', 'only_staff_comment')
     date_hierarchy = 'uploaded_at'
     raw_id_fields = ('user',)

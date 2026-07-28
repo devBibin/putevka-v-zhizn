@@ -32,20 +32,20 @@ from core.decorators import ensure_registration_gate
 from core.forms import SendNotificationForm
 from core.models import MotivationLetter, Notification, UserNotification
 from core.services.email_service import send_email_to_user
-from documents.models import Document
+from documents.models import Document, DocumentType
 from my_study.models import CourseSelection, UniversityPriority, AssessmentResult, School, Course
 from review_by_tutor.forms import MotivationLetterStaffForm, UserInfoStaffForm, ScholarVideoStaffForm, \
     DocumentStaffUploadForm, DocumentCommentForm, \
     DocumentStatusForm, InterviewForm, TestAssignmentCreateForm, TestAssignmentEditForm, TestResultForm, \
     LetterRevisionForm, MotivationLetterRubricReviewStaffForm, LetterDeadlineForm, ScholarVideoDeadlineForm, \
-    ScholarVideoYandexPublicLinkForm, InterviewResultForm, TestRevisionForm
+    ScholarVideoYandexPublicLinkForm, InterviewResultForm, TestRevisionForm, UserPersonalDataStaffForm
 from review_by_tutor.models import Interview, TestAssignment, InterviewPreparation, InterviewTemplate, InterviewResult, \
     TestTemplate, TestingInstruction
 from review_by_tutor.services.interview_xlsx import build_prefilled_interview_xlsx, import_interview_result_xlsx
 from review_by_tutor.services.staff_users import build_staff_users_queryset, get_staff_users_filters
 from review_by_tutor.utils.contact_form import handle_send_notification
 from review_by_tutor.utils.selection_stages import require_selection_step
-from scholar_form.models import UserInfo, ScholarVideo, StaffNote, InterviewInstruction
+from scholar_form.models import UserInfo, UserPersonalData, ScholarVideo, StaffNote, InterviewInstruction
 from scholar_form.services.yandex_disk import (
     YandexDiskError,
     build_document_disk_path,
@@ -795,6 +795,7 @@ def staff_video_detail(request, user_id: int):
 @transaction.atomic
 def staff_documents_detail(request, user_id: int):
     user_obj = get_object_or_404(User, pk=user_id)
+    personal_data, _ = UserPersonalData.objects.get_or_create(user=user_obj)
     send_notification_form = handle_send_notification(request, user_obj)
 
     docs = (Document.objects
@@ -808,7 +809,15 @@ def staff_documents_detail(request, user_id: int):
 
     if request.method == "POST":
         form_type = request.POST.get("form_type")
-        if form_type in {"update_status", "update_lock", "update_comment"}:
+        if form_type == "update_personal_data":
+            personal_data_form = UserPersonalDataStaffForm(request.POST, instance=personal_data)
+            if personal_data_form.is_valid():
+                personal_data_form.save()
+                messages.success(request, "Персональные данные сохранены.")
+                return redirect("staff_documents_detail", user_id=user_id)
+            messages.error(request, "Исправьте ошибки в персональных данных.")
+
+        elif form_type in {"update_status", "update_lock", "update_comment"}:
             doc_id = request.POST.get("document_id")
             doc = get_object_or_404(Document, pk=doc_id, user_id=user_id)
 
@@ -864,18 +873,42 @@ def staff_documents_detail(request, user_id: int):
             return redirect("staff_documents_detail", user_id=user_id)
 
     rows = []
+    rows_by_type = {}
+    other_rows = []
     for d in docs:
-        rows.append((
+        row = (
             d,
             DocumentStatusForm(instance=d, prefix=f"st-{d.pk}"),
             DocumentCommentForm(instance=d, prefix=f"cm-{d.pk}"),
-        ))
+        )
+        rows.append(row)
+        if d.document_type_id:
+            rows_by_type.setdefault(d.document_type_id, []).append(row)
+        else:
+            other_rows.append(row)
+
+    active_slot_sections = []
+    archived_slot_sections = []
+    for document_type in DocumentType.objects.all():
+        section = {"document_type": document_type, "rows": rows_by_type.get(document_type.pk, [])}
+        if document_type.is_active:
+            active_slot_sections.append(section)
+        elif section["rows"]:
+            archived_slot_sections.append(section)
     upload_form = locals().get("upload_form", DocumentStaffUploadForm())
+    personal_data_form = locals().get(
+        "personal_data_form",
+        UserPersonalDataStaffForm(instance=personal_data),
+    )
 
     return render(request, "staff_templates/documents_detail.html", {
         "user_obj": user_obj,
         "rows": rows,
+        "active_slot_sections": active_slot_sections,
+        "archived_slot_sections": archived_slot_sections,
+        "other_rows": other_rows,
         "upload_form": upload_form,
+        "personal_data_form": personal_data_form,
         "active": "documents_dashboard",
         "send_notification_form": send_notification_form,
 

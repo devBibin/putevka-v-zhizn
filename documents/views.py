@@ -8,6 +8,7 @@ from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.http import Http404, FileResponse, HttpResponse
+from django.db.models import Prefetch
 from django.shortcuts import get_object_or_404
 from django.shortcuts import render, redirect
 from django.utils import timezone
@@ -17,8 +18,8 @@ from review_by_tutor.utils.contact_form import handle_send_notification
 from review_by_tutor.views import _staff_check
 from .ctx_builders import merge_context, base_user_context
 from .decorators import rate_limit_uploads
-from .forms import DocumentUploadForm, AttachDocumentsForm, build_params_form
-from .models import Document, DocTemplate
+from .forms import DocumentUploadForm, SlotDocumentUploadForm, AttachDocumentsForm, build_params_form
+from .models import Document, DocumentType, DocTemplate
 from .services import render_docx_bytes
 from scholar_form.services.yandex_disk import (
     YandexDiskError,
@@ -82,17 +83,69 @@ def serve_document(request, document_id):
 @login_required
 @rate_limit_uploads(rate_limit_seconds=1, max_uploads=1)
 def documents_dashboard(request):
-    user_documents = Document.objects.filter(user=request.user, uploaded_by_staff=False, is_deleted=False).order_by(
+    all_user_documents = Document.objects.filter(user=request.user, uploaded_by_staff=False, is_deleted=False).order_by(
         '-uploaded_at')
+    user_documents = all_user_documents.filter(document_type__isnull=True)
     staff_documents = Document.objects.filter(user=request.user, uploaded_by_staff=True, is_deleted=False).order_by(
         '-uploaded_at')
+    slot_document_qs = Document.objects.filter(
+        user=request.user, uploaded_by_staff=False, is_deleted=False
+    ).order_by('-uploaded_at')
+    document_types = DocumentType.objects.filter(is_active=True).prefetch_related(
+        Prefetch('documents', queryset=slot_document_qs, to_attr='user_slot_documents')
+    )
+    archived_slot_documents = all_user_documents.filter(document_type__is_active=False).select_related('document_type')
 
     document_upload_form = DocumentUploadForm()
+    slot_upload_form = SlotDocumentUploadForm()
 
     attach_documents_form = AttachDocumentsForm(user=request.user)
 
     if request.method == 'POST':
-        if request.POST.get('form_type') == 'general_document_form':
+        if request.POST.get('form_type') == 'slot_document_form':
+            document_type = get_object_or_404(
+                DocumentType,
+                pk=request.POST.get('document_type_id'),
+                is_active=True,
+            )
+            form = SlotDocumentUploadForm(
+                request.POST,
+                request.FILES,
+                instance=Document(
+                    user=request.user,
+                    document_type=document_type,
+                    caption=document_type.name,
+                ),
+            )
+            if form.is_valid():
+                document = form.save(commit=False)
+                uploaded_file = form.cleaned_data["file"]
+                disk_path = build_document_disk_path(
+                    request.user, uploaded_file.name, unique_suffix=uuid.uuid4().hex[:8]
+                )
+                try:
+                    upload_file_to_yandex_disk(
+                        uploaded_file=uploaded_file,
+                        disk_path=disk_path,
+                        log_context={"user_id": request.user.id, "asset": "document"},
+                    )
+                except YandexDiskError as exc:
+                    logger.warning("Ошибка загрузки документа слота на Яндекс Диск user_id=%s: %s", request.user.id, exc)
+                    messages.error(request, "Не удалось загрузить документ на Яндекс Диск. Попробуйте ещё раз.")
+                    slot_upload_form = form
+                else:
+                    document.user_file_name = uploaded_file.name
+                    document.file = ""
+                    document.yandex_disk_path = disk_path
+                    document.yandex_disk_uploaded_at = timezone.now()
+                    document.yandex_disk_error = ""
+                    document.save()
+                    messages.success(request, f'Документ «{document_type.name}» успешно загружен!')
+                    return redirect('documents_dashboard')
+            else:
+                messages.error(request, 'Ошибка при загрузке документа. Проверьте выбранный файл.')
+                slot_upload_form = form
+        elif request.POST.get('form_type') == 'general_document_form':
             form = DocumentUploadForm(request.POST, request.FILES)
             if form.is_valid():
                 document = form.save(commit=False)
@@ -158,7 +211,11 @@ def documents_dashboard(request):
 
     context = {
         'general_document_form': document_upload_form,
+        'slot_upload_form': slot_upload_form,
+        'document_types': document_types,
+        'archived_slot_documents': archived_slot_documents,
         'user_documents': user_documents,
+        'has_user_documents': all_user_documents.exists(),
         'staff_documents': staff_documents,
         'attach_documents_form': attach_documents_form,
         'active': 'documents_dashboard',

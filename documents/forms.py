@@ -52,7 +52,8 @@ class DocumentUploadForm(forms.ModelForm):
 
         super().__init__(*args, **kwargs)
 
-        self.fields['caption'].required = True
+        if 'caption' in self.fields:
+            self.fields['caption'].required = True
 
     def clean_file(self):
         uploaded_file = self.cleaned_data.get('file')
@@ -100,6 +101,21 @@ class DocumentUploadForm(forms.ModelForm):
 
         uploaded_file.seek(0)
         return uploaded_file
+
+
+class SlotDocumentUploadForm(DocumentUploadForm):
+    class Meta(DocumentUploadForm.Meta):
+        fields = ['file', 'slot_label']
+        labels = {
+            'file': 'Файл',
+            'slot_label': 'Что находится в файле',
+        }
+        widgets = {
+            'slot_label': forms.TextInput(attrs={
+                'placeholder': 'Например: разворот с фотографией',
+                'maxlength': 100,
+            }),
+        }
 
 
 FIELD_TYPES = {

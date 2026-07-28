@@ -1,0 +1,63 @@
+{% if table_rows %}
+    <div class="table-responsive">
+        <table class="table align-middle mb-0">
+            <thead>
+            <tr>
+                <th style="min-width: 280px;">Документ</th>
+                <th>Статус</th>
+                <th style="min-width: 260px;">Комментарий (staff)</th>
+                <th class="text-end">Действия</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for doc, status_form, comment_form in table_rows %}
+                <tr>
+                    <td>
+                        <a href="{% url 'serve_document' doc.pk %}" target="_blank" class="text-break">
+                            {{ doc.slot_label|default:doc.user_file_name|default:doc.caption }}
+                        </a>
+                        {% if doc.slot_label %}<div class="small text-muted text-break">{{ doc.user_file_name }}</div>{% endif %}
+                        <div class="small text-muted">
+                            Загружено: {{ doc.uploaded_at|date:"d.m.Y H:i" }}
+                            {% if doc.uploaded_by_staff %} · <span class="badge text-bg-dark">сотрудник</span>{% endif %}
+                            {% if doc.is_deleted %} · <span class="badge text-bg-secondary">удалён пользователем</span>{% endif %}
+                        </div>
+                        {% if doc.related_documents.all %}
+                            <div class="mt-2 small">
+                                <strong>Прикреплено:</strong>
+                                <ul class="list-unstyled mb-0">
+                                    {% for related in doc.related_documents.all %}
+                                        <li><a href="{% url 'serve_document' related.pk %}" target="_blank">{{ related.caption|default:related.user_file_name }}</a></li>
+                                    {% endfor %}
+                                </ul>
+                            </div>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <form method="post" class="m-0 doc-row-form">
+                            {% csrf_token %}
+                            <input type="hidden" name="form_type" value="update_status">
+                            <input type="hidden" name="document_id" value="{{ doc.pk }}">
+                            {{ status_form.status }}
+                        </form>
+                    </td>
+                    <td>
+                        <form method="post" class="m-0 doc-row-form">
+                            {% csrf_token %}
+                            <input type="hidden" name="form_type" value="update_comment">
+                            <input type="hidden" name="document_id" value="{{ doc.pk }}">
+                            {{ comment_form.only_staff_comment }}
+                            <div class="text-end mt-2"><button class="btn btn-outline-primary btn-sm" type="submit">Сохранить</button></div>
+                        </form>
+                    </td>
+                    <td class="text-end">
+                        <a class="btn btn-sm btn-outline-secondary" href="{% url 'serve_document' doc.pk %}" download>Скачать</a>
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+{% else %}
+    <div class="text-muted small">Файлы ещё не загружены.</div>
+{% endif %}

@@ -33,7 +33,7 @@ from core.models import (
 )
 from documents.ctx_builders import base_user_context, merge_context
 from documents.jinja_env import build_jinja_env, date_ru, money_text_ru
-from documents.models import DocTemplate, Document
+from documents.models import DocTemplate, Document, DocumentType
 from my_study.models import (
     AssessmentResult,
     Course,
@@ -686,6 +686,75 @@ class YandexDiskServiceTests(IntegrationTestCase):
 
 
 class DocumentHelperTests(IntegrationTestCase):
+    def test_document_slots_are_rendered_and_inactive_slots_are_archived(self):
+        user = self.create_finished_candidate("document-slots@example.com")
+        active_type = DocumentType.objects.create(name="Справка", sort_order=5)
+        inactive_type = DocumentType.objects.create(name="Старый тип", is_active=False)
+        Document.objects.create(
+            user=user,
+            document_type=inactive_type,
+            caption=inactive_type.name,
+            user_file_name="old.pdf",
+            yandex_disk_path="disk:/old.pdf",
+        )
+        self.client.force_login(user)
+
+        response = self.client.get(reverse("documents_dashboard"))
+
+        self.assertContains(response, active_type.name)
+        self.assertContains(response, "Архивные документы")
+        self.assertContains(response, "old.pdf")
+
+    def test_candidate_can_upload_multiple_files_to_document_slot(self):
+        cache.clear()
+        user = self.create_finished_candidate("document-slot-upload@example.com")
+        document_type = DocumentType.objects.create(name="Паспорт тест", sort_order=1)
+        self.client.force_login(user)
+
+        for index in range(2):
+            cache.clear()
+            uploaded = SimpleUploadedFile(f"page-{index}.txt", b"page", content_type="text/plain")
+            with patch("documents.forms.magic.from_buffer", return_value="text/plain", create=True):
+                response = self.client.post(
+                    reverse("documents_dashboard"),
+                    {
+                        "form_type": "slot_document_form",
+                        "document_type_id": document_type.pk,
+                        "file": uploaded,
+                        "slot_label": f"Страница {index + 1}",
+                    },
+                    REMOTE_ADDR=f"127.0.1.{index + 1}",
+                )
+            self.assertRedirects(response, reverse("documents_dashboard"))
+
+        documents = Document.objects.filter(user=user, document_type=document_type)
+        self.assertEqual(documents.count(), 2)
+        self.assertTrue(all(document.caption == document_type.name for document in documents))
+        self.assertEqual(
+            set(documents.values_list("slot_label", flat=True)),
+            {"Страница 1", "Страница 2"},
+        )
+
+    def test_candidate_cannot_upload_to_inactive_document_slot(self):
+        cache.clear()
+        user = self.create_finished_candidate("inactive-slot@example.com")
+        document_type = DocumentType.objects.create(name="Неактивный", is_active=False)
+        self.client.force_login(user)
+        uploaded = SimpleUploadedFile("file.txt", b"page", content_type="text/plain")
+
+        response = self.client.post(
+            reverse("documents_dashboard"),
+            {
+                "form_type": "slot_document_form",
+                "document_type_id": document_type.pk,
+                "file": uploaded,
+            },
+            REMOTE_ADDR="127.0.2.1",
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertFalse(Document.objects.filter(user=user, document_type=document_type).exists())
+
     def test_candidate_document_upload_is_stored_on_yandex_disk_only(self):
         cache.clear()
         user = self.create_finished_candidate("document-upload@example.com")
@@ -1178,6 +1247,67 @@ class StaffPageSmokeTests(IntegrationTestCase):
             with self.subTest(name=name):
                 response = self.client.get(reverse(name, args=[self.candidate.id]))
                 self.assertEqual(response.status_code, 200)
+
+    def test_staff_documents_are_grouped_by_active_archived_and_other_types(self):
+        active_type = DocumentType.objects.create(name="Паспорт родителя", sort_order=1)
+        archived_type = DocumentType.objects.create(name="Старая справка", is_active=False)
+        Document.objects.create(
+            user=self.candidate,
+            document_type=active_type,
+            caption=active_type.name,
+            slot_label="Разворот с фотографией",
+            user_file_name="parent-passport.pdf",
+            yandex_disk_path="disk:/parent-passport.pdf",
+        )
+        Document.objects.create(
+            user=self.candidate,
+            document_type=archived_type,
+            caption=archived_type.name,
+            user_file_name="old-certificate.pdf",
+            yandex_disk_path="disk:/old-certificate.pdf",
+        )
+
+        response = self.client.get(reverse("staff_documents_detail", args=[self.candidate.id]))
+
+        self.assertContains(response, "Основные документы")
+        self.assertContains(response, "Паспорт родителя")
+        self.assertContains(response, "parent-passport.pdf")
+        self.assertContains(response, "Разворот с фотографией")
+        self.assertContains(response, "Архивные документы")
+        self.assertContains(response, "old-certificate.pdf")
+        self.assertContains(response, "Другие документы")
+
+    def test_staff_can_update_personal_data_from_documents_page(self):
+        response = self.client.post(
+            reverse("staff_documents_detail", args=[self.candidate.id]),
+            {
+                "form_type": "update_personal_data",
+                "last_name": "Иванова",
+                "first_name": "Анна",
+                "middle_name": "Петровна",
+                "passport_series": "1234",
+                "passport_number": "567890",
+                "passport_issued_at": "2025-04-03",
+                "passport_issued_by": "УМВД России",
+                "passport_department_code": "700-001",
+                "registration_address": "г. Томск, ул. Ленина, 1",
+                "phone": "+79990000000",
+                "email": "anna@example.com",
+                "inn": "123456789012",
+                "bank_name": "Банк",
+                "bank_account": "40817810000000000000",
+                "bank_bik": "044525225",
+                "bank_correspondent_account": "30101810400000000225",
+            },
+        )
+
+        self.assertRedirects(response, reverse("staff_documents_detail", args=[self.candidate.id]))
+        personal_data = self.candidate.personal_data
+        personal_data.refresh_from_db()
+        self.assertEqual(personal_data.passport_series, "1234")
+        self.assertEqual(personal_data.passport_number, "567890")
+        self.assertEqual(personal_data.inn, "123456789012")
+        self.assertEqual(personal_data.bank_bik, "044525225")
 
     def test_staff_collection_and_json_pages_render(self):
         response = self.client.get(reverse("staff_users_list"), {"q": "pages-target"})

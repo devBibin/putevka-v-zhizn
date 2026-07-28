@@ -4,7 +4,7 @@ from core.models import MotivationLetter
 from documents.models import Document
 from my_study.models import Subject
 from review_by_tutor.models import Interview, TestAssignment, InterviewResult
-from scholar_form.models import UserInfo, ScholarVideo
+from scholar_form.models import UserInfo, UserPersonalData, ScholarVideo
 
 
 class SelectionStepUpdateForm(forms.ModelForm):
@@ -259,6 +259,28 @@ class DocumentStaffUploadForm(forms.ModelForm):
         }
 
     file = forms.FileField(widget=forms.ClearableFileInput(attrs={"class": "form-control"}))
+
+
+class UserPersonalDataStaffForm(forms.ModelForm):
+    class Meta:
+        model = UserPersonalData
+        fields = [
+            "last_name", "first_name", "middle_name",
+            "passport_series", "passport_number", "passport_issued_at",
+            "passport_issued_by", "passport_department_code", "registration_address",
+            "phone", "email", "inn",
+            "bank_name", "bank_account", "bank_bik", "bank_correspondent_account",
+        ]
+        widgets = {
+            "passport_issued_at": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date"}),
+            "registration_address": forms.Textarea(attrs={"rows": 2}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            field.required = False
+            field.widget.attrs["class"] = "form-control"
 
 
 class DocumentStatusForm(forms.ModelForm):
