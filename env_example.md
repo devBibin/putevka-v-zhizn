@@ -51,5 +51,6 @@ ZVONOK_API_POLLING_URL=  # Call status URL
 
 YANDEX_DISK_OAUTH_TOKEN=               # OAuth token for Yandex Disk
 YANDEX_DISK_VIDEO_FOLDER=              # Base folder, for example Putevka/VideoBusinessCards
+YANDEX_DISK_DOCUMENTS_FOLDER=Админка/документы # Base folder for documents
 YANDEX_DISK_TIMEOUT_SECONDS=60         # API metadata timeout
 YANDEX_DISK_UPLOAD_TIMEOUT_SECONDS=900 # Large upload timeout

@@ -18,6 +18,10 @@ BASE_URL = config.BASE_URL
 logger = logging.getLogger(__name__)
 
 
+def _document_name(document):
+    return document.user_file_name or os.path.basename(document.file.name) or document.caption
+
+
 @receiver(post_save, sender=Document)
 def notify_telegram_on_document_upload(sender, instance, created, **kwargs):
     if created:
@@ -25,7 +29,7 @@ def notify_telegram_on_document_upload(sender, instance, created, **kwargs):
 
         message_text = (
             f"Новый документ загружен пользователем {instance.user.username}:\n"
-            f"Название: {os.path.basename(instance.file.name)}\n"
+            f"Название: {_document_name(instance)}\n"
             f"Описание: {instance.caption}\n"
             f"Доступен по ссылке: {BASE_URL}{document_url}\n"
             f"Загружен персоналом: {'да' if instance.uploaded_by_staff else 'нет'}"
@@ -51,7 +55,7 @@ def notify_telegram_on_documents_attached(sender, instance, created, **kwargs):
 
         message_text = (
             f"Пользователь {instance.user.username} прикрепил документы:\n"
-            f"К документу: '{instance.caption or os.path.basename(instance.file.name)}' (ID: {instance.pk})\n"
+            f"К документу: '{instance.caption or _document_name(instance)}' (ID: {instance.pk})\n"
             f"Новый статус документа: {instance.get_status_display()}\n"
             f"Прикрепленные документы:\n- {attached_docs_list}\n"
             f"Ссылка на основной документ: {BASE_URL}{document_url}"

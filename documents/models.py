@@ -16,6 +16,21 @@ def upload_to_path(instance, filename):
     return os.path.join('documents', instance.user.username, new_filename)
 
 
+class DocumentType(models.Model):
+    name = models.CharField("Название", max_length=100, unique=True)
+    description = models.TextField("Пояснение для пользователя", blank=True)
+    sort_order = models.PositiveIntegerField("Порядок отображения", default=0)
+    is_active = models.BooleanField("Активен", default=True)
+
+    class Meta:
+        ordering = ("sort_order", "name", "pk")
+        verbose_name = "Тип документа"
+        verbose_name_plural = "Типы документов"
+
+    def __str__(self):
+        return self.name
+
+
 class Document(models.Model):
     STATUSES = [
         ('PENDING', 'На проверке'),
@@ -27,8 +42,25 @@ class Document(models.Model):
     ]
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='documents')
-    file = models.FileField(upload_to=upload_to_path)
+    document_type = models.ForeignKey(
+        DocumentType,
+        on_delete=models.PROTECT,
+        related_name='documents',
+        verbose_name="Тип документа",
+        blank=True,
+        null=True,
+    )
+    slot_label = models.CharField(
+        "Подпись файла в слоте",
+        max_length=100,
+        blank=True,
+        help_text="Например: разворот с фотографией или страница регистрации",
+    )
+    file = models.FileField(upload_to=upload_to_path, blank=True)
     user_file_name = models.CharField(max_length=100, null=True, blank=True)
+    yandex_disk_path = models.CharField(max_length=1024, blank=True, default="")
+    yandex_disk_uploaded_at = models.DateTimeField(blank=True, null=True)
+    yandex_disk_error = models.TextField(blank=True, default="")
     caption = models.CharField(max_length=255, blank=False)
     uploaded_at = models.DateTimeField(auto_now_add=True)
     is_deleted = models.BooleanField(default=False)
@@ -54,7 +86,7 @@ class Document(models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return self.file.name
+        return self.user_file_name or self.file.name or self.yandex_disk_path
 
 
 class DocTemplate(models.Model):
