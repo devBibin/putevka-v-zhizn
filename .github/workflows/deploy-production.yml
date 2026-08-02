@@ -1,0 +1,115 @@
+name: Deploy Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "I understand that this deploys the selected branch to production"
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+# Do not cancel a running deploy: interrupting `docker compose up` can leave the
+# existing production stack in an unknown state.
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: inputs.confirm
+    name: Deploy ${{ github.ref_name }} to production
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Configure SSH
+        env:
+          DEPLOY_HOST: ${{ vars.PROD_DEPLOY_HOST }}
+          DEPLOY_USER: ${{ vars.PROD_DEPLOY_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.PROD_DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ vars.PROD_DEPLOY_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+
+          test -n "$DEPLOY_HOST"
+          test -n "$DEPLOY_USER"
+          test -n "$DEPLOY_SSH_KEY"
+          test -n "$DEPLOY_KNOWN_HOSTS"
+
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/production_deploy_key
+          chmod 600 ~/.ssh/production_deploy_key
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Deploy current Compose stack
+        env:
+          DEPLOY_HOST: ${{ vars.PROD_DEPLOY_HOST }}
+          DEPLOY_USER: ${{ vars.PROD_DEPLOY_USER }}
+          DEPLOY_PATH: ${{ vars.PROD_DEPLOY_PATH }}
+          DEPLOY_REF: ${{ github.ref }}
+          DEPLOY_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          test -n "$DEPLOY_PATH"
+
+          deploy_ref_b64="$(printf '%s' "$DEPLOY_REF" | base64 | tr -d '\n')"
+          deploy_sha_b64="$(printf '%s' "$DEPLOY_SHA" | base64 | tr -d '\n')"
+          deploy_path_b64="$(printf '%s' "$DEPLOY_PATH" | base64 | tr -d '\n')"
+
+          ssh \
+            -i ~/.ssh/production_deploy_key \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            "DEPLOY_REF_B64='$deploy_ref_b64' DEPLOY_SHA_B64='$deploy_sha_b64' DEPLOY_PATH_B64='$deploy_path_b64' bash -s" <<'REMOTE'
+          set -euo pipefail
+
+          decode() {
+            printf '%s' "$1" | base64 --decode
+          }
+
+          deploy_ref="$(decode "$DEPLOY_REF_B64")"
+          deploy_sha="$(decode "$DEPLOY_SHA_B64")"
+          deploy_path="$(decode "$DEPLOY_PATH_B64")"
+
+          case "$deploy_ref" in
+            refs/heads/*) ;;
+            *)
+              echo "Only branch refs can be deployed, got: $deploy_ref" >&2
+              exit 1
+              ;;
+          esac
+
+          test -d "$deploy_path/.git"
+          cd "$deploy_path"
+
+          # Preserve .env, media, staticfiles, logs, database dumps, and any
+          # other untracked production data. Tracked manual changes must be
+          # committed before a deployment so they cannot be overwritten.
+          if ! git diff --quiet || ! git diff --cached --quiet; then
+            echo "Tracked changes found in $deploy_path; commit or revert them before deploying." >&2
+            git status --short >&2
+            exit 1
+          fi
+
+          git fetch --depth=1 origin "$deploy_ref"
+          fetched_sha="$(git rev-parse FETCH_HEAD)"
+          if [ "$fetched_sha" != "$deploy_sha" ]; then
+            echo "Branch changed while the workflow was starting. Expected $deploy_sha, got $fetched_sha." >&2
+            exit 1
+          fi
+
+          git reset --hard "$deploy_sha"
+          docker compose up -d --build
+          docker compose ps
+
+          # The existing application redirects an unauthenticated request to
+          # its login page; any HTTP response below 400 confirms web is reachable.
+          curl --fail --silent --show-error --max-time 30 -o /dev/null http://127.0.0.1:8000/
+          REMOTE
