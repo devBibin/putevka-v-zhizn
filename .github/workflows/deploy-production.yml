@@ -51,23 +51,26 @@ jobs:
           DEPLOY_HOST: ${{ vars.PROD_DEPLOY_HOST }}
           DEPLOY_USER: ${{ vars.PROD_DEPLOY_USER }}
           DEPLOY_PATH: ${{ vars.PROD_DEPLOY_PATH }}
+          DEPLOY_HEALTHCHECK_HOST: ${{ vars.PROD_HEALTHCHECK_HOST }}
           DEPLOY_REF: ${{ github.ref }}
           DEPLOY_SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
 
           test -n "$DEPLOY_PATH"
+          test -n "$DEPLOY_HEALTHCHECK_HOST"
 
           deploy_ref_b64="$(printf '%s' "$DEPLOY_REF" | base64 | tr -d '\n')"
           deploy_sha_b64="$(printf '%s' "$DEPLOY_SHA" | base64 | tr -d '\n')"
           deploy_path_b64="$(printf '%s' "$DEPLOY_PATH" | base64 | tr -d '\n')"
+          deploy_healthcheck_host_b64="$(printf '%s' "$DEPLOY_HEALTHCHECK_HOST" | base64 | tr -d '\n')"
 
           ssh \
             -i ~/.ssh/production_deploy_key \
             -o BatchMode=yes \
             -o StrictHostKeyChecking=yes \
             "$DEPLOY_USER@$DEPLOY_HOST" \
-            "DEPLOY_REF_B64='$deploy_ref_b64' DEPLOY_SHA_B64='$deploy_sha_b64' DEPLOY_PATH_B64='$deploy_path_b64' bash -s" <<'REMOTE'
+            "DEPLOY_REF_B64='$deploy_ref_b64' DEPLOY_SHA_B64='$deploy_sha_b64' DEPLOY_PATH_B64='$deploy_path_b64' DEPLOY_HEALTHCHECK_HOST_B64='$deploy_healthcheck_host_b64' bash -s" <<'REMOTE'
           set -euo pipefail
 
           decode() {
@@ -77,6 +80,7 @@ jobs:
           deploy_ref="$(decode "$DEPLOY_REF_B64")"
           deploy_sha="$(decode "$DEPLOY_SHA_B64")"
           deploy_path="$(decode "$DEPLOY_PATH_B64")"
+          deploy_healthcheck_host="$(decode "$DEPLOY_HEALTHCHECK_HOST_B64")"
 
           case "$deploy_ref" in
             refs/heads/*) ;;
@@ -110,6 +114,21 @@ jobs:
           docker compose ps
 
           # The existing application redirects an unauthenticated request to
-          # its login page; any HTTP response below 400 confirms web is reachable.
-          curl --fail --silent --show-error --max-time 30 -o /dev/null http://127.0.0.1:8000/
+          # its login page. Startup includes migrations and collectstatic, so
+          # wait for Django instead of treating the first connection reset as
+          # a failed deployment.
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --show-error --max-time 5 \
+              -H "Host: $deploy_healthcheck_host" \
+              -o /dev/null http://127.0.0.1:8000/; then
+              echo "Web is ready after ${attempt} attempt(s)."
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "Web did not become ready within 60 seconds." >&2
+          docker compose ps >&2
+          docker compose logs --tail=100 web >&2
+          exit 1
           REMOTE
