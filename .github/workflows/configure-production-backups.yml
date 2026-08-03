@@ -64,16 +64,24 @@ jobs:
           set -euo pipefail
 
           deploy_path="$(printf '%s' "$DEPLOY_PATH_B64" | base64 --decode)"
-          test -d "$deploy_path/.git"
-          test -f "$deploy_path/scripts/backup-postgres-to-yadisk.sh"
-          test -f "$deploy_path/deploy/backups/putevka-postgres-backup.service"
-          test -f "$deploy_path/deploy/backups/putevka-postgres-backup.timer"
+          require() {
+            local description="$1"
+            shift
+            if ! "$@"; then
+              echo "Prerequisite failed: $description" >&2
+              exit 1
+            fi
+          }
 
-          sudo -n true
-          command -v rclone >/dev/null
-          sudo test -s /root/.config/rclone/rclone.conf
-          sudo rclone listremotes | grep -Fx 'yadisk_crypt:' >/dev/null
-          sudo test -f /etc/putevka-backup.env
+          require "production repository at DEPLOY_PATH" test -d "$deploy_path/.git"
+          require "backup script deployed to production repository" test -f "$deploy_path/scripts/backup-postgres-to-yadisk.sh"
+          require "backup systemd service deployed to production repository" test -f "$deploy_path/deploy/backups/putevka-postgres-backup.service"
+          require "backup systemd timer deployed to production repository" test -f "$deploy_path/deploy/backups/putevka-postgres-backup.timer"
+          require "passwordless sudo for deploy user" sudo -n true
+          require "rclone installed on production" command -v rclone
+          require "rclone configuration installed" sudo test -s /root/.config/rclone/rclone.conf
+          require "encrypted rclone remote yadisk_crypt configured" bash -c "sudo rclone listremotes | grep -Fx 'yadisk_crypt:' >/dev/null"
+          require "backup environment file installed" sudo test -f /etc/putevka-backup.env
 
           sudo install -m 0750 "$deploy_path/scripts/backup-postgres-to-yadisk.sh" /usr/local/sbin/putevka-postgres-backup
           sudo install -m 0644 "$deploy_path/deploy/backups/putevka-postgres-backup.service" /etc/systemd/system/putevka-postgres-backup.service
