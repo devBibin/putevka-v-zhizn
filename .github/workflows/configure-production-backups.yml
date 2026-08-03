@@ -103,7 +103,12 @@ jobs:
           sudo systemctl list-timers --all putevka-postgres-backup.timer
 
           if [ "$RUN_BACKUP_NOW" = "true" ]; then
-            sudo systemctl start putevka-postgres-backup.service
+            if ! sudo systemctl start putevka-postgres-backup.service; then
+              echo "Backup service failed; recent journal follows." >&2
+              sudo systemctl --no-pager --full status putevka-postgres-backup.service || true
+              sudo journalctl -u putevka-postgres-backup.service -n 100 --no-pager || true
+              exit 1
+            fi
             sudo systemctl --no-pager --full status putevka-postgres-backup.service
           fi
           REMOTE
