@@ -1,0 +1,11 @@
+[Unit]
+Description=Run Putevka PostgreSQL backup every night
+
+[Timer]
+OnCalendar=*-*-* 03:30:00 UTC
+Persistent=true
+RandomizedDelaySec=15m
+Unit=putevka-postgres-backup.service
+
+[Install]
+WantedBy=timers.target

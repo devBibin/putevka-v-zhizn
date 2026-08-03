@@ -1,0 +1,90 @@
+name: Configure Production Backups
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: "I understand that this installs and enables the production backup timer"
+        required: true
+        type: boolean
+        default: false
+      run_backup_now:
+        description: "Run a backup immediately after installing the timer"
+        required: true
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  configure:
+    if: inputs.confirm
+    name: Configure production backup timer
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Configure SSH
+        env:
+          DEPLOY_HOST: ${{ vars.PROD_DEPLOY_HOST }}
+          DEPLOY_USER: ${{ vars.PROD_DEPLOY_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.PROD_DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ vars.PROD_DEPLOY_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          test -n "$DEPLOY_HOST"
+          test -n "$DEPLOY_USER"
+          test -n "$DEPLOY_SSH_KEY"
+          test -n "$DEPLOY_KNOWN_HOSTS"
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/production_deploy_key
+          chmod 600 ~/.ssh/production_deploy_key
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Install and enable backup timer
+        env:
+          DEPLOY_HOST: ${{ vars.PROD_DEPLOY_HOST }}
+          DEPLOY_USER: ${{ vars.PROD_DEPLOY_USER }}
+          DEPLOY_PATH: ${{ vars.PROD_DEPLOY_PATH }}
+          RUN_BACKUP_NOW: ${{ inputs.run_backup_now }}
+        run: |
+          set -euo pipefail
+          test -n "$DEPLOY_PATH"
+          deploy_path_b64="$(printf '%s' "$DEPLOY_PATH" | base64 | tr -d '\n')"
+
+          ssh -i ~/.ssh/production_deploy_key -o BatchMode=yes -o StrictHostKeyChecking=yes \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            "DEPLOY_PATH_B64='$deploy_path_b64' RUN_BACKUP_NOW='$RUN_BACKUP_NOW' bash -s" <<'REMOTE'
+          set -euo pipefail
+
+          deploy_path="$(printf '%s' "$DEPLOY_PATH_B64" | base64 --decode)"
+          test -d "$deploy_path/.git"
+          test -f "$deploy_path/scripts/backup-postgres-to-yadisk.sh"
+          test -f "$deploy_path/deploy/backups/putevka-postgres-backup.service"
+          test -f "$deploy_path/deploy/backups/putevka-postgres-backup.timer"
+
+          sudo -n true
+          command -v rclone >/dev/null
+          sudo test -s /root/.config/rclone/rclone.conf
+          sudo rclone listremotes | grep -Fx 'yadisk_crypt:' >/dev/null
+          sudo test -f /etc/putevka-backup.env
+
+          sudo install -m 0750 "$deploy_path/scripts/backup-postgres-to-yadisk.sh" /usr/local/sbin/putevka-postgres-backup
+          sudo install -m 0644 "$deploy_path/deploy/backups/putevka-postgres-backup.service" /etc/systemd/system/putevka-postgres-backup.service
+          sudo install -m 0644 "$deploy_path/deploy/backups/putevka-postgres-backup.timer" /etc/systemd/system/putevka-postgres-backup.timer
+          sudo systemctl daemon-reload
+          sudo systemctl enable --now putevka-postgres-backup.timer
+          sudo systemctl is-enabled putevka-postgres-backup.timer
+          sudo systemctl list-timers --all putevka-postgres-backup.timer
+
+          if [ "$RUN_BACKUP_NOW" = "true" ]; then
+            sudo systemctl start putevka-postgres-backup.service
+            sudo systemctl --no-pager --full status putevka-postgres-backup.service
+          fi
+          REMOTE

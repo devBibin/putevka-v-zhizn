@@ -34,3 +34,9 @@ docker-compose.override.yml
 
 # logging
 logs/
+
+# Production backup material and credentials
+/backups/
+*.dump
+*.dump.sha256
+putevka-backup.env

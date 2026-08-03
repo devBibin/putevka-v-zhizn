@@ -1,0 +1,12 @@
+[Unit]
+Description=Back up Putevka PostgreSQL to Yandex Disk
+Wants=network-online.target
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/putevka-backup.env
+ExecStart=/usr/local/sbin/putevka-postgres-backup
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7

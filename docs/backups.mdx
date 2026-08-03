@@ -1,0 +1,41 @@
+---
+title: "Резервные копии PostgreSQL"
+description: "Автоматические зашифрованные дампы production PostgreSQL на Яндекс Диск."
+---
+
+# Резервные копии PostgreSQL на Яндекс Диск
+
+База остаётся на production-сервере. Скрипт создаёт архив `pg_dump` внутри Docker-контейнера `db`, проверяет его командой `pg_restore --list`, загружает на Яндекс Диск и удаляет файлы старше 30 дней.
+
+## Однократная настройка
+
+1. В Яндекс ID создай пароль приложения типа **WebDAV-клиент для Яндекс Диска**. Не используй основной пароль аккаунта.
+2. На production установи rclone и выполни `sudo rclone config`.
+3. Создай remote `yadisk`: тип `webdav`, URL `https://webdav.yandex.ru`, vendor `other`, логин Яндекс ID и пароль приложения.
+4. Создай remote `yadisk_crypt`: тип `crypt`, путь `yadisk:putevka-backups`; включи шифрование имён и содержимого. Пароль crypt сохрани в менеджере паролей.
+5. Проверь доступ: `sudo rclone lsd yadisk:`.
+
+## Установка на production
+
+После однократной настройки rclone и создания `/etc/putevka-backup.env` установка timer выполняется через GitHub Actions: **Actions → Configure Production Backups → Run workflow**. Подтверди запуск и оставь включённым `Run a backup immediately` для первого теста.
+
+Workflow использует существующий production SSH-доступ и требует, чтобы deploy-пользователь мог выполнить `sudo` без запроса пароля. Он не передаёт в GitHub ни пароль Яндекс Диска, ни пароль шифрования rclone.
+
+Если GitHub Actions пока не используется, можно выполнить ту же установку вручную:
+
+```bash
+cd /srv/putevka-v-zhizn
+sudo install -m 0750 scripts/backup-postgres-to-yadisk.sh /usr/local/sbin/putevka-postgres-backup
+sudo install -m 0600 deploy/backups/putevka-backup.env.example /etc/putevka-backup.env
+sudoedit /etc/putevka-backup.env
+sudo install -m 0644 deploy/backups/putevka-postgres-backup.service /etc/systemd/system/
+sudo install -m 0644 deploy/backups/putevka-postgres-backup.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now putevka-postgres-backup.timer
+sudo systemctl start putevka-postgres-backup.service
+sudo journalctl -u putevka-postgres-backup.service -n 100 --no-pager
+```
+
+В `/etc/putevka-backup.env` укажи настоящий `APP_DIR`. Не меняй `RCLONE_REMOTE=yadisk_crypt`: remote `yadisk` не шифрует дампы. Timer запускает задачу ежедневно в 03:30 UTC (10:30 по Томску при UTC+7) и наверстывает запуск после перезагрузки.
+
+Раз в квартал скачивай один архив в отдельную папку и проверяй `sha256sum -c *.sha256` и `pg_restore --list`; не восстанавливай тестовый файл поверх production.
