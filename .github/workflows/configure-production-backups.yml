@@ -81,6 +81,17 @@ jobs:
           require "rclone installed on production" command -v rclone
           require "rclone configuration installed" sudo test -s /root/.config/rclone/rclone.conf
           require "encrypted rclone remote yadisk_crypt configured" bash -c "sudo rclone listremotes | grep -Fx 'yadisk_crypt:' >/dev/null"
+
+          if ! sudo test -f /etc/putevka-backup.env; then
+            echo "Creating /etc/putevka-backup.env with default backup settings."
+            {
+              printf 'APP_DIR=%s\n' "$deploy_path"
+              printf '%s\n' 'BACKUP_DIR=/var/lib/putevka-backups'
+              printf '%s\n' 'RCLONE_REMOTE=yadisk_crypt'
+              printf '%s\n' 'RCLONE_PATH=putevka/production/postgres'
+              printf '%s\n' 'RETENTION_DAYS=30'
+            } | sudo install -m 0600 /dev/stdin /etc/putevka-backup.env
+          fi
           require "backup environment file installed" sudo test -f /etc/putevka-backup.env
 
           sudo install -m 0750 "$deploy_path/scripts/backup-postgres-to-yadisk.sh" /usr/local/sbin/putevka-postgres-backup

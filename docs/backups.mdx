@@ -17,7 +17,7 @@ description: "Автоматические зашифрованные дампы
 
 ## Установка на production
 
-После однократной настройки rclone и создания `/etc/putevka-backup.env` установка timer выполняется через GitHub Actions: **Actions → Configure Production Backups → Run workflow**. Подтверди запуск и оставь включённым `Run a backup immediately` для первого теста.
+После однократной настройки rclone установка timer выполняется через GitHub Actions: **Actions → Configure Production Backups → Run workflow**. Если `/etc/putevka-backup.env` ещё нет, workflow создаст его с путём текущего production-репозитория, ежедневной ротацией 30 дней и remote `yadisk_crypt`.
 
 Workflow использует существующий production SSH-доступ и требует, чтобы deploy-пользователь мог выполнить `sudo` без запроса пароля. Пароль Яндекс Диска и пароль шифрования rclone остаются только на production-сервере.
 
