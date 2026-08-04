@@ -43,7 +43,10 @@ rclone copy "$work_dir" "$remote_path" \
   --include "$archive" \
   --include "$archive.sha256" \
   --transfers 1 \
-  --checkers 4
+  --checkers 4 \
+  --stats 30s \
+  --stats-one-line \
+  --log-level INFO
 
 # Retention applies only inside the dedicated backup directory on the remote.
 rclone delete "$remote_path" \

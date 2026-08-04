@@ -7,6 +7,8 @@ After=network-online.target docker.service
 Type=oneshot
 EnvironmentFile=/etc/putevka-backup.env
 ExecStart=/usr/local/sbin/putevka-postgres-backup
+# Prevent a failed network transfer from blocking all later scheduled backups.
+TimeoutStartSec=30min
 Nice=10
 IOSchedulingClass=best-effort
 IOSchedulingPriority=7
