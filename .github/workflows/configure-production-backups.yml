@@ -64,16 +64,40 @@ jobs:
           set -euo pipefail
 
           deploy_path="$(printf '%s' "$DEPLOY_PATH_B64" | base64 --decode)"
-          test -d "$deploy_path/.git"
-          test -f "$deploy_path/scripts/backup-postgres-to-yadisk.sh"
-          test -f "$deploy_path/deploy/backups/putevka-postgres-backup.service"
-          test -f "$deploy_path/deploy/backups/putevka-postgres-backup.timer"
+          require() {
+            local description="$1"
+            shift
+            if ! "$@"; then
+              echo "Prerequisite failed: $description" >&2
+              exit 1
+            fi
+          }
 
-          sudo -n true
-          command -v rclone >/dev/null
-          sudo test -s /root/.config/rclone/rclone.conf
-          sudo rclone listremotes | grep -Fx 'yadisk_crypt:' >/dev/null
-          sudo test -f /etc/putevka-backup.env
+          require "production repository at DEPLOY_PATH" test -d "$deploy_path/.git"
+          require "backup script deployed to production repository" test -f "$deploy_path/scripts/backup-postgres-to-yadisk.sh"
+          require "backup systemd service deployed to production repository" test -f "$deploy_path/deploy/backups/putevka-postgres-backup.service"
+          require "backup systemd timer deployed to production repository" test -f "$deploy_path/deploy/backups/putevka-postgres-backup.timer"
+          require "passwordless sudo for deploy user" sudo -n true
+          require "rclone installed on production" command -v rclone
+          require "rclone configuration installed" sudo test -s /root/.config/rclone/rclone.conf
+
+          if ! sudo test -f /etc/putevka-backup.env; then
+            echo "Creating /etc/putevka-backup.env with default backup settings."
+            {
+              printf 'APP_DIR=%s\n' "$deploy_path"
+              printf '%s\n' 'BACKUP_DIR=/var/lib/putevka-backups'
+              printf '%s\n' 'RCLONE_REMOTE=yadisk_crypt'
+              printf '%s\n' 'RCLONE_PATH=putevka/production/postgres'
+              printf '%s\n' 'RETENTION_DAYS=30'
+            } | sudo install -m 0600 /dev/stdin /etc/putevka-backup.env
+          fi
+          require "backup environment file installed" sudo test -f /etc/putevka-backup.env
+          rclone_remote="$(sudo sed -n 's/^RCLONE_REMOTE=//p' /etc/putevka-backup.env)"
+          if ! [[ "$rclone_remote" =~ ^[A-Za-z0-9_-]+$ ]]; then
+            echo "Invalid RCLONE_REMOTE in /etc/putevka-backup.env" >&2
+            exit 1
+          fi
+          require "configured rclone remote $rclone_remote" bash -c "sudo rclone listremotes | grep -Fx '$rclone_remote:' >/dev/null"
 
           sudo install -m 0750 "$deploy_path/scripts/backup-postgres-to-yadisk.sh" /usr/local/sbin/putevka-postgres-backup
           sudo install -m 0644 "$deploy_path/deploy/backups/putevka-postgres-backup.service" /etc/systemd/system/putevka-postgres-backup.service
@@ -84,7 +108,12 @@ jobs:
           sudo systemctl list-timers --all putevka-postgres-backup.timer
 
           if [ "$RUN_BACKUP_NOW" = "true" ]; then
-            sudo systemctl start putevka-postgres-backup.service
+            if ! sudo systemctl start putevka-postgres-backup.service; then
+              echo "Backup service failed; recent journal follows." >&2
+              sudo systemctl --no-pager --full status putevka-postgres-backup.service || true
+              sudo journalctl -u putevka-postgres-backup.service -n 100 --no-pager || true
+              exit 1
+            fi
             sudo systemctl --no-pager --full status putevka-postgres-backup.service
           fi
           REMOTE
