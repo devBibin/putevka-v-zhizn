@@ -207,6 +207,7 @@ EMAIL_HOST_PASSWORD = os.getenv("YC_EMAIL_PASSWORD")
 EMAIL_TIMEOUT = 10
 
 DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL")
+CONTACT_EMAIL = os.getenv("CONTACT_EMAIL", "talents@putevka-v-zhizn.ru").strip() or "talents@putevka-v-zhizn.ru"
 
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/'

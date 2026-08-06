@@ -9,10 +9,11 @@
 
         <div class="flex-grow-1">
           <div class="fw-semibold text-break">{{ n.message|truncatechars:120 }}</div>
-          {% if n.sender %}
-            <div class="small text-muted">От: {{ n.sender.username }}</div>
-          {% endif %}
+          <div class="small text-muted">От: {{ n.public_sender_name }}</div>
           <div class="small text-secondary">{{ n.created_at|date:"d.m.Y H:i" }}</div>
+          <div class="small text-muted mt-1">
+            Вопросы? <a href="mailto:{{ n.contact_email }}">{{ n.contact_email }}</a>
+          </div>
         </div>
 
         <button class="btn btn-sm btn-outline-success"

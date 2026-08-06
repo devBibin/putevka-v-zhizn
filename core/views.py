@@ -4,6 +4,7 @@ import uuid
 
 import requests
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import authenticate, login
 from django.contrib.auth.decorators import login_required
@@ -48,7 +49,7 @@ logger = logging.getLogger(__name__)
 @login_required
 @require_http_methods(["GET", "POST"])
 def feedback_view(request):
-    feedback_email = "talents@putevka-v-zhizn.ru"
+    feedback_email = settings.CONTACT_EMAIL
     if request.method == "POST":
         form = FeedbackForm(request.POST)
         if form.is_valid():
@@ -551,7 +552,7 @@ def send_notification_to_users(request):
             message_text = form.cleaned_data['message']
 
             with transaction.atomic():
-                new_notification = Notification.objects.create(message=message_text)
+                new_notification = Notification.objects.create(message=message_text, sender=request.user)
 
                 user_notification_objects = [
                     UserNotification.objects.create(notification=new_notification, recipient=user)
