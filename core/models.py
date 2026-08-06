@@ -18,6 +18,7 @@ from scholar_form.models import StaffNote
 
 
 MOTIVATION_LETTER_MAX_LENGTH = 20000
+DEFAULT_NOTIFICATION_SENDER_NAME = 'Команда фонда «Путёвка в жизнь»'
 
 
 class TelegramAccount(models.Model):
@@ -745,6 +746,24 @@ class Notification(models.Model):
         ordering = ['-created_at']
         verbose_name = "Оповещение"
         verbose_name_plural = "Оповещения"
+
+    @property
+    def public_sender_name(self) -> str:
+        """Return a participant-safe sender label without exposing a login or email."""
+        if not self.sender_id:
+            return DEFAULT_NOTIFICATION_SENDER_NAME
+
+        name_parts = (self.sender.last_name, self.sender.first_name)
+        full_name = " ".join(part.strip() for part in name_parts if part and part.strip())
+        return full_name or DEFAULT_NOTIFICATION_SENDER_NAME
+
+    @property
+    def contact_email(self) -> str:
+        return settings.CONTACT_EMAIL
+
+    @property
+    def contact_footer(self) -> str:
+        return f"Вопросы? Напишите: {self.contact_email}"
 
     def save_model(self, request, obj, form, change):
         if not obj.pk and not obj.sender:

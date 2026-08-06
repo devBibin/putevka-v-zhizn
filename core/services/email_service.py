@@ -1,10 +1,10 @@
 import logging
 
 from django.core.mail import EmailMultiAlternatives, send_mail
+from django.conf import settings
 from django.urls import reverse
 
 import config
-from Putevka import settings
 
 logger = logging.getLogger(__name__)
 
@@ -14,6 +14,7 @@ def send_email_message(
     to: list[str],
     text: str,
     html: str | None = None,
+    reply_to: list[str] | None = None,
 ) -> None:
     from_email = getattr(settings, "DEFAULT_FROM_EMAIL", None)
     if not from_email:
@@ -29,6 +30,7 @@ def send_email_message(
         body=text,
         from_email=from_email,
         to=to,
+        reply_to=reply_to,
     )
     if html:
         msg.attach_alternative(html, "text/html")
@@ -74,13 +76,19 @@ def send_email_verification_code(attempt):
         return False
 
 
-def send_email_to_user(subject: str, user, text: str, html: str | None = None) -> None:
+def send_email_to_user(
+    subject: str,
+    user,
+    text: str,
+    html: str | None = None,
+    reply_to: list[str] | None = None,
+) -> None:
     email = user.username
     if not email:
         return
 
     try:
-        send_email_message(subject=subject, to=[email], text=text, html=html)
+        send_email_message(subject=subject, to=[email], text=text, html=html, reply_to=reply_to)
         logger.info("Сообщение отправлено пользователю на почту %s", email)
     except Exception as e:
         logger.warning("Ошибка при отправке email пользователю %s: %s", user, e)

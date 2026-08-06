@@ -661,6 +661,24 @@ class StaffFlowTests(IntegrationTestCase):
         self.assertEqual(requested_document.status, "PENDING_SIGNATURE")
         self.assertEqual(list(requested_document.related_documents.all()), [])
 
+    def test_admin_bulk_notification_records_current_staff_member_as_sender(self):
+        session = self.client.session
+        session["selected_users_for_notification"] = [self.candidate.id]
+        session.save()
+
+        response = self.client.post(
+            reverse("send_notification_to_users"),
+            {"message": "Please check your documents"},
+        )
+
+        self.assertRedirects(
+            response,
+            reverse("admin:auth_user_changelist"),
+            fetch_redirect_response=False,
+        )
+        notification = Notification.objects.get(message="Please check your documents")
+        self.assertEqual(notification.sender, self.staff)
+
 
 class RubricPayloadTests(TestCase):
     def payload(self, **overrides):
@@ -2418,6 +2436,40 @@ class CorePageFlowTests(IntegrationTestCase):
         self.assertContains(response, "First")
         self.assertNotContains(response, "Seen")
 
+    def test_notification_views_show_public_sender_name_and_contact_email(self):
+        staff = User.objects.create_user(
+            username="private.staff@example.com",
+            email="private.staff@example.com",
+            password="StrongPass123!",
+            first_name="Мария",
+            last_name="Иванова",
+            is_staff=True,
+        )
+        notification = Notification.objects.create(message="Please update your profile", sender=staff)
+        UserNotification.objects.create(recipient=self.user, notification=notification, is_seen=False)
+
+        response = self.client.get(reverse("notifications"))
+
+        self.assertContains(response, "Иванова Мария")
+        self.assertContains(response, "mailto:talents@putevka-v-zhizn.ru")
+        self.assertNotContains(response, staff.username)
+
+        response = self.client.get(reverse("notifications_dropdown"))
+
+        self.assertContains(response, "Иванова Мария")
+        self.assertContains(response, "mailto:talents@putevka-v-zhizn.ru")
+        self.assertNotContains(response, staff.username)
+
+    def test_notification_without_sender_uses_team_name(self):
+        notification = Notification.objects.create(message="General update")
+        UserNotification.objects.create(recipient=self.user, notification=notification, is_seen=False)
+
+        self.assertEqual(notification.public_sender_name, 'Команда фонда «Путёвка в жизнь»')
+
+        response = self.client.get(reverse("notifications"))
+
+        self.assertContains(response, 'Команда фонда «Путёвка в жизнь»')
+
     def test_motivation_autosave_creates_and_keeps_submitted_letter(self):
         response = self.client.post(
             reverse("motivation_letter_autosave"),
@@ -2526,6 +2578,60 @@ class CorePageFlowTests(IntegrationTestCase):
         letter = MotivationLetter.objects.get(user=self.user)
         self.assertEqual(letter.letter_text, "Saved draft")
         self.assertEqual(letter.status, MotivationLetter.Status.DRAFT)
+
+
+class NotificationEmailTests(TestCase):
+    @override_settings(
+        DEFAULT_FROM_EMAIL="no-reply@example.com",
+        EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    )
+    def test_email_message_keeps_default_sender_and_sets_reply_to(self):
+        from django.core import mail
+
+        from core.services.email_service import send_email_message
+
+        send_email_message(
+            subject="Notification",
+            to=["participant@example.com"],
+            text="Hello",
+            reply_to=["talents@putevka-v-zhizn.ru"],
+        )
+
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].from_email, "no-reply@example.com")
+        self.assertEqual(mail.outbox[0].reply_to, ["talents@putevka-v-zhizn.ru"])
+
+
+class NotificationWorkerTests(IntegrationTestCase):
+    @patch("Shadows.notification_worker.send_email_to_user")
+    @patch("Shadows.notification_worker.send_tg_notification_to_user")
+    def test_worker_uses_public_sender_name_contact_footer_and_reply_to(self, send_tg, send_email):
+        from Shadows import notification_worker
+
+        participant = self.create_finished_candidate("worker-participant@example.com")
+        staff = User.objects.create_user(
+            username="private.staff@example.com",
+            email="private.staff@example.com",
+            password="StrongPass123!",
+            first_name="Мария",
+            last_name="Иванова",
+            is_staff=True,
+        )
+        notification = Notification.objects.create(message="Please update your profile", sender=staff)
+        UserNotification.objects.create(notification=notification, recipient=participant)
+
+        self.assertEqual(notification_worker.process_batch(), 1)
+
+        telegram_text = send_tg.call_args.args[1]
+        self.assertIn("Иванова Мария", telegram_text)
+        self.assertIn("talents@putevka-v-zhizn.ru", telegram_text)
+        self.assertNotIn(staff.username, telegram_text)
+
+        email_args = send_email.call_args.kwargs
+        self.assertIn("Иванова Мария", email_args["text"])
+        self.assertIn("talents@putevka-v-zhizn.ru", email_args["text"])
+        self.assertNotIn(staff.username, email_args["text"])
+        self.assertEqual(email_args["reply_to"], ["talents@putevka-v-zhizn.ru"])
 
 
 class DocumentAndStudyPageFlowTests(IntegrationTestCase):

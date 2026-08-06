@@ -3,6 +3,7 @@ import time
 import logging
 
 import django
+from django.utils.html import escape
 
 import config
 
@@ -65,7 +66,8 @@ def process_batch():
         msg = (
             "📬 <b>Новое уведомление!</b>\n\n"
             f"{notif.message}\n\n"
-            f"👤 <b>Отправитель:</b> {notif.sender}\n"
+            f"👤 <b>Отправитель:</b> {notif.public_sender_name}\n"
+            f"{notif.contact_footer}\n"
         )
 
         try:
@@ -94,15 +96,18 @@ def process_batch():
                     text=(
                         "У вас новое уведомление.\n\n"
                         f"{notif.message}\n\n"
-                        f"Отправитель: {notif.sender}\n"
+                        f"Отправитель: {notif.public_sender_name}\n"
+                        f"{notif.contact_footer}\n"
                         f"Открыть сайт: {BASE_URL}"
                     ),
                     html=(
                         "<b>📬 Новое уведомление!</b><br><br>"
-                        f"{notif.message}<br><br>"
-                        f"<b>Отправитель:</b> {notif.sender}<br>"
+                        f"{escape(notif.message).replace(chr(10), '<br>')}<br><br>"
+                        f"<b>Отправитель:</b> {escape(notif.public_sender_name)}<br>"
+                        f"Вопросы? Напишите: <a href='mailto:{escape(notif.contact_email)}'>{escape(notif.contact_email)}</a><br>"
                         f"<a href='{BASE_URL}'>🌐 Открыть сайт</a>"
                     ),
+                    reply_to=[notif.contact_email],
                 )
                 updated = UserNotification.objects.filter(pk=item.pk, email_sent_at__isnull=True).update(
                     email_sent_at=now,
