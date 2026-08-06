@@ -36,6 +36,12 @@ TELEGRAM_SERVICE_TOKEN = os.getenv("TELEGRAM_SERVICE_TOKEN", "")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.getenv("DEBUG", "true").lower() in {"1", "true", "yes", "on"}
 
+# Controls only the final submission of a candidate questionnaire. Existing
+# submitted questionnaires and every later selection stage remain available.
+APPLICATION_SUBMISSIONS_OPEN = os.getenv("APPLICATION_SUBMISSIONS_OPEN", "true").lower() in {
+    "1", "true", "yes", "on"
+}
+
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1,web").split(",")
 
 USE_X_FORWARDED_HOST = os.getenv("USE_X_FORWARDED_HOST", "true").lower() in {"1", "true", "yes", "on"}

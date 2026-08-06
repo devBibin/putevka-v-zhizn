@@ -1,6 +1,7 @@
 from pathlib import Path
 
 from django import forms
+from django.conf import settings
 from django.contrib import messages
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -355,6 +356,13 @@ class ApplicationWizard(SessionWizardView):
         return super().process_step(form)
 
     def done(self, form_list, **kwargs):
+        if not settings.APPLICATION_SUBMISSIONS_OPEN:
+            messages.info(
+                self.request,
+                "Приём анкет завершён. Черновик сохранён, но отправка недоступна.",
+            )
+            return self.render(self.get_form(step=self.steps.current))
+
         instance = self.get_form_instance(None)
         normal_fields, m2m_fields = self._get_model_fields()
 
@@ -454,6 +462,7 @@ class ApplicationWizard(SessionWizardView):
         instance = self.get_form_instance(self.steps.current)
         context["active"] = "apply"
         context["is_locked"] = getattr(instance, "form_status", "draft") in {"submitted", "clarification", "approved", "rejected"}
+        context["application_submission_closed"] = not settings.APPLICATION_SUBMISSIONS_OPEN
         return context
 
 
