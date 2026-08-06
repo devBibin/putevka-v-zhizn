@@ -29,6 +29,7 @@ TELEGRAM_WORKER_LEASE_SECONDS=120
 # Common Settings
 
 BASE_URL= # Base app URL, for example https://example.com
+APPLICATION_SUBMISSIONS_OPEN=true # Set to false to close final questionnaire submission
 
 
 # GPT

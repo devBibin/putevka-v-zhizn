@@ -12,6 +12,10 @@
                     <div class="alert alert-warning">
                         Анкета уже отправлена и доступна только для просмотра.
                     </div>
+                {% elif application_submission_closed and wizard.steps.current == wizard.steps.last %}
+                    <div class="alert alert-info">
+                        Приём анкет завершён. Вы можете сохранить черновик, но отправка недоступна.
+                    </div>
                 {% endif %}
 
                 <form method="post"
@@ -102,9 +106,15 @@
                                 </a>
                             {% endif %}
                         {% else %}
-                            <button type="submit" class="btn btn-primary ms-auto">
-                                {% if wizard.steps.current == wizard.steps.last %}Отправить{% else %}Далее{% endif %}
-                            </button>
+                            {% if application_submission_closed and wizard.steps.current == wizard.steps.last %}
+                                <button type="button" class="btn btn-secondary ms-auto" disabled>
+                                    Приём анкет завершён
+                                </button>
+                            {% else %}
+                                <button type="submit" class="btn btn-primary ms-auto">
+                                    {% if wizard.steps.current == wizard.steps.last %}Отправить{% else %}Далее{% endif %}
+                                </button>
+                            {% endif %}
                         {% endif %}
                     </div>
                 </form>

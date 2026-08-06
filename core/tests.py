@@ -495,6 +495,13 @@ class CandidateApplicationFlowTests(IntegrationTestCase):
         self.user = self.create_finished_candidate()
         self.client.force_login(self.user)
 
+    @override_settings(APPLICATION_SUBMISSIONS_OPEN=False)
+    def test_closed_submission_keeps_existing_candidate_access(self):
+        response = self.client.get(reverse("apply"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.user.user_info.form_status, UserInfo.FormStatus.DRAFT)
+
     def test_candidate_submits_letter_documents_study_choices_and_reads_notification(self):
         response = self.client.post(
             reverse("motivation_letter"),
