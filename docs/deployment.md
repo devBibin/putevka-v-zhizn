@@ -661,12 +661,11 @@ Workflow:
 .github/workflows/deploy-docs.yml
 ```
 
-Workflow документации собирает Mintlify-доку из `docs/`, экспортирует сайт и публикует результат в GitHub Pages.
+Workflow документации собирает сайт на Material for MkDocs из `docs/` и публикует результат в GitHub Pages. Поиск строится во время сборки и работает в браузере без внешнего сервиса.
 
 Локальный preview:
 
 ```powershell
-npm i -g mint
-cd docs
-mint dev
+.\.venv\Scripts\python.exe -m pip install -r requirements-docs.txt
+.\.venv\Scripts\python.exe -m mkdocs serve
 ```

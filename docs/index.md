@@ -36,4 +36,4 @@ description: "Документация проекта Путёвка в жизн
 - Docker Compose
 - Bootstrap-шаблоны
 - GitHub Actions
-- Mintlify для документации
+- Material for MkDocs для документации

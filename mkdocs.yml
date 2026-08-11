@@ -1,0 +1,51 @@
+site_name: Путёвка в жизнь
+site_description: Документация проекта «Путёвка в жизнь»
+site_url: https://putevka-v-zhizn.github.io/putevka-v-zhizn/
+repo_url: https://github.com/Putevka-v-zhizn/putevka-v-zhizn
+repo_name: Putevka-v-zhizn/putevka-v-zhizn
+
+theme:
+  name: material
+  language: ru
+  features:
+    - navigation.instant
+    - navigation.top
+    - search.highlight
+    - search.suggest
+    - content.code.copy
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Переключиться на тёмную тему
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Переключиться на светлую тему
+
+plugins:
+  - search:
+      lang:
+        - ru
+        - en
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+
+nav:
+  - Проект:
+      - Обзор: index.md
+      - Ультимативный гайд запуска: quickstart.md
+      - Локальная разработка: development.md
+  - Сервисы:
+      - AI-сервис: ai-service.md
+      - Деплой: deployment.md
+
+not_in_nav: backups.md
