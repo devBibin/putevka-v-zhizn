@@ -1,6 +1,8 @@
 ---
 title: "Резервные копии PostgreSQL"
 description: "Автоматические зашифрованные дампы production PostgreSQL на Яндекс Диск."
+search:
+  exclude: true
 ---
 
 # Резервные копии PostgreSQL на Яндекс Диск

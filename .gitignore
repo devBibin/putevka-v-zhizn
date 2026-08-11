@@ -40,3 +40,4 @@ logs/
 *.dump
 *.dump.sha256
 putevka-backup.env
+/.tmp/
