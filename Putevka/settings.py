@@ -64,6 +64,7 @@ INSTALLED_APPS = [
     'scholar_form',
     'core',
     'documents',
+    'family_income',
     'widget_tweaks',
     'my_study',
     'review_by_tutor',
