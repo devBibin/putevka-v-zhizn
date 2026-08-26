@@ -118,8 +118,6 @@ class IncomeEvidence(models.Model):
         super().clean()
         if self.family_income_document_id and self.family_income_document.category != FamilyIncomeDocument.Category.INCOME:
             raise ValidationError({"family_income_document": "Сведения о доходе можно добавить только к документу категории «Доход»."})
-        if all(value is None for value in (self.gross_amount, self.net_amount, self.average_monthly_amount)) and not self.absence_reason.strip():
-            raise ValidationError({"absence_reason": "Укажите причину отсутствия сумм."})
 
     def __str__(self):
         return f"{self.owner_name}, {self.year}"

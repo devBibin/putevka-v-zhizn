@@ -83,6 +83,9 @@ def serve_document(request, document_id):
 @login_required
 @rate_limit_uploads(rate_limit_seconds=1, max_uploads=1)
 def documents_dashboard(request):
+    if request.user.user_info.status != "FINAL STAGE":
+        raise Http404("Раздел документов доступен только финалистам.")
+
     all_user_documents = Document.objects.filter(user=request.user, uploaded_by_staff=False, is_deleted=False).order_by(
         '-uploaded_at')
     user_documents = all_user_documents.filter(document_type__isnull=True)

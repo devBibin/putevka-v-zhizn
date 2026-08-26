@@ -1,0 +1,160 @@
+{% extends 'core/base.html' %}
+{% block title %}Семья и доход{% endblock %}
+{% block content %}
+{% include 'core/_messages.html' %}
+<div class="container px-0" style="max-width: 960px">
+  <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-4">
+    <div>
+      <h1 class="h2 mb-1">Семья и доход</h1>
+      <p class="text-muted mb-0">Расскажите о семье и приложите подтверждающие документы.</p>
+    </div>
+    {% if case.status == 'pending_review' %}<span class="badge text-bg-warning fs-6">На проверке</span>{% endif %}
+    {% if case.status == 'approved' %}<span class="badge text-bg-success fs-6">Проверено</span>{% endif %}
+  </div>
+
+  <ol class="list-group list-group-horizontal-md mb-4" aria-label="Прогресс заполнения">
+    <li class="list-group-item flex-fill {% if completion.family_complete %}list-group-item-success{% endif %}">
+      <span class="fw-semibold">1. Семья</span><br><small>{% if completion.family_complete %}Заполнено{% else %}Заполните состав{% endif %}</small>
+    </li>
+    <li class="list-group-item flex-fill {% if completion.documents_added %}list-group-item-success{% endif %}">
+      <span class="fw-semibold">2. Документы</span><br><small>{% if completion.documents_added %}Добавлены{% else %}Если есть, добавьте справки{% endif %}</small>
+    </li>
+    <li class="list-group-item flex-fill {% if case.status == 'pending_review' or case.status == 'approved' %}list-group-item-success{% endif %}">
+      <span class="fw-semibold">3. Проверка</span><br><small>{% if case.status == 'pending_review' %}Сведения отправлены{% elif case.status == 'approved' %}Проверено{% else %}Отправьте на проверку{% endif %}</small>
+    </li>
+  </ol>
+
+  {% if not editable %}
+    <div class="alert alert-info">Сведения доступны только для просмотра. Если потребуются уточнения, сотрудник вернёт карточку на доработку.</div>
+  {% endif %}
+
+  <form method="post" class="card shadow-sm mb-4">
+    <div class="card-body p-4">
+      {% csrf_token %}
+      <h2 class="h4 mb-3">1. Состав семьи</h2>
+      <p class="text-muted small">Укажите всех, кто живёт вместе с вами, и чем они занимаются.</p>
+      {% for field in form %}
+        {% if field.name != 'family_characteristics' %}
+          <div class="mb-3">
+            <label class="form-label fw-semibold" for="{{ field.id_for_label }}">{{ field.label }}</label>
+            {{ field }}
+            {% for error in field.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+          </div>
+        {% endif %}
+      {% endfor %}
+
+      <h3 class="h5 mt-4 mb-2">Особенности семьи</h3>
+      <p class="text-muted small">Например: многодетная семья, опека, состояние здоровья близких — если хотите сообщить об этом.</p>
+      {% for field in form %}
+        {% if field.name == 'family_characteristics' %}
+          <div class="mb-3">
+            {{ field }}
+            {% for error in field.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+          </div>
+        {% endif %}
+      {% endfor %}
+      {% if editable %}<button class="btn btn-primary px-4">Сохранить</button>{% endif %}
+    </div>
+  </form>
+
+  <h2 class="h4 mb-3">2. Документы</h2>
+  {% for section in sections %}
+    <section class="card shadow-sm mb-3">
+      <div class="card-body p-4">
+        <div class="d-flex flex-wrap align-items-start justify-content-between gap-3 mb-3">
+          <div>
+            <h3 class="h5 mb-1">{{ section.label }}</h3>
+            {% if section.category == 'family_characteristic' %}<p class="text-muted small mb-0">Подтвердите статус или особенности семьи.</p>{% endif %}
+            {% if section.category == 'income' %}<p class="text-muted small mb-0">Добавьте отдельную справку для каждого члена семьи и года.</p>{% endif %}
+            {% if section.category == 'social_benefit' %}<p class="text-muted small mb-0">Добавьте справку о получаемых выплатах.</p>{% endif %}
+            {% if section.category == 'other' %}<p class="text-muted small mb-0">Приложите сведения, которые не подходят к другим разделам.</p>{% endif %}
+          </div>
+          {% if editable %}<button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#add-document-{{ section.category }}">Добавить документ</button>{% endif %}
+        </div>
+
+        {% for item in section.items %}
+          <article class="border rounded-3 p-3 mb-3 bg-light-subtle">
+            <div class="d-flex flex-wrap justify-content-between gap-2">
+              <div>
+                <a class="fw-semibold" href="{% url 'serve_document' item.document.pk %}" target="_blank" rel="noopener">{{ item.document.user_file_name|default:item.document.caption }}</a>
+                <div class="small text-muted mt-1">Статус проверки: {{ item.get_review_status_display }}</div>
+              </div>
+              {% if editable and item.review_status != 'approved' %}
+                <div class="dropdown">
+                  <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">Действия</button>
+                  <ul class="dropdown-menu dropdown-menu-end">
+                    <li><a class="dropdown-item" href="{% url 'family_income:edit_document' item.pk %}">Изменить</a></li>
+                    <li>
+                      <form method="post" action="{% url 'family_income:delete_document' item.pk %}">
+                        {% csrf_token %}<button class="dropdown-item text-danger">Удалить</button>
+                      </form>
+                    </li>
+                  </ul>
+                </div>
+              {% endif %}
+            </div>
+            {% if section.category == 'income' %}
+              <dl class="row small mt-3 mb-0">
+                <dt class="col-sm-4">Год</dt><dd class="col-sm-8">{{ item.income_evidence.year }}</dd>
+                <dt class="col-sm-4">Чей документ</dt><dd class="col-sm-8">{{ item.income_evidence.owner_name }}</dd>
+                {% if item.income_evidence.gross_amount is not None %}<dt class="col-sm-4">Общая сумма дохода</dt><dd class="col-sm-8">{{ item.income_evidence.gross_amount|floatformat:2 }} ₽</dd>{% endif %}
+                {% if item.income_evidence.net_amount is not None %}<dt class="col-sm-4">За вычетом налога</dt><dd class="col-sm-8">{{ item.income_evidence.net_amount|floatformat:2 }} ₽</dd>{% endif %}
+                {% if item.income_evidence.average_monthly_amount is not None %}<dt class="col-sm-4">Средний доход за год</dt><dd class="col-sm-8">{{ item.income_evidence.average_monthly_amount|floatformat:2 }} ₽</dd>{% endif %}
+              </dl>
+            {% elif section.category == 'social_benefit' %}
+              <dl class="row small mt-3 mb-0">
+                <dt class="col-sm-4">Чья справка</dt><dd class="col-sm-8">{{ item.social_benefit_evidence.recipient_name }}</dd>
+                <dt class="col-sm-4">Выплата</dt><dd class="col-sm-8">{{ item.social_benefit_evidence.other_benefit_name|default:item.social_benefit_evidence.benefit_type }}</dd>
+              </dl>
+            {% else %}
+              <p class="mb-0 mt-2">{{ item.candidate_comment }}</p>
+            {% endif %}
+          </article>
+        {% empty %}
+          <p class="text-muted mb-0">Документы пока не добавлены.</p>
+        {% endfor %}
+      </div>
+    </section>
+
+    {% if editable %}
+      <div class="modal fade" id="add-document-{{ section.category }}" tabindex="-1" aria-labelledby="add-document-title-{{ section.category }}" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-scrollable"><div class="modal-content">
+          <form method="post" action="{% url 'family_income:add_document' section.category %}" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="modal-header"><h2 class="modal-title fs-5" id="add-document-title-{{ section.category }}">{{ section.label }}</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button></div>
+            <div class="modal-body">
+              {% for error in section.form.non_field_errors %}<div class="alert alert-danger">{{ error }}</div>{% endfor %}
+              {% if section.category == 'income' %}<p class="text-muted small">Если в документе нет сумм, оставьте поля с доходом пустыми.</p>{% endif %}
+              {% for field in section.form %}
+                <div class="mb-3">
+                  <label class="form-label fw-semibold" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                  {{ field }}
+                  {% for error in field.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                </div>
+              {% endfor %}
+            </div>
+            <div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Отмена</button><button class="btn btn-primary">Загрузить документ</button></div>
+          </form>
+        </div></div>
+      </div>
+    {% endif %}
+  {% endfor %}
+
+  {% if editable %}
+    <section class="card border-primary shadow-sm mt-4 mb-4"><div class="card-body p-4">
+      <h2 class="h4">3. Отправка на проверку</h2>
+      {% if completion.can_submit %}
+        <p class="mb-3">Состав семьи заполнен. Проверьте данные и приложите документы, если они есть, затем отправьте сведения сотруднику Фонда.</p>
+        <form method="post" action="{% url 'family_income:submit' %}">{% csrf_token %}<button class="btn btn-primary px-4">Отправить на проверку</button></form>
+      {% else %}
+        <p class="mb-0 text-muted">Чтобы отправить сведения, заполните состав семьи.</p>
+      {% endif %}
+    </div></section>
+  {% endif %}
+</div>
+{% endblock %}
+{% block extra_js %}
+  {% if document_error_category %}
+    <script>document.addEventListener('DOMContentLoaded', function () { new bootstrap.Modal(document.getElementById('add-document-{{ document_error_category }}')).show(); });</script>
+  {% endif %}
+{% endblock %}
