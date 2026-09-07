@@ -20,7 +20,11 @@ from scholar_form.services.yandex_disk import (
 )
 
 from .forms import FamilyIncomeCaseForm, document_form_for_category
-from .models import FamilyIncomeCase, FamilyIncomeDocument, IncomeEvidence, SocialBenefitEvidence
+from .models import (
+    FamilyIncomeCase, FamilyIncomeDocument, FamilyIncomeInstruction,
+    IncomeEvidence, SocialBenefitEvidence,
+)
+from .notifications import active_staff_users, create_family_income_notification
 
 logger = logging.getLogger(__name__)
 
@@ -64,10 +68,22 @@ def _document_evidence(item):
     return None
 
 
+def _has_candidate_response_to_clarification(item):
+    if item.review_status != FamilyIncomeDocument.ReviewStatus.CLARIFICATION:
+        return False
+    if not item.candidate_response_at:
+        return False
+    return (
+        item.clarification_requested_at is None
+        or item.candidate_response_at > item.clarification_requested_at
+    )
+
+
 def _sections(case, *, form_with_error=None, error_category=None):
     items_by_category = {category: [] for category, _ in FamilyIncomeDocument.Category.choices}
     documents = case.family_income_documents.select_related("document").prefetch_related("income_evidence", "social_benefit_evidence")
     for item in documents:
+        item.has_candidate_response_to_clarification = _has_candidate_response_to_clarification(item)
         items_by_category[item.category].append(item)
 
     sections = []
@@ -79,9 +95,18 @@ def _sections(case, *, form_with_error=None, error_category=None):
 
 def _completion(case):
     family_complete = bool(case.family_members_count and case.family_members_description.strip())
+    clarification_items = list(case.family_income_documents.filter(
+        review_status=FamilyIncomeDocument.ReviewStatus.CLARIFICATION,
+    ).only("id", "review_status", "clarification_requested_at", "candidate_response_at"))
+    unresolved_clarifications_count = sum(
+        not _has_candidate_response_to_clarification(item)
+        for item in clarification_items
+    )
     return {
         "family_complete": family_complete,
         "documents_added": case.family_income_documents.exists(),
+        "clarifications_count": len(clarification_items),
+        "unresolved_clarifications_count": unresolved_clarifications_count,
         "can_submit": family_complete,
     }
 
@@ -98,6 +123,11 @@ def _render_page(request, case, *, case_form=None, document_form=None, document_
         "editable": editable,
         "sections": _sections(case, form_with_error=document_form, error_category=document_category),
         "completion": _completion(case),
+        "instruction": FamilyIncomeInstruction.objects.filter(
+            status=FamilyIncomeInstruction.Status.PUBLISHED,
+            title__gt="",
+            text__gt="",
+        ).first(),
         "document_error_category": document_category,
         "active": "family_income",
     }, status=status)
@@ -128,7 +158,7 @@ def _save_evidence(item, category, cleaned_data):
         }
         IncomeEvidence.objects.update_or_create(family_income_document=item, defaults=defaults)
     elif category == FamilyIncomeDocument.Category.SOCIAL_BENEFIT:
-        defaults = {name: cleaned_data[name] for name in ("recipient_name", "benefit_type", "other_benefit_name")}
+        defaults = {name: cleaned_data[name] for name in ("recipient_name", "benefit_description")}
         SocialBenefitEvidence.objects.update_or_create(family_income_document=item, defaults=defaults)
 
 
@@ -195,7 +225,7 @@ def add_document(request, category):
             added_by=request.user,
         )
         _save_evidence(item, category, form.cleaned_data)
-    messages.success(request, "Документ добавлен и отправлен на проверку.")
+    messages.success(request, "Документ добавлен. Когда закончите заполнение, отправьте карточку на проверку.")
     return redirect("family_income:page")
 
 
@@ -211,12 +241,32 @@ def submit_case(request):
     errors = []
     if not completion["family_complete"]:
         errors.append("заполните состав семьи")
+    if completion["unresolved_clarifications_count"]:
+        errors.append("сохраните изменения по документам, по которым запрошено уточнение")
     if errors:
         messages.error(request, "Перед отправкой: " + "; ".join(errors) + ".")
         return redirect("family_income:page")
 
-    case.status = FamilyIncomeCase.Status.PENDING_REVIEW
-    case.save(update_fields=("status", "updated_at"))
+    is_resubmission = case.family_income_documents.filter(
+        review_status=FamilyIncomeDocument.ReviewStatus.CLARIFICATION,
+    ).exists()
+    candidate_name = request.user.get_full_name().strip() or request.user.username
+    submission_word = "повторно отправил" if is_resubmission else "отправил"
+
+    with transaction.atomic():
+        case.family_income_documents.filter(
+            review_status=FamilyIncomeDocument.ReviewStatus.CLARIFICATION,
+        ).update(review_status=FamilyIncomeDocument.ReviewStatus.PENDING, updated_at=timezone.now())
+        case.status = FamilyIncomeCase.Status.PENDING_REVIEW
+        case.save(update_fields=("status", "updated_at"))
+        create_family_income_notification(
+            recipients=active_staff_users(exclude_user_id=request.user.pk),
+            sender=request.user,
+            message=(
+                f"Соискатель «{candidate_name}» {submission_word} карточку "
+                "«Семья и доход» на проверку."
+            ),
+        )
     messages.success(request, "Сведения отправлены на проверку. Сообщим, если потребуется уточнение.")
     return redirect("family_income:page")
 
@@ -274,10 +324,18 @@ def edit_document(request, document_id):
                         logger.warning("Could not remove replaced family-income file path=%s", old_disk_path)
             item.document.caption = title
             item.document.save(update_fields=("caption",))
+            was_clarification = item.review_status == FamilyIncomeDocument.ReviewStatus.CLARIFICATION
             item.candidate_comment = title
-            item.save(update_fields=("candidate_comment", "updated_at"))
+            if was_clarification:
+                item.candidate_response_at = timezone.now()
+                item.save(update_fields=("candidate_comment", "candidate_response_at", "updated_at"))
+            else:
+                item.save(update_fields=("candidate_comment", "updated_at"))
             _save_evidence(item, item.category, form.cleaned_data)
-            messages.success(request, "Данные документа сохранены.")
+            if was_clarification:
+                messages.success(request, "Изменения сохранены. Отправьте карточку на проверку, когда исправите все замечания.")
+            else:
+                messages.success(request, "Данные документа сохранены.")
             return redirect("family_income:page")
     return render(request, "family_income/edit_document.html", {"form": form, "item": item, "active": "family_income"})
 
@@ -291,6 +349,8 @@ def delete_document(request, document_id):
         messages.error(request, "Удаление документов сейчас недоступно.")
     elif item.review_status == FamilyIncomeDocument.ReviewStatus.APPROVED:
         messages.error(request, "Подтверждённый документ нельзя удалить. Обратитесь к сотруднику Фонда.")
+    elif item.review_status == FamilyIncomeDocument.ReviewStatus.CLARIFICATION:
+        messages.error(request, "По этому документу запрошено уточнение. Исправьте его или замените файл вместо удаления.")
     else:
         item.document.is_deleted = True
         item.document.save(update_fields=("is_deleted",))

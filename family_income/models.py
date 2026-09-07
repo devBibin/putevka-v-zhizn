@@ -19,21 +19,6 @@ class IncomeYear(models.Model):
         return str(self.year)
 
 
-class SocialBenefitType(models.Model):
-    name = models.CharField("Наименование", max_length=255, unique=True)
-    is_other = models.BooleanField("Вариант «другое»", default=False)
-    is_active = models.BooleanField("Активен", default=True)
-    sort_order = models.PositiveSmallIntegerField("Порядок отображения", default=0)
-
-    class Meta:
-        ordering = ("sort_order", "name")
-        verbose_name = "Тип социальной выплаты"
-        verbose_name_plural = "Типы социальных выплат"
-
-    def __str__(self):
-        return self.name
-
-
 class FamilyIncomeCase(models.Model):
     class Status(models.TextChoices):
         STAFF_DRAFT = "staff_draft", "Черновик сотрудника"
@@ -79,6 +64,8 @@ class FamilyIncomeDocument(models.Model):
     candidate_comment = models.TextField("Комментарий кандидата")
     staff_comment = models.TextField("Комментарий сотрудника", blank=True)
     review_status = models.CharField("Статус проверки", max_length=20, choices=ReviewStatus.choices, default=ReviewStatus.PENDING, db_index=True)
+    clarification_requested_at = models.DateTimeField("Запрошено уточнение", null=True, blank=True)
+    candidate_response_at = models.DateTimeField("Соискатель сохранил ответ", null=True, blank=True)
     added_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="family_income_documents_added", verbose_name="Добавил")
     created_at = models.DateTimeField("Создано", auto_now_add=True)
     updated_at = models.DateTimeField("Изменено", auto_now=True)
@@ -105,7 +92,7 @@ class IncomeEvidence(models.Model):
     owner_name = models.CharField("Чей документ", max_length=255)
     gross_amount = models.DecimalField("Общая сумма", max_digits=14, decimal_places=2, null=True, blank=True)
     net_amount = models.DecimalField("Сумма после налога", max_digits=14, decimal_places=2, null=True, blank=True)
-    average_monthly_amount = models.DecimalField("Средний годовой доход", max_digits=14, decimal_places=2, null=True, blank=True)
+    average_monthly_amount = models.DecimalField("Средний доход в месяц", max_digits=14, decimal_places=2, null=True, blank=True)
     months_received = models.PositiveSmallIntegerField("Месяцев получения", null=True, blank=True, validators=[MinValueValidator(1), MaxValueValidator(12)])
     absence_reason = models.TextField("Причина отсутствия сумм", blank=True)
     staff_decision_comment = models.TextField("Комментарий сотрудника об учёте", blank=True)
@@ -125,23 +112,15 @@ class IncomeEvidence(models.Model):
 
 class SocialBenefitEvidence(models.Model):
     family_income_document = models.OneToOneField(FamilyIncomeDocument, on_delete=models.CASCADE, related_name="social_benefit_evidence", verbose_name="Документ")
-    recipient_name = models.CharField("Получатель", max_length=255)
-    benefit_type = models.ForeignKey(SocialBenefitType, on_delete=models.PROTECT, related_name="evidence", verbose_name="Тип выплаты")
-    other_benefit_name = models.CharField("Иная выплата", max_length=255, blank=True)
+    recipient_name = models.CharField("Чья справка", max_length=255)
+    benefit_description = models.TextField("Описание выплат", blank=True)
 
     class Meta:
         verbose_name = "Сведения о социальной выплате"
         verbose_name_plural = "Сведения о социальных выплатах"
 
-    def clean(self):
-        super().clean()
-        if self.family_income_document_id and self.family_income_document.category != FamilyIncomeDocument.Category.SOCIAL_BENEFIT:
-            raise ValidationError({"family_income_document": "Сведения о выплате можно добавить только к документу категории «Социальные выплаты»."})
-        if self.benefit_type_id and self.benefit_type.is_other and not self.other_benefit_name.strip():
-            raise ValidationError({"other_benefit_name": "Укажите название выплаты."})
-
     def __str__(self):
-        return f"{self.recipient_name}: {self.benefit_type}"
+        return self.recipient_name
 
 
 class FamilyIncomeDecision(models.Model):
@@ -167,10 +146,13 @@ class FamilyIncomeDecision(models.Model):
 class FamilyIncomeInstruction(models.Model):
     class Status(models.TextChoices):
         DRAFT = "draft", "Черновик"
-        PUBLISHED = "published", "Опубликована"
+        PUBLISHED = "published", "Активна"
         ARCHIVED = "archived", "Архив"
 
-    url = models.URLField("Ссылка")
+    title = models.CharField("Заголовок", max_length=200, blank=True)
+    text = models.TextField("Текст", blank=True)
+    url = models.URLField("Ссылка", blank=True)
+    file = models.FileField("Файл", upload_to="family_income/instructions/", blank=True)
     version = models.CharField("Версия", max_length=64, unique=True)
     status = models.CharField("Статус", max_length=16, choices=Status.choices, default=Status.DRAFT)
     published_at = models.DateTimeField("Опубликована", null=True, blank=True)
@@ -183,7 +165,18 @@ class FamilyIncomeInstruction(models.Model):
         verbose_name_plural = "Инструкции по семье и доходу"
 
     def __str__(self):
-        return f"Инструкция {self.version}"
+        return self.title or f"Инструкция {self.version}"
+
+    def clean(self):
+        super().clean()
+        if self.status == self.Status.PUBLISHED:
+            errors = {}
+            if not self.title.strip():
+                errors["title"] = "Укажите заголовок активной инструкции."
+            if not self.text.strip():
+                errors["text"] = "Добавьте текст активной инструкции."
+            if errors:
+                raise ValidationError(errors)
 
 
 class FamilyIncomeAuditEvent(models.Model):

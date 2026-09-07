@@ -1,9 +1,11 @@
+import uuid
+
 from django.contrib import admin
 
 from .models import (
     FamilyIncomeAuditEvent, FamilyIncomeCase, FamilyIncomeDecision,
     FamilyIncomeDocument, FamilyIncomeInstruction, IncomeEvidence, IncomeYear,
-    SocialBenefitEvidence, SocialBenefitType,
+    SocialBenefitEvidence,
 )
 
 
@@ -50,9 +52,8 @@ class IncomeEvidenceAdmin(admin.ModelAdmin):
 
 @admin.register(SocialBenefitEvidence)
 class SocialBenefitEvidenceAdmin(admin.ModelAdmin):
-    list_display = ("recipient_name", "benefit_type", "family_income_document")
-    list_filter = ("benefit_type",)
-    search_fields = ("recipient_name", "other_benefit_name")
+    list_display = ("recipient_name", "benefit_description", "family_income_document")
+    search_fields = ("recipient_name", "benefit_description")
     raw_id_fields = ("family_income_document",)
 
 
@@ -64,7 +65,7 @@ class FamilyIncomeDecisionAdmin(admin.ModelAdmin):
     readonly_fields = ("created_at", "updated_at")
 
 
-@admin.register(IncomeYear, SocialBenefitType)
+@admin.register(IncomeYear)
 class ReferenceAdmin(admin.ModelAdmin):
     list_display = ("__str__", "is_active", "sort_order")
     list_editable = ("is_active", "sort_order")
@@ -73,10 +74,22 @@ class ReferenceAdmin(admin.ModelAdmin):
 
 @admin.register(FamilyIncomeInstruction)
 class FamilyIncomeInstructionAdmin(admin.ModelAdmin):
-    list_display = ("version", "status", "published_at", "updated_by", "updated_at")
+    list_display = ("title", "status", "updated_at")
     list_filter = ("status",)
+    search_fields = ("title", "text", "version")
     raw_id_fields = ("updated_by",)
     readonly_fields = ("updated_at",)
+    fieldsets = (
+        ("Содержание", {"fields": ("title", "text")}),
+        ("Материалы", {"fields": ("url", "file")}),
+        ("Публикация", {"fields": ("status", "updated_at")}),
+    )
+
+    def save_model(self, request, obj, form, change):
+        if not obj.pk and not obj.version:
+            obj.version = uuid.uuid4().hex
+        obj.updated_by = request.user
+        super().save_model(request, obj, form, change)
 
 
 @admin.register(FamilyIncomeAuditEvent)

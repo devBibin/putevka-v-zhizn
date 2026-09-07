@@ -1,6 +1,6 @@
 from django import forms
 
-from .models import FamilyIncomeCase, FamilyIncomeDocument, IncomeYear, SocialBenefitType
+from .models import FamilyIncomeCase, FamilyIncomeDocument, IncomeEvidence, IncomeYear
 
 
 class FamilyIncomeCaseForm(forms.ModelForm):
@@ -18,6 +18,57 @@ class FamilyIncomeCaseForm(forms.ModelForm):
         for field_name, field in self.fields.items():
             if field_name != "family_members_count":
                 field.widget.attrs.setdefault("class", "form-control")
+
+
+class FamilyIncomeCaseStaffForm(FamilyIncomeCaseForm):
+    """Служебная форма без полей пользовательского расчёта."""
+
+
+class FamilyIncomeDocumentReviewForm(forms.ModelForm):
+    class Meta:
+        model = FamilyIncomeDocument
+        fields = ("review_status", "staff_comment")
+        widgets = {
+            "review_status": forms.Select(attrs={"class": "form-select"}),
+            "staff_comment": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+        }
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if (
+            cleaned_data.get("review_status") == FamilyIncomeDocument.ReviewStatus.CLARIFICATION
+            and not cleaned_data.get("staff_comment", "").strip()
+        ):
+            self.add_error(
+                "staff_comment",
+                "Напишите, что именно нужно уточнить соискателю.",
+            )
+        return cleaned_data
+
+
+class IncomeEvidenceStaffForm(forms.ModelForm):
+    class Meta:
+        model = IncomeEvidence
+        fields = (
+            "year",
+            "owner_name",
+            "gross_amount",
+            "net_amount",
+            "average_monthly_amount",
+            "months_received",
+            "absence_reason",
+            "staff_decision_comment",
+        )
+        widgets = {
+            "year": forms.Select(attrs={"class": "form-select"}),
+            "owner_name": forms.TextInput(attrs={"class": "form-control"}),
+            "gross_amount": forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
+            "net_amount": forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
+            "average_monthly_amount": forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
+            "months_received": forms.NumberInput(attrs={"class": "form-control", "min": 1, "max": 12}),
+            "absence_reason": forms.Textarea(attrs={"class": "form-control", "rows": 2}),
+            "staff_decision_comment": forms.Textarea(attrs={"class": "form-control", "rows": 2}),
+        }
 
 
 class BaseFamilyIncomeDocumentForm(forms.Form):
@@ -45,7 +96,7 @@ class IncomeDocumentForm(BaseFamilyIncomeDocumentForm):
     owner_name = forms.CharField(label="Чей документ", max_length=255)
     gross_amount = forms.DecimalField(label="Общая сумма дохода", max_digits=14, decimal_places=2, required=False)
     net_amount = forms.DecimalField(label="Сумма за вычетом налога", max_digits=14, decimal_places=2, required=False)
-    average_monthly_amount = forms.DecimalField(label="Средний доход за год", max_digits=14, decimal_places=2, required=False)
+    average_monthly_amount = forms.DecimalField(label="Средний доход в месяц", max_digits=14, decimal_places=2, required=False)
 
     def __init__(self, *args, evidence=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -57,22 +108,17 @@ class IncomeDocumentForm(BaseFamilyIncomeDocumentForm):
 
 class SocialBenefitDocumentForm(BaseFamilyIncomeDocumentForm):
     recipient_name = forms.CharField(label="Чья справка", max_length=255)
-    benefit_type = forms.ModelChoiceField(label="Какие выплаты получает семья", queryset=SocialBenefitType.objects.none())
-    other_benefit_name = forms.CharField(label="Название выплаты", max_length=255, required=False)
+    benefit_description = forms.CharField(
+        label="Описание выплат",
+        required=False,
+        widget=forms.Textarea(attrs={"rows": 3}),
+    )
 
     def __init__(self, *args, evidence=None, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["benefit_type"].queryset = SocialBenefitType.objects.filter(is_active=True)
         if evidence:
-            for field_name in ("recipient_name", "benefit_type", "other_benefit_name"):
+            for field_name in ("recipient_name", "benefit_description"):
                 self.initial[field_name] = getattr(evidence, field_name)
-
-    def clean(self):
-        cleaned_data = super().clean()
-        benefit_type = cleaned_data.get("benefit_type")
-        if benefit_type and benefit_type.is_other and not cleaned_data.get("other_benefit_name", "").strip():
-            self.add_error("other_benefit_name", "Укажите название выплаты.")
-        return cleaned_data
 
 
 class OtherDocumentForm(BaseFamilyIncomeDocumentForm):
