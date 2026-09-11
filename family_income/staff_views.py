@@ -12,8 +12,9 @@ from .forms import (
     FamilyIncomeCaseStaffForm,
     FamilyIncomeDocumentReviewForm,
     IncomeEvidenceStaffForm,
+    FamilyIncomeDecisionForm,
 )
-from .models import FamilyIncomeCase, FamilyIncomeDocument
+from .models import FamilyIncomeCase, FamilyIncomeDocument, FamilyIncomeDecision, FamilyIncomeAuditEvent
 from .notifications import create_family_income_notification
 
 User = get_user_model()
@@ -83,6 +84,7 @@ def _render_page(
     case_form=None,
     review_form_with_error=None,
     income_form_with_error=None,
+    decision_form=None,
     status=200,
 ):
     return render(
@@ -98,6 +100,9 @@ def _render_page(
                 income_form_with_error=income_form_with_error,
             ),
             "active": "family_income_staff",
+            "decision_form": decision_form if decision_form is not None else FamilyIncomeDecisionForm(
+                case=case, initial=case.decisions.filter(year__isnull=True).values("amount_per_member", "comment").first(),
+            ),
             "unapproved_documents_count": case.family_income_documents.exclude(
                 review_status=FamilyIncomeDocument.ReviewStatus.APPROVED,
             ).count(),
@@ -118,6 +123,49 @@ def staff_family_income(request, user_id: int):
         return _render_page(request, user_obj=user_obj, case=case)
 
     form_type = request.POST.get("form_type")
+    if form_type == "save_decision":
+        # Serialize updates for a case, including creation of its current result.
+        case = FamilyIncomeCase.objects.select_for_update().get(pk=case.pk)
+        form = FamilyIncomeDecisionForm(request.POST, case=case)
+        if not form.is_valid():
+            return _render_page(request, user_obj=user_obj, case=case, decision_form=form, status=400)
+        decision = FamilyIncomeDecision.objects.filter(case=case, year__isnull=True).first()
+        before = {} if decision is None else {
+            "amount_per_member": str(decision.amount_per_member) if decision.amount_per_member is not None else None,
+            "comment": decision.comment,
+        }
+        if decision is None:
+            decision = FamilyIncomeDecision(case=case, created_by=request.user)
+        decision.amount_per_member = form.cleaned_data["amount_per_member"]
+        decision.comment = form.cleaned_data["comment"]
+        decision.updated_by = request.user
+        decision.save()
+        FamilyIncomeAuditEvent.objects.create(
+            case=case, actor=request.user, action="save_decision",
+            target_model="FamilyIncomeDecision", target_id=decision.pk,
+            before=before,
+            after={"amount_per_member": str(decision.amount_per_member), "comment": decision.comment},
+            reason=decision.comment,
+        )
+        messages.success(request, "Итоговый доход сохранён.")
+        return redirect("staff_family_income", user_id=user_obj.pk)
+
+    if form_type == "reopen_case":
+        case = FamilyIncomeCase.objects.select_for_update().get(pk=case.pk)
+        if case.status != FamilyIncomeCase.Status.APPROVED:
+            messages.error(request, "Вернуть на проверку можно только подтверждённую карточку.")
+            return redirect("staff_family_income", user_id=user_obj.pk)
+        previous_status = case.status
+        case.status = FamilyIncomeCase.Status.PENDING_REVIEW
+        case.save(update_fields=("status", "updated_at"))
+        FamilyIncomeAuditEvent.objects.create(
+            case=case, actor=request.user, action="reopen_case",
+            target_model="FamilyIncomeCase", target_id=case.pk,
+            before={"status": previous_status}, after={"status": case.status},
+        )
+        messages.success(request, "Карточка возвращена на проверку.")
+        return redirect("staff_family_income", user_id=user_obj.pk)
+
     if form_type == "update_case":
         case_form = FamilyIncomeCaseStaffForm(request.POST, instance=case)
         if case_form.is_valid():

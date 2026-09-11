@@ -3,6 +3,22 @@ from django import forms
 from .models import FamilyIncomeCase, FamilyIncomeDocument, IncomeEvidence, IncomeYear
 
 
+class FamilyIncomeDecisionForm(forms.Form):
+    amount_per_member = forms.DecimalField(
+        label="Среднемесячный доход на члена семьи, ₽",
+        max_digits=14, decimal_places=2, min_value=0,
+        widget=forms.NumberInput(attrs={"step": "0.01", "min": "0"}),
+    )
+    comment = forms.CharField(label="Пояснение", widget=forms.Textarea(attrs={"rows": 2}))
+
+    def __init__(self, *args, case, **kwargs):
+        super().__init__(*args, **kwargs)
+        for field in self.fields.values():
+            field.widget.attrs.setdefault(
+                "class", "form-select" if isinstance(field.widget, forms.Select) else "form-control"
+            )
+
+
 class FamilyIncomeCaseForm(forms.ModelForm):
     class Meta:
         model = FamilyIncomeCase

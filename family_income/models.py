@@ -125,7 +125,7 @@ class SocialBenefitEvidence(models.Model):
 
 class FamilyIncomeDecision(models.Model):
     case = models.ForeignKey(FamilyIncomeCase, on_delete=models.CASCADE, related_name="decisions", verbose_name="Карточка")
-    year = models.ForeignKey(IncomeYear, on_delete=models.PROTECT, related_name="decisions", verbose_name="Год")
+    year = models.ForeignKey(IncomeYear, on_delete=models.PROTECT, related_name="decisions", verbose_name="Год архивного итога", null=True, blank=True)
     amount_per_member = models.DecimalField("Среднемесячный доход на члена семьи", max_digits=14, decimal_places=2, null=True, blank=True)
     comment = models.TextField("Пояснение")
     is_low_income_recognized = models.BooleanField("Семья признана малоимущей за год", null=True, blank=True)
@@ -135,12 +135,15 @@ class FamilyIncomeDecision(models.Model):
     updated_at = models.DateTimeField("Изменено", auto_now=True)
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=("case", "year"), name="family_income_unique_decision_year")]
+        constraints = [
+            models.UniqueConstraint(fields=("case", "year"), name="family_income_unique_decision_year"),
+            models.UniqueConstraint(fields=("case",), condition=Q(year__isnull=True), name="family_income_unique_current_decision"),
+        ]
         verbose_name = "Ручной итог дохода"
         verbose_name_plural = "Ручные итоги дохода"
 
     def __str__(self):
-        return f"{self.case} — {self.year}"
+        return f"{self.case} — {self.year if self.year_id else 'Текущий итог'}"
 
 
 class FamilyIncomeInstruction(models.Model):

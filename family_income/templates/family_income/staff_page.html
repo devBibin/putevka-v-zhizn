@@ -41,12 +41,20 @@
       </div>
     </section>
 
+    <section class="card mb-4">
+      <div class="card-header">Итоговый доход</div>
+      <div class="card-body">
+        <p class="text-muted">Текущий среднемесячный доход на одного члена семьи, рассчитанный сотрудником вручную. Итог и пояснение видны только сотрудникам.</p>
+        {% include "family_income/decision_form.html" with form=decision_form %}
+      </div>
+    </section>
+
     <section class="card border-success mb-4">
       <div class="card-body d-flex flex-wrap align-items-center justify-content-between gap-3">
         <div>
           <h2 class="h5 mb-1">Решение по карточке</h2>
           {% if case.status == 'approved' %}
-            <p class="mb-0 text-success">Карточка уже подтверждена. Соискатель получил уведомление.</p>
+            <p class="mb-0 text-success">Карточка подтверждена. Итоговый доход можно изменить. Для повторной проверки нажмите «Вернуть на проверку».</p>
           {% elif case.status == 'pending_review' and unapproved_documents_count %}
             <p class="mb-0 text-muted">Перед подтверждением завершите проверку документов: осталось {{ unapproved_documents_count }}.</p>
           {% elif case.status == 'pending_review' %}
@@ -55,7 +63,13 @@
             <p class="mb-0 text-muted">Карточку можно подтвердить после отправки соискателем на проверку.</p>
           {% endif %}
         </div>
-        {% if case.status == 'pending_review' and not unapproved_documents_count %}
+        {% if case.status == 'approved' %}
+          <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="form_type" value="reopen_case">
+            <button class="btn btn-outline-primary">Вернуть на проверку</button>
+          </form>
+        {% elif case.status == 'pending_review' and not unapproved_documents_count %}
           <form method="post">
             {% csrf_token %}
             <input type="hidden" name="form_type" value="approve_case">

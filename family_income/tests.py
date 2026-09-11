@@ -288,6 +288,98 @@ class FamilyIncomeUserFlowTests(TestCase):
 
 
 class FamilyIncomeStaffViewTests(TestCase):
+    def _save_decision(self, **overrides):
+        data = {"form_type": "save_decision",
+                "amount_per_member": "1234.50", "comment": "Ручной расчёт"}
+        data.update(overrides)
+        return self.client.post(reverse("staff_family_income", args=[self.candidate.pk]), data)
+
+    def test_manual_results_in_all_statuses_and_audit(self):
+        self.client.force_login(self.staff)
+        for status in FamilyIncomeCase.Status.values:
+            self.case.status = status
+            self.case.save()
+            self.assertEqual(self._save_decision().status_code, 302)
+            self.case.refresh_from_db()
+            self.assertEqual(self.case.status, status)
+        self.assertEqual(self.case.decisions.count(), 1)
+        decision = self.case.decisions.get()
+        self.assertEqual(decision.created_by, self.staff)
+        editor = User.objects.create_user(username="second-editor", is_staff=True)
+        self.client.force_login(editor)
+        self.assertEqual(self._save_decision(amount_per_member="0").status_code, 302)
+        decision.refresh_from_db()
+        self.assertEqual(decision.amount_per_member, 0)
+        self.assertEqual(decision.created_by, self.staff)
+        self.assertEqual(decision.updated_by, editor)
+        event = self.case.audit_events.first()
+        self.assertEqual(event.before["amount_per_member"], "1234.50")
+        self.assertEqual(event.actor, editor)
+        other_year = IncomeYear.objects.get(year=2026)
+        self._save_decision(year=other_year.pk)
+        self.assertEqual(self.case.decisions.count(), 1)
+        self.assertIsNone(self.case.decisions.get().year_id)
+
+    def test_invalid_manual_result_and_form_without_year(self):
+        self.client.force_login(self.staff)
+        for overrides in ({"amount_per_member": ""}, {"amount_per_member": "-1"},
+                          {"amount_per_member": "1.234"}, {"comment": "  "}):
+            response = self._save_decision(**overrides)
+            self.assertEqual(response.status_code, 400)
+            self.assertTrue(response.context["decision_form"].errors)
+        self.assertEqual(self.case.decisions.count(), 0)
+        self.assertEqual(self.case.audit_events.count(), 0)
+        self.assertEqual(self._save_decision().status_code, 302)
+        response = self.client.get(reverse("staff_family_income", args=[self.candidate.pk]))
+        self.assertNotIn("year", response.context["decision_form"].fields)
+        self.assertEqual(response.context["decision_form"].initial["comment"], "Ручной расчёт")
+
+    def test_reopen_preserves_data_and_allows_reapproval(self):
+        self.client.force_login(self.staff)
+        self._save_decision()
+        item = self._document(FamilyIncomeDocument.Category.OTHER)
+        item.review_status = FamilyIncomeDocument.ReviewStatus.APPROVED
+        item.save()
+        self.case.status = FamilyIncomeCase.Status.APPROVED
+        self.case.save()
+        url = reverse("staff_family_income", args=[self.candidate.pk])
+        response = self.client.get(url)
+        self.assertContains(response, "Вернуть на проверку")
+        self.assertContains(response, "Сохранить сведения о семье")
+        notifications_before = UserNotification.objects.count()
+        self.assertEqual(self.client.post(url, {"form_type": "reopen_case"}).status_code, 302)
+        self.case.refresh_from_db()
+        item.refresh_from_db()
+        self.assertEqual(self.case.status, FamilyIncomeCase.Status.PENDING_REVIEW)
+        self.assertEqual(item.review_status, FamilyIncomeDocument.ReviewStatus.APPROVED)
+        self.assertEqual(self.case.decisions.count(), 1)
+        self.assertEqual(UserNotification.objects.count(), notifications_before)
+        self.assertEqual(self.case.audit_events.first().action, "reopen_case")
+        self.assertContains(self.client.get(url), "Подтвердить карточку")
+        self.client.post(url, {"form_type": "approve_case"})
+        self.case.refresh_from_db()
+        self.assertEqual(self.case.status, FamilyIncomeCase.Status.APPROVED)
+
+    def test_reopen_only_approved_and_results_private(self):
+        url = reverse("staff_family_income", args=[self.candidate.pk])
+        self.client.force_login(self.staff)
+        for status in (FamilyIncomeCase.Status.REVISION, FamilyIncomeCase.Status.STAFF_DRAFT,
+                       FamilyIncomeCase.Status.PENDING_REVIEW):
+            self.case.status = status
+            self.case.save()
+            self.client.post(url, {"form_type": "reopen_case"})
+            self.case.refresh_from_db()
+            self.assertEqual(self.case.status, status)
+        self.assertEqual(self.case.audit_events.count(), 0)
+        self._save_decision(comment="Секретное пояснение итога")
+        self.client.force_login(self.candidate)
+        response = self.client.get(reverse("family_income:page"))
+        self.assertNotContains(response, "Секретное пояснение итога")
+        self.assertFalse(response.context["editable"])
+        self.assertEqual(self._save_decision().status_code, 302)
+        self.assertEqual(self.client.post(url, {"form_type": "reopen_case"}).status_code, 302)
+        self.assertEqual(self.case.audit_events.count(), 1)
+
     def setUp(self):
         self.staff = User.objects.create_user(
             username="staff", password="password", is_staff=True
