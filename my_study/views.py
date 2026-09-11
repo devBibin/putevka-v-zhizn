@@ -36,6 +36,8 @@ def schools_and_courses(request):
     paginator = Paginator(qs, 12)
     page = request.GET.get("page")
     courses = paginator.get_page(page)
+    pagination_params = request.GET.copy()
+    pagination_params.pop("page", None)
 
     selections = (
         CourseSelection.objects
@@ -48,6 +50,7 @@ def schools_and_courses(request):
         "subjects": subjects,
         "schools": schools,
         "courses": courses,
+        "pagination_query": pagination_params.urlencode(),
         "filter_form": form,
         "selected_school": request.GET.get("school"),
         "selections": selections,
